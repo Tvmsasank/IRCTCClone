@@ -1,4 +1,6 @@
-﻿@{
+﻿@model IrctcClone.Models.ViewModels
+
+@{
     ViewData["Title"] = "Login";
     Layout = "~/Views/Shared/_Layout.cshtml";
 }
@@ -6,18 +8,6 @@
 <section class="page-centered">
     <div class="card auth-card">
         <h2>Login</h2>
-
-        <!-- Display validation summary -->
-        @if (!ViewData.ModelState.IsValid)
-        {
-            <div class="validation-summary">
-                @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
-                {
-                    <p>@error.ErrorMessage</p>
-                }
-            </div>
-        }
-
         <form method="post" action="/Account/Login" class="auth-form">
             <label>
                 Email

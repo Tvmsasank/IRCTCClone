@@ -1,23 +1,46 @@
-﻿@model IrctcClone.Models.Station
+﻿@model IRCTCClone.Models.Station
 @{
     ViewData["Title"] = "Add Station";
 }
 
 <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
-<div class="station-card">
-    <h3>🚉 Add New Station</h3>
-    <form method="post" asp-action="CreateStation">
-        <div class="mb-3 d-sm-block w-25">
-            <label class="form-label">Station Code</label>
-            <input asp-for="Code" class="form-control" placeholder="e.g. SC" required />
-        </div>
 
-        <div class="mb-3 d-sm-grid w-25">
-            <label class="form-label">Station Name</label>
-            <input asp-for="Name" class="form-control" placeholder="e.g. Secunderabad" required />
-        </div>
+<div class="container mt-4">
+    <div class="card shadow-sm p-4">
+        <h3 class="text-primary mb-4">🚉 Add New Station</h3>
 
-        <button type="submit" class="btn btn-primary mb-0">💾 Save Station</button>
-        <a asp-action="StationList" class="btn btn-secondary">↩ Cancel</a>
-    </form>
+        <!-- ✅ Alert Messages -->
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                @TempData["SuccessMessage"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                @TempData["ErrorMessage"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        <form method="post" asp-action="CreateStation">
+            <div class="mb-3 w-50">
+                <label class="form-label fw-semibold">Station Code</label>
+                <input asp-for="Code" class="form-control" placeholder="e.g. SC" required />
+            </div>
+
+            <div class="mb-3 w-50">
+                <label class="form-label fw-semibold">Station Name</label>
+                <input asp-for="Name" class="form-control" placeholder="e.g. SECUNDERABAD JN" required />
+            </div>
+
+            <div class="mt-3">
+                <button type="submit" class="btn btn-primary me-2">💾 Save Station</button>
+                <a asp-action="StationList" class="btn btn-outline-secondary">↩ Cancel</a>
+            </div>
+        </form>
+    </div>
 </div>

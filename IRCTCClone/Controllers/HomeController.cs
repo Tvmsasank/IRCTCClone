@@ -1,9 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;   // ✅ Add this
-using IrctcClone.Models;  // For Station, Train, etc.
-using IrctcClone.Data;
+using IRCTCClone.Models;  // For Station, Train, etc.
+using IRCTCClone.Data;
 
-namespace IrctcClone.Controllers
+namespace IRCTCClone.Controllers
 {
     public class HomeController : Controller
     {

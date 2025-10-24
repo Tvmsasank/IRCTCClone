@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Identity;
 
-namespace IrctcClone.Models
+namespace IRCTCClone.Models
 {
     public class ApplicationUser : IdentityUser
     {

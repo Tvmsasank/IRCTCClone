@@ -1,0 +1,33 @@
+﻿@model IRCTCClone.Models.Station
+@{
+    ViewData["Title"] = "Edit Station";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="container mt-5">
+    <div class="card shadow-lg p-4">
+        <h3 class="text-center mb-4">Edit Station</h3>
+
+        <form asp-action="EditStation" method="post" class="needs-validation" novalidate>
+            <input type="hidden" asp-for="Id" />
+
+            <div class="mb-3">
+                <label asp-for="Code" class="form-label fw-bold">Station Code</label>
+                <input asp-for="Code" class="form-control" placeholder="Enter Station Code" required />
+                <span asp-validation-for="Code" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Name" class="form-label fw-bold">Station Name</label>
+                <input asp-for="Name" class="form-control" placeholder="Enter Station Name" required />
+                <span asp-validation-for="Name" class="text-danger"></span>
+            </div>
+
+            <div class="d-flex justify-content-between mt-4">
+                <a asp-action="StationList" class="btn btn-secondary">Back to List</a>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+

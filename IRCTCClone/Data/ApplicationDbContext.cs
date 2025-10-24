@@ -1,7 +1,7 @@
 ﻿using Microsoft.Data.SqlClient;
-using IrctcClone.Models;
+using IRCTCClone.Models;
 
-namespace IrctcClone.Data
+namespace IRCTCClone.Data
 {
     public class Database
     {

@@ -1,4 +1,4 @@
-﻿using IrctcClone.Data;
+﻿using IRCTCClone.Data;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Authentication.Cookies;

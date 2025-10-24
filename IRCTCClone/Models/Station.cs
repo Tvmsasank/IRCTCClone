@@ -1,4 +1,4 @@
-﻿namespace IrctcClone.Models
+﻿namespace IRCTCClone.Models
 {
     public class Station
     {

@@ -1,15 +1,6 @@
 ﻿// --- Small helper for AJAX station autocomplete ---
-function searchStations(query, callback) {
-    $.ajax({
-        url: '/Train/SearchStations', // corrected to match your controller method
-        data: { term: query },
-        success: function (data) {
-            callback(data);
-        }
-    });
-}
 
-// --- Autocomplete Setup Function ---
+/*// --- Autocomplete Setup Function ---
 function setupAutocomplete(inputId, listId) {
     const $input = $("#" + inputId);
     const $list = $("#" + listId);
@@ -49,7 +40,7 @@ function setupAutocomplete(inputId, listId) {
             $list.hide();
         }
     });
-}
+}*/
 
 // --- DOM Ready ---
 $(document).ready(function () {
@@ -123,3 +114,32 @@ $(document).ready(function () {
         };
     }
 });
+
+
+
+
+
+//function searchStations(query, callback) {
+//    $.ajax({
+//        url: '/Train/SearchStations', // corrected to match your controller method
+//        data: { term: query },
+//        success: function (data) {
+//            callback(data);
+//        }
+//    });
+//}
+function togglePasswordVisibility() {
+    const passwordField = document.getElementById('passwordmain');
+    const icon = document.querySelector('#togglePassword i');
+
+    // Toggle the type of the input between 'password' and 'text'
+    if (passwordField.type === 'password') {
+        passwordField.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        passwordField.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+}

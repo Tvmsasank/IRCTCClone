@@ -1,10 +1,10 @@
-﻿using IrctcClone.Models;
+﻿using IRCTCClone.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using System;
 using System.Collections.Generic;
 
-namespace IrctcClone.Controllers
+namespace IRCTCClone.Controllers
 {
     public class TrainController : Controller
     {

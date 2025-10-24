@@ -1,6 +1,7 @@
 ﻿using System.Runtime.CompilerServices;
+using IRCTCClone.Models;
 
-namespace IrctcClone.Models
+namespace IRCTCClone.Models
 {
     public class Booking
     {

@@ -1,4 +1,6 @@
-﻿@{
+﻿
+
+@{
     ViewData["Title"] = "Admin Dashboard";
 }
 
@@ -27,8 +29,8 @@
                         asp-action="CreateTrain" asp-controller="Admin">Add Train</a>
                 </li>
                 <li>
-                    <a class="dropdown-item text-black" 
-                        asp-action="Edittrain" asp-controller="Admin">Edit/Delete Trains</a>
+                    <a class="dropdown-item text-black"
+                       asp-controller="Admin" asp-action="TrainList" class="btn btn-warning btn-sm">Edit/Delete Trains</a>
                 </li>
             </ul>
          </div>

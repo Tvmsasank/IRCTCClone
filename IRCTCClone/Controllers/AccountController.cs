@@ -1,4 +1,4 @@
-﻿using IrctcClone.ViewModels;
+﻿using IrctcClone.Models;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
@@ -7,7 +7,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace IrctcClone.Controllers
+namespace IRCTCClone.Controllers
 {
     public class AccountController : Controller
     {
@@ -19,15 +19,15 @@ namespace IrctcClone.Controllers
         }
 
         [HttpGet]
-        public IActionResult Login(string returnUrl = null)
+        public IActionResult Login()
         {
             // Pass ReturnUrl to View via ViewData
-            ViewData["ReturnUrl"] = returnUrl;
-            return View(new LoginVM());
+       
+            return View(new ViewModels());
         }
 
         [HttpPost]
-        public async Task<IActionResult> Login(LoginVM model, string returnUrl = null)
+        public async Task<IActionResult> Login(ViewModels model)
         {
             if (!ModelState.IsValid) return View(model);
 
@@ -58,11 +58,11 @@ namespace IrctcClone.Controllers
             var principal = new ClaimsPrincipal(identity);
             await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
 
-            // Redirect to booking page if present
-            if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
-            {
-                return Redirect(returnUrl);
-            }
+            //// Redirect to booking page if present
+            //if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+            //{
+            //    return Redirect(returnUrl);
+            //}
 
             return RedirectToAction("Index", "Home");
         }
@@ -85,11 +85,11 @@ namespace IrctcClone.Controllers
         [HttpGet]
         public IActionResult Register()
         {
-            return View(new RegisterVM());
+            return View(new RegisterViewModel());
         }
 
         [HttpPost]
-        public IActionResult Register(RegisterVM model)
+        public IActionResult Register(RegisterViewModel model)
         {
             if (!ModelState.IsValid) return View(model);
 

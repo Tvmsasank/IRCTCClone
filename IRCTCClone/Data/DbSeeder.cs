@@ -1,7 +1,7 @@
-﻿using IrctcClone.Models;
+﻿using IRCTCClone.Models;
 using Microsoft.Data.SqlClient;
 
-namespace IrctcClone.Data
+namespace IRCTCClone.Data
 {
     public static class DbSeeder
     {

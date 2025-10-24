@@ -1,4 +1,4 @@
-﻿namespace IrctcClone.Models
+﻿namespace IRCTCClone.Models
 {
     public class Train
     {
@@ -12,6 +12,8 @@
         public TimeSpan Departure { get; set; }
         public TimeSpan Arrival { get; set; }
         public TimeSpan Duration { get; set; }
+        public String FromStationName { get; set; } // ✅ use this
+        public String ToStationName { get; set; }   // ✅ use this
         public List<TrainClass> Classes { get; set; } = new();
     }
 }

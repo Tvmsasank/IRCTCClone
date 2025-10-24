@@ -1,0 +1,166 @@
+﻿@model IRCTCClone.Models.Train
+@{
+    ViewData["Title"] = "Add New Train";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<div class="container mt-4">
+    <h2 class="mb-4 text-primary">Add New Train</h2>
+
+    <!-- ✅ Alert Messages -->
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            @TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <form asp-action="CreateTrain" method="post">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="fw-bold mb-3">Train Details</h5>
+
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Train Number</label>
+                        <input asp-for="Number" class="form-control" required />
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label">Train Name</label>
+                        <input asp-for="Name" class="form-control" required />
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">From Station</label>
+                        <select asp-for="FromStationId" class="form-select" required>
+                            <option value="">Select Station</option>
+                            @foreach (var station in ViewBag.Stations as List<IRCTCClone.Models.Station>)
+                            {
+                                <option value="@station.Id">@station.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">To Station</label>
+                        <select asp-for="ToStationId" class="form-select" required>
+                            <option value="">Select Station</option>
+                            @foreach (var station in ViewBag.Stations as List<IRCTCClone.Models.Station>)
+                            {
+                                <option value="@station.Id">@station.Name</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Departure Time</label>
+                        <input asp-for="Departure" type="time" class="form-control" required />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Arrival Time</label>
+                        <input asp-for="Arrival" type="time" class="form-control" required />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Duration</label>
+                        <input asp-for="Duration" class="form-control" placeholder="e.g. 00:00" required />
+                    </div>
+                </div>
+
+                <hr />
+                <h5 class="fw-bold mb-3">Train Classes</h5>
+                <table class="table table-bordered align-middle" id="classTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Class Code</th>
+                            <th>Fare</th>
+                            <th>Seats</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><input name="classCodes" class="form-control" placeholder="e.g. 1A, 2A, SL" required /></td>
+                            <td><input name="fares" type="number" step="0.01" class="form-control" placeholder="Fare" required /></td>
+                            <td><input name="seats" type="number" class="form-control" placeholder="Seats" required /></td>
+                            <td><button type="button" class="btn btn-danger btn-sm remove-row">X</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+                <button type="button" id="addClassRow" class="btn btn-secondary btn-sm mb-3">+ Add Class</button>
+
+                <div class="text-end">
+                    <button type="submit" class="btn btn-primary">Save Train</button>
+                    <a asp-action="TrainList" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+@section Scripts { 
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const addBtn = document.getElementById("addClassRow");
+            const tableBody = document.querySelector("#classTable tbody");
+
+            addBtn.addEventListener("click", function () {
+                const newRow = document.createElement("tr");
+                newRow.innerHTML = `
+                    <td><input name="classCodes" class="form-control" placeholder="e.g. 1A, 2A, SL" required></td>
+                    <td><input name="fares" type="number" step="0.01" class="form-control" placeholder="Fare" required></td>
+                    <td><input name="seats" type="number" class="form-control" placeholder="Seats" required></td>
+                    <td><button type="button" class="btn btn-danger btn-sm remove-row">X</button></td>
+                `;
+                tableBody.appendChild(newRow);
+            });
+
+            // Delegate remove-row click
+            tableBody.addEventListener("click", function (e) {
+                if (e.target.classList.contains("remove-row")) {
+                    e.target.closest("tr").remove();
+                }
+            });
+        });
+
+    </script>
+}
+
+@* <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script> *@
+
+@* @if (TempData["SuccessMessage"] != null)
+{
+    <script>
+        Swal.fire({
+            icon: 'success',
+            text: '@TempData["SuccessMessage"]',
+            confirmButtonColor: '#3085d6'
+        });
+    </script>
+}
+
+@if (TempData["ErrorMessage"] != null)
+{
+    <script>
+        Swal.fire({
+            icon: 'error',
+            title: 'Duplicate Station',
+            text: '@TempData["ErrorMessage"]',
+            confirmButtonColor: '#d33'
+        });
+    </script>
+}
+ *@

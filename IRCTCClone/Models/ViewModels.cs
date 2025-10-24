@@ -1,6 +1,6 @@
-﻿namespace IrctcClone.ViewModels
+﻿namespace IrctcClone.Models
 {
-    public class LoginVM
+    public class ViewModels
     {
         public string Email { get; set; } = string.Empty;
         public string Password { get; set; } = string.Empty;

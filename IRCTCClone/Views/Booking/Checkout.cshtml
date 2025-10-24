@@ -1,10 +1,12 @@
-﻿@{
+﻿@model IRCTCClone.Models.Train;
+
+@{
     ViewData["Title"] = "Booking Details";
 }
 
 @{
-    var train = ViewBag.Train as IrctcClone.Models.Train;
-    var cls = ViewBag.Class as IrctcClone.Models.TrainClass;
+    var train = ViewBag.Train as IRCTCClone.Models.Train;
+    var cls = ViewBag.Class as IRCTCClone.Models.TrainClass;
     var journey = ViewBag.JourneyDate as string ?? DateTime.Today.ToString("yyyy-MM-dd");
 }
 

@@ -1,0 +1,170 @@
+﻿@model IEnumerable<IRCTCClone.Models.Train>
+
+@{
+    ViewData["Title"] = "Train List";
+}
+
+@* If your _Layout already includes Bootstrap, remove the link/script below. They are included here to make this view self-contained for testing. *@
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<div class="container py-4">
+    <h2 class="mb-3">Train List</h2>
+
+    @if (!Model.Any())
+{
+    <div class="alert alert-info text-center">
+        No trains available at the moment.
+    </div>
+}
+else 
+{
+
+    <table class="table table-bordered table-hover">
+        <thead class="table-light">
+            <tr>
+                <th>Number</th>
+                <th>Name</th>
+                <th>From</th>
+                <th>To</th>
+                <th>Departure</th>
+                <th>Arrival</th>
+                <th>Duration</th>
+                <th class="text-center">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var train in Model)
+            {
+                <tr>
+                    <td>@train.Number</td>
+                    <td>@train.Name</td>
+                    <td>@train.FromStation?.Name</td>
+                    <td>@train.ToStation?.Name</td>
+                    <td>@train.Departure</td>
+                    <td>@train.Arrival</td>
+                    <td>@train.Duration</td>
+                    <td class="text-center">
+                        <a asp-controller="Admin" asp-action="EditTrain" asp-route-id="@train.Id" class="btn btn-sm btn-warning me-1">Edit</a>
+
+                        <!-- Delete = only opens modal (no immediate navigation) -->
+                        <button type="button" class="btn btn-sm btn-danger"
+                                data-bs-toggle="modal"
+                                data-bs-target="#deleteModal"
+                                data-train-id="@train.Id"
+                                data-train-name="@train.Name">
+                            <i class="bi bi-trash"></i> Delete
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    }
+</div>
+
+@* Small centered confirmation modal (single instance) *@
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-danger text-white">
+                <div class="d-flex align-items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-exclamation-triangle-fill" viewBox="0 0 16 16">
+                        <path d="M8.982 1.566a1.13 1.13 0 0 0-1.964 0L.165 13.233c-.457.778.091 1.767.982 1.767h13.706c.89 0 1.438-.99.982-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 7a1 1 0 1 1-2 0 1 1 0 0 1 2 0z" />
+                    </svg>
+                    <h5 class="modal-title mb-0" id="deleteModalLabel">Confirm Deletion</h5>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body text-center">
+                <p class="mb-1">Are you sure you want to delete train</p>
+                <p class="h6 fw-bold mb-2" id="trainName"></p>
+                <p class="text-warning small mb-0">This action cannot be undone!</p>
+            </div>
+
+            <div class="modal-footer justify-content-center">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+
+                @* Use GET or POST to your Delete action. Prefer POST for destructive ops; using GET here to match your existing DeleteTrain GET. *@
+                <a id="confirmDeleteBtn" class="btn btn-danger btn-sm" href="#">Delete</a>
+            </div>
+        </div> 
+    </div>
+</div>
+
+@* Bootstrap JS (bundle) - ensure this is present and loaded BEFORE the script below.
+   If your _Layout already loads bootstrap.bundle, remove this line. *@
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+@section Scripts {
+    <script>
+        // This script uses bootstrap's modal 'show.bs.modal' event.
+        // Make sure bootstrap.bundle is loaded (above or in layout) or this won't fire.
+        document.addEventListener("DOMContentLoaded", function () {
+            var deleteModalEl = document.getElementById('deleteModal');
+            if (!deleteModalEl) return;
+
+            var trainNameSpan = document.getElementById('trainName');
+            var confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+
+            // Listen for the bootstrap show event
+            deleteModalEl.addEventListener('show.bs.modal', function (event) {
+                var button = event.relatedTarget; // button that triggered the modal
+                var trainId = button.getAttribute('data-train-id');
+                var trainName = button.getAttribute('data-train-name');
+
+                // populate modal fields
+                trainNameSpan.textContent = trainName || '';
+                confirmDeleteBtn.setAttribute('href', '/Admin/DeleteTrain/' + trainId);
+            });
+        });
+    </script>
+}
+
+
+
+
+@* <table class="table table-bordered">
+    <thead>
+        <tr>
+            <th>Number</th>
+            <th>Name</th>
+            <th>From</th>
+            <th>To</th>
+            <th>Departure</th>
+            <th>Arrival</th>
+            <th>Duration</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var train in Model)
+        {
+            <tr>
+                <td>@train.Number</td>
+                <td>@train.Name</td>
+                <td>@train.FromStation?.Name</td>
+                <td>@train.ToStation?.Name</td>
+                <td>@train.Departure</td>
+                <td>@train.Arrival</td>
+                <td>@train.Duration</td>
+          <td>
+                    <a asp-controller="Admin" asp-action="EditTrain" asp-route-id="@train.Id" class="btn btn-sm btn-warning">Edit</a>
+                    <a asp-controller="Admin" asp-action="DeleteTrain" asp-route-id="@train.Id" class="btn btn-sm btn-danger">Delete</a>
+                </td> 
+                <td>
+                    <a asp-controller="Admin" asp-action="EditTrain" asp-route-id="@train.Id" class="btn btn-sm btn-warning">Edit</a>
+                    <button type="button" class="btn btn-sm btn-danger delete-btn"
+                            data-bs-toggle="modal" data-bs-target="#deleteModal"
+                            data-train-id="@train.Id"
+                            data-train-name="@train.Name">
+                        Delete
+                    </button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+ *@

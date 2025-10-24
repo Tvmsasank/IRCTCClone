@@ -1,6 +1,6 @@
 ﻿using Microsoft.Data.SqlClient;
 
-namespace IrctcClone.db
+namespace IRCTCClone.db
 {
     public class SqlConnectionHelper
     {
