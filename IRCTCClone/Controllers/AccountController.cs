@@ -117,10 +117,11 @@ namespace IrctcClone.Controllers
 
                 // Insert new user
                 using (var cmd = new SqlCommand(
-                    "INSERT INTO Usrs (Email, PasswordHash) VALUES (@Email, @PasswordHash)", conn))
+                    "INSERT INTO Usrs (Email, PasswordHash, FullName) VALUES (@Email, @PasswordHash, @FullName)", conn))
                 {
                     cmd.Parameters.AddWithValue("@Email", model.Email);
                     cmd.Parameters.AddWithValue("@PasswordHash", HashPassword(model.Password));
+                    cmd.Parameters.AddWithValue("@FullName", (model.FullName));
                     cmd.ExecuteNonQuery();
                 }
             }
