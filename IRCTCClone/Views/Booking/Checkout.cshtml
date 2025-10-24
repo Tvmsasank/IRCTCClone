@@ -1,0 +1,73 @@
+﻿@{
+    ViewData["Title"] = "Booking Details";
+}
+
+@{
+    var train = ViewBag.Train as IrctcClone.Models.Train;
+    var cls = ViewBag.Class as IrctcClone.Models.TrainClass;
+    var journey = ViewBag.JourneyDate as string ?? DateTime.Today.ToString("yyyy-MM-dd");
+}
+
+<section class="checkout-page">
+    <div class="checkout-card">
+        <h2>Booking Details</h2>
+
+@if (train != null && cls != null)
+{
+    <div class="train-info">
+        <p><strong>Train:</strong> @train.Number - @train.Name</p>
+        <p><strong>Class:</strong> @cls.Code, Fare: ₹@cls.Fare</p>
+        <p><strong>Route:</strong> @train.FromStation?.Name (@train.FromStation?.Code) → @train.ToStation?.Name (@train.ToStation?.Code)</p>
+        <p>
+            <strong>Departure:</strong> @train.Departure.ToString(@"hh\:mm") |
+            <strong>Arrival:</strong> @train.Arrival.ToString(@"hh\:mm") |
+            <strong>Duration:</strong> @train.Duration.ToString(@"hh\:mm")
+        </p>
+    </div>
+            <form method="post" action="/Booking/Confirm" class="checkout-form">
+                <input type="hidden" name="trainId" value="@train.Id" />
+                <input type="hidden" name="classId" value="@cls.Id" />
+                <input type="hidden" name="journeyDate" value="@journey" />
+                <input type="hidden" name="trainName" value="@train.Name" />
+                <input type="hidden" name="trainNumber" value="@train.Number" />
+                <input type="hidden" name="Class" value="@cls.Code" />
+
+
+                <h3>Passengers</h3>
+
+                <div id="passengers">
+                    <div class="passenger-card">
+                        <input name="passengerNames" placeholder="Name" required />
+                        <input name="passengerAges" type="number" placeholder="Age" required />
+                        <select name="passengerGenders" required>
+                            <option value="">Select Gender</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
+                        </select>
+                        <select name="passengerBerths" required>
+                            <option value="">Select Berth</option>
+                            <option value="Lower">Lower</option>
+                            <option value="Middle">Middle</option>
+                            <option value="Upper">Upper</option>
+                            <option value="Side Lower">Side Lower</option>
+                            <option value="Side Upper">Side Upper</option>
+                        </select>
+                        <button type="button" class="remove-passenger">❌</button>
+                    </div>
+                </div>
+                <button type="button" id="addPassenger" class="btn btn-primary mb-2">+ Add Passenger</button>
+
+                <p class="total-fare">
+                    Total Fare: ₹<span id="totalFare" data-fare="@cls.Fare">@cls.Fare</span>
+                </p>
+                <button type="submit" class="btn-primary">Pay & Book (Mock)</button>
+            </form>
+
+}
+else
+{
+    <p class="error-msg">Error: Train or Class data not found.</p>
+}
+</div>
+</section>

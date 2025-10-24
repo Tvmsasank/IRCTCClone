@@ -1,0 +1,38 @@
+﻿@model IrctcClone.Models.Booking
+
+<h2>Booking Details</h2>
+
+<div class="booking-card">
+    <div class="booking-info">
+        <p><strong>PNR:</strong> @Model.PNR</p>
+        <p><strong>Train:</strong> @Model.TrainNumber - @Model.TrainName</p>
+        <p><strong>Class:</strong> @Model.ClassCode</p>
+        <p><strong>Journey Date:</strong> @Model.JourneyDate.ToString("dd-MM-yyyy")</p>
+        <p><strong>Amount:</strong> ₹@Model.Amount</p>
+        <p><strong>Status:</strong> <span class="@(Model.Status == "CONFIRMED" ? "status-confirmed" : "status-cancelled")">@Model.Status</span></p>
+    </div>
+</div>
+
+<h3>Passengers</h3>
+
+<table class="passengers-table">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Age</th>
+            <th>Gender</th>
+            <th>Seat Number</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var p in Model.Passengers)
+        {
+            <tr>
+                <td>@p.Name</td>
+                <td>@p.Age</td>
+                <td>@p.Gender</td>
+                <td>@p.SeatNumber</td>
+            </tr>
+        }
+    </tbody>
+</table>

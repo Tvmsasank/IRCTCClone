@@ -1,0 +1,36 @@
+﻿@{
+    ViewData["Title"] = "Admin Login";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Admin Login</title>
+        <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    </head>
+
+    <body class="bg-light d-flex align-items-center" style="height:100vh;">
+        <div class="container mt-5">
+            <div class="card mt-5 shadow p-4 justify-content-mt-end border-1" style="width: 18rem; height: 20rem">
+                <h3 class="text-center mb-4">Admin Login</h3>
+                <form method="post">
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Username</strong></label>
+                        <input type="text" name="username" class="form-control" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Password</strong></label>
+                        <input type="password" name="password" class="form-control" required />
+                    </div>
+                    
+                    @if (ViewBag.Error != null)
+                    {
+                        <div class="alert alert-danger">@ViewBag.Error</div>
+                    }
+                    <button type="submit" class="btn btn-primary w-10 d-grid col-4 mx-auto">Login</button>
+                </form>
+            </div>
+        </div>
+    </body>
+</html>

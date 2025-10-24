@@ -1,0 +1,40 @@
+﻿@{
+    ViewData["Title"] = "Login";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<section class="page-centered">
+    <div class="card auth-card">
+        <h2>Login</h2>
+
+        <!-- Display validation summary -->
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div class="validation-summary">
+                @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                {
+                    <p>@error.ErrorMessage</p>
+                }
+            </div>
+        }
+
+        <form method="post" action="/Account/Login" class="auth-form">
+            <label>
+                Email
+                <input type="email" name="Email" value="@Model.Email" required />
+            </label>
+
+            <label>
+                Password
+                <input type="password" name="Password" required />
+            </label>
+
+            <div class="auth-actions">
+                <button type="submit" class="btn-primary">Login</button>
+                <a class="link-muted" href="/Account/ForgotPassword">Forgot password?</a>
+            </div>
+        </form>
+
+        <p class="muted small">Don't have an account? <a href="/Account/Register">Register</a></p>
+    </div>
+</section>

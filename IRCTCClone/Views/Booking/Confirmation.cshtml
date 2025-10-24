@@ -1,0 +1,38 @@
+﻿@model IrctcClone.Models.Booking
+
+@{
+    ViewData["Title"] = "Booking Confirmation";
+}
+
+<div class="booking-confirmation">
+    <h2 class="confirmation-title">🎟️ Booking Confirmation</h2>
+
+    <div class="booking-info">
+        <p><strong>PNR:</strong> @Model.PNR</p>
+        <p><strong>Train:</strong> @Model.TrainNumber - @Model.TrainName</p>
+        <p><strong>Journey Date:</strong> @Model.JourneyDate.ToString("dd-MM-yyyy")</p>
+
+        @if (Model.Train != null && Model.JourneyDate != null)
+        {
+            var departureDateTime = Model.JourneyDate.Date + Model.Train.Departure;
+            <p><strong>Scheduled Departure:</strong> @departureDateTime.ToString("dd-MM-yyyy HH:mm")</p>
+        }
+
+        <p><strong>Class:</strong> @Model.ClassCode</p>
+        <p><strong>Amount Paid:</strong> ₹@Model.Amount</p>
+        <p>
+            <strong>Status:</strong>
+            <span class="@(Model.Status == "CONFIRMED" ? "status-confirmed" : "status-cancelled")">
+                @Model.Status
+            </span>
+        </p>
+    </div>
+
+    <h3 class="passenger-heading">👥 Passengers</h3>
+    <ul class="passenger-list">
+        @foreach (var p in Model.Passengers)
+        {
+            <li>@p.Name, @p.Age, @p.Gender — Seat: @p.SeatNumber</li>
+        }
+    </ul>
+</div>

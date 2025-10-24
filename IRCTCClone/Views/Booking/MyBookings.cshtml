@@ -1,0 +1,50 @@
+﻿@model IEnumerable<IrctcClone.Models.Booking>
+
+<h2>My Bookings</h2>
+
+@if (!Model.Any())
+{
+    <p>No bookings found</p>
+}
+else
+{
+    <table class="table table-bordered table-hover">
+        <thead class="table-light">
+            <tr>
+                <th>PNR</th>
+                <th>Train</th>
+                <th>Class</th>
+                <th>Journey Date</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Details</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var b in Model)
+            {
+                <tr>
+                    <td>@b.PNR</td>
+                    <td>@b.TrainNumber - @b.TrainName</td>
+                    <td>@b.ClassCode</td>
+                    <td>@b.JourneyDate.ToString("dd-MM-yyyy")</td>
+                    <td>₹@b.Amount</td>
+                    <td>@b.Status</td>
+                    <td>
+                        <a href="/Booking/Details/@b.BookingId" class="btn btn-info btn-sm">View</a>
+                    </td>
+                    <td>
+                        <form asp-action="Cancel" asp-controller="Booking" method="post" style="display:inline;">
+                            <input type="hidden" name="id" value="@b.BookingId" />
+@*                             <button type="submit" class="btn btn-danger btn-sm"
+                                    onclick="return confirm('Are you sure you want to cancel this booking?');">
+                                Cancel 
+                            </button>  *@
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

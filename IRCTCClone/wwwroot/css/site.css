@@ -1,0 +1,872 @@
+/* ---------- GLOBAL RESET ---------- */
+*{
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: linear-gradient(135deg, #e9f2ff, #d8ebff);
+    color: #222;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ---------- HEADER ---------- */
+.site-header {
+    background: linear-gradient(90deg, #0078d7, #0098ff);
+    color: white;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+    position: sticky;
+    top: 0;
+    width: 100%;
+    z-index: 10;
+}
+
+.header-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 20px;
+}
+
+.logo-section {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.logo {
+    width: 40px;
+    height: 40px;
+}
+
+.brand-name {
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.nav-links a {
+    color: white;
+    text-decoration: none;
+    margin-left: 18px;
+    font-weight: 500;
+    transition: color 0.3s;
+}
+
+    .nav-links a:hover {
+        color: #d1e8ff;
+    }
+
+/* ---------- HOME PAGE ---------- */
+.home-page {
+    flex: 1;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    background: url('https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEg5wIVGScLbfJP-U8NokGAi4UroYmTJFgv9IpImlCoUelTlfmHuu6MlfOT8SxEVK_-EtIM27eg7cYIb6xadkrydWSUaG4amwhc-siq8EFwVo7cyO5Vj5p89tPF7bVnMcIH4n6mTipWogU5ns_RfnwWTAtWRe1OvIM2UWWx9EV4HRDtlTm2LML1vyZ-dIA/s1920/kishore-v-kgH64ekcq4I-unsplash.jpg') no-repeat center center fixed;
+    background-size: cover;
+    padding: 100px 50px;  
+    overflow: hidden;
+}
+
+.search-box {
+    background-color: rgba(255, 255, 255, 0.95);
+    padding: 20px 40px;
+    border-radius: 10px;
+    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.2);
+    max-width: 300px;
+    width: 50%;
+    position: absolute;
+    animation: fadeInUp 0.6s ease-in-out;
+}
+
+    .search-box h2 {
+        text-align: center;
+        color: #0078D7;
+        margin-bottom: 20px;
+    }
+
+    .search-box select,
+    .search-box input[type="date"] {
+        width: 100%;
+        padding: 11px;
+        margin-bottom: 10px;
+        border: 1px solid #b6d6ff;
+        border-radius: 10px;
+        font-size: 15px;
+    }
+
+    .search-box button {
+        width: 100%;
+        padding: 10px;
+        background: linear-gradient(90deg, #0078d7, #00b7ff);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+        .search-box button:hover {
+            background-color: #005fa3;
+            transform: scale(1.03);
+        }
+    .form-control{
+
+    }
+
+/* ---------- FOOTER ---------- */
+.site-footer {
+    background: linear-gradient(90deg, #0078d7, #0098ff);
+    color: white;
+    text-align: center;
+    padding: 15.3px;
+    font-size: 14px;
+    margin-top: auto;
+}
+
+
+/* ---------- LOGIN / REGISTER PAGE STYLING ---------- */
+.page-centered {
+    flex: 1;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    background: url('https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEg5wIVGScLbfJP-U8NokGAi4UroYmTJFgv9IpImlCoUelTlfmHuu6MlfOT8SxEVK_-EtIM27eg7cYIb6xadkrydWSUaG4amwhc-siq8EFwVo7cyO5Vj5p89tPF7bVnMcIH4n6mTipWogU5ns_RfnwWTAtWRe1OvIM2UWWx9EV4HRDtlTm2LML1vyZ-dIA/s1920/kishore-v-kgH64ekcq4I-unsplash.jpg') no-repeat center center fixed;
+    background-size: cover;
+    padding: 40px 20px;
+}
+
+.auth-card {
+    background-color: rgba(255, 255, 255, 0.94);
+    padding: 5px 50px;
+    border-radius: 12px;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
+    max-width: 290px;
+    width: 100%;
+    animation: fadeInUp 0.6s ease-out;
+}
+
+    .auth-card h2 {
+        text-align: center;
+        color: #0078D7;
+        margin-bottom: 25px;
+        font-size: 1.8rem;
+        padding: 1px;
+    }
+
+.auth-form label {
+    padding: 0px;
+    display: block;
+    color: #333;
+    font-weight: 500;
+    margin-bottom: 15px;
+    font-size: 15px;
+}
+
+.auth-form input {
+    width: 100%;
+    padding: 9px;
+    margin-top: 1px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 15px;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+    .auth-form input:focus {
+        border-color: #0078D7;
+        box-shadow: 0 0 5px rgba(0, 120, 215, 0.4);
+        outline: none;
+    }
+
+.auth-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+}
+
+.btn-primary {
+    background: linear-gradient(90deg, #0078d7, #00b7ff);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 15px;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+    .btn-primary:hover {
+        background-color: #005fa3;
+        transform: scale(1.03);
+    }
+
+.link-muted {
+    color: #0078D7;
+    font-size: 14px;
+    text-decoration: none;
+}
+
+    .link-muted:hover {
+        text-decoration: underline;
+    }
+
+.muted {
+    text-align: center;
+    color: #555;
+    margin-top: 20px;
+    font-size: 14px;
+}
+
+    .muted a {
+        color: #0078D7;
+        text-decoration: none;
+    }
+
+        .muted a:hover {
+            text-decoration: underline;
+        }
+
+/* ---------- ANIMATIONS ---------- */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/*/* ---------- LAYOUT FIX FOR FOOTER ALIGNMENT ---------- */
+html, body {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+/*
+ Ensure auth pages and home pages don't push footer down unnecessarily */
+.page-centered {
+    flex: 1;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 40px 80px 0 20px;  reduced bottom padding 
+    margin-bottom: 0;
+}
+/*
+ Remove any white gap before footer on all pages */
+.main-content, .page-centered {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+}
+/*
+ Footer polish */
+.site-footer {
+    background-color: #0078D7;
+    color: white;
+    text-align: center;
+    padding: 12px;
+    font-size: 14px;
+    width: 100%;
+    margin-top: auto;
+    position: relative;
+    bottom: 0;
+}
+
+
+/* ---------- TRAIN RESULTS PAGE ---------- */
+.results-page {
+    flex: 1;
+    background: linear-gradient(to bottom right, #f8fbff, #dfeeff);
+    padding: 50px 80px;
+    animation: fadeInUp 0.7s ease-out;
+}
+
+.results-container {
+    background: rgba(255, 255, 255, 0.95);
+    padding: 30px 40px;
+    border-radius: 10px;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.1);
+}
+
+.results-title {
+    text-align: center;
+    color: #0078D7;
+    margin-bottom: 25px;
+    font-size: 1.8rem;
+}
+
+.highlight {
+    color: #005fa3;
+    font-weight: 600;
+}
+
+.no-results {
+    text-align: center;
+    color: #555;
+    font-size: 1.1rem;
+    margin-top: 40px;
+}
+
+.table-wrapper {
+    overflow-x: auto;
+}
+
+.train-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    background-color: white;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+    .train-table th {
+        background: linear-gradient(90deg, #0078d7, #00aaff);
+        color: white;
+        padding: 12px;
+        text-align: center;
+        font-weight: 600;
+    }
+
+    .train-table td {
+        padding: 10px 12px;
+        border-bottom: 1px solid #ddd;
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    .train-table tr:hover {
+        background-color: #f3f9ff;
+    }
+
+.train-link {
+    color: #0078D7;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+    .train-link:hover {
+        text-decoration: underline;
+    }
+
+.class-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+}
+
+.inline-form {
+    display: inline;
+}
+
+.class-btn {
+    background-color: #0078D7;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+    .class-btn:hover {
+        background-color: #005fa3;
+        transform: scale(1.05);
+    }
+
+
+/* ---------- AUTH STATUS / NAV ---------- */
+.welcome-text {
+    color: #d1e8ff;
+    font-weight: 500;
+    margin-left: 15px;
+    margin-right: 10px;
+}
+
+.logout-btn {
+    background-color: #0078D7; 
+    color: white;  White text 
+    text-decoration: none;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    border: 1px solid #0078D7;
+}
+.validation-summary {
+    background-color: #ffe6e6;
+    color: #b30000;
+    padding: 0px 1px;
+    border-radius: 6px;
+    margin-bottom: 15px;
+    font-weight: 500;
+    text-align: center;
+}
+
+    .logout-btn:hover {
+        font-family: 'Segoe UI', Arial, sans-serif;
+        color: #005fa3;
+        border-color: #0078D7;
+    }
+
+.checkout-page {
+    flex: 1;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    background: url('https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEg5wIVGScLbfJP-U8NokGAi4UroYmTJFgv9IpImlCoUelTlfmHuu6MlfOT8SxEVK_-EtIM27eg7cYIb6xadkrydWSUaG4amwhc-siq8EFwVo7cyO5Vj5p89tPF7bVnMcIH4n6mTipWogU5ns_RfnwWTAtWRe1OvIM2UWWx9EV4HRDtlTm2LML1vyZ-dIA/s1920/kishore-v-kgH64ekcq4I-unsplash.jpg') no-repeat center center fixed;
+    background-size: cover;
+    padding: 40px 20px;
+    overflow: hidden;
+}
+
+.checkout-card {
+    background-color: rgba(255, 255, 255, 0.95);
+    padding: 22px 30px;
+    border-radius: 12px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+    max-width: 720px;
+    width: 100%;
+    animation: fadeInUp 0.6s ease-out;
+}
+
+
+.train-info p {
+    margin: 6px 0;
+    font-weight: 500;
+}
+
+.passenger-card {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+    .passenger-card input,
+    .passenger-card select {
+        flex: 1;
+        padding: 8px;
+        border-radius: 6px;
+        border: 1px solid #ccc;
+    }
+
+#addPassenger {
+    display: inline-block;
+    margin-bottom: 15px;
+}
+#addPassengerBtn {
+    display: inline-block;
+    margin-bottom: 15px;
+}
+
+.total-fare {
+    font-weight: bold;
+    margin-bottom: 15px;
+}
+
+.error-msg {
+    color: #b30000;
+    font-weight: 600;
+    text-align: center;
+}
+
+.remove-passenger {
+    border: none;
+    color: white;
+    font-weight: bold;
+    padding: 5px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+    .remove-passenger:hover {
+        background: #ff8080;
+    }
+
+/* ---------- BOOKING DETAILS PAGE ---------- */
+.booking-card {
+    background-color: rgba(255, 255, 255, 0.95);
+    border-radius: 14px;
+    padding: 0px 10px;
+    box-shadow: 0 8px 22px rgba(0,0,0,0.2);
+    margin-bottom: 20px;
+    animation: fadeInUp 0.6s ease-out;
+}
+
+.booking-info p {
+    font-size: 1rem;
+    margin: 9px 0;
+    font-weight: 500;
+}
+
+.booking-info span {
+    font-weight: 700;
+}
+
+.passengers-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+    .passengers-table th {
+        background: #0078D7;
+        color: white;
+        padding: 12px;
+        text-align: left;
+        font-weight: 600;
+    }
+
+    .passengers-table td {
+        background-color: #f9f9f9;
+        padding: 12px;
+        font-size: 0.95rem;
+        transition: background 0.3s ease;
+    }
+
+    .passengers-table tr:hover td {
+        background-color: #e3f0ff;
+    }
+
+.status-confirmed {
+    color: green;
+    font-weight: 600;
+}
+
+.status-cancelled {
+    color: red;
+    font-weight: 600;
+}
+
+/* ---------- BOOKING HISTORY PAGE ---------- */
+.history-title {
+    text-align: center;
+    color: #0078D7;
+    font-size: 1.5rem;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    animation: fadeInUp 0.3s ease-out;
+}
+
+.no-bookings-msg {
+    text-align: center;
+    color: #555;
+    font-size: 1.5rem;
+    margin-top: 40px;
+    font-weight: 100;
+}
+
+.history-container {
+    background-color: rgba(255, 255, 255, 0.95);
+    border-radius: 10px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
+    margin: 0 auto 50px;
+    max-width: 1000px;
+    overflow-x: auto;
+    animation: fadeInUp 0.3s ease-out;
+}
+
+.history-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+    .history-table th {
+        background-color: #0078D7;
+        color: white;
+        padding: 9px;
+        text-align: center;
+        font-weight: 600;
+        font-size: 1rem;
+    }
+
+    .history-table td {
+        padding: 9px 15px;
+        text-align: center;
+        border-bottom: 1px solid #ddd;
+        font-size: 0.95rem;
+        color: #333;
+        font-weight: 700;
+    }
+
+    .history-table tr:hover {
+        background-color: #f3f9ff;
+        transition: background 0.3s ease;
+    }
+
+.view-details-btn {
+    display: inline-block;
+    background-color: #0078D7;
+    color: white;
+    padding: 6px 14px;
+}
+
+.inline-cancel-form {
+    display: inline;
+    margin-left: 5px;
+}
+
+.cancel-btn {
+    background-color: #ff4c4c;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 14px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+    .cancel-btn:hover {
+        background-color: #cc0000;
+        transform: scale(1.05);
+    }
+
+.booking-confirmation {
+    max-width: 600px;
+    margin: 30px auto;
+    padding: 20px;
+    border-radius: 12px;
+    background: #f9f9ff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    font-family: 'Segoe UI', sans-serif;
+}
+
+.confirmation-title {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.booking-info p {
+    margin: 6px 0;
+    font-size: 15px;
+}
+
+.passenger-heading {
+    margin-top: 20px;
+    color: #444;
+    font-weight: bold;
+}
+
+.passenger-list {
+    list-style: none;
+    padding-left: 0;
+}
+
+    .passenger-list li {
+        background: #fff;
+        margin-bottom: 8px;
+        padding: 8px 10px;
+        border-radius: 6px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+.status-confirmed {
+    color: green;
+    font-weight: 600;
+}
+
+.status-cancelled {
+    color: red;
+    font-weight: 600;
+}
+
+.cancel-form {
+    text-align: center;
+    margin-top: 20px;
+}
+
+.cancel-btn {
+    background: #dc3545;
+    color: #fff;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+    .cancel-btn:hover {
+        background: #b52a36;
+    }
+
+/* Small circular swap button */
+.swapStations {
+    color: white;
+    border: none;
+    border-radius: 20%; 
+    width: 210px; 
+    height: 3px;
+    font-size: 16px;
+    transform: translateY(-25%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: 0.3s ease;
+    margin-top: -5px;
+
+}
+
+/*    .swapStations:hover {
+        background-color: #0056b3;
+    }
+*/
+
+.swapStations button{
+    width: 19%;
+    background-color: dodgerblue;
+    border-radius: 50px;
+}
+
+
+/* ===== Layout ===== */
+.admin-container {
+    max-width: 800px;
+    margin: 50px auto;
+    background: #fff;
+    padding: 25px;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    font-family: Arial, sans-serif;
+}
+
+.admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+    .admin-header h3 {
+        margin: 0;
+        font-weight: 600;
+    }
+
+.logout-btn {
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+    .logout-btn:hover {
+        background-color: #b02a37;
+    }
+
+hr {
+    border: none;
+    border-top: 2px solid #333;
+    margin: 15px 0;
+}
+
+/* Dropdown container */
+/*.custom-dropdown {
+    position: relative;
+    display: inline-block;
+}*/
+
+/* The button */
+/*.custom-dropdown-btn {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    font-size: 16px;
+    border-radius: 6px;
+    cursor: pointer;
+}*/
+
+/* The hidden dropdown menu */
+/*.custom-dropdown-menu {
+    display: none;
+    position: absolute;
+    top: 100%;*/ /* appears below the button */
+    /*left: 0;
+    background-color: #fff;
+    min-width: 200px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    border-radius: 6px;
+    z-index: 1000;
+    flex-direction: column;
+    text-align: left;
+    padding: 8px 0;
+}*/
+
+/* Show dropdown when active */
+/*.custom-dropdown.active .custom-dropdown-menu {
+    display: flex;
+}
+*/
+/* Dropdown links */
+/*.custom-dropdown-menu a {
+    display: block;
+    padding: 8px 15px;
+    color: #333;
+    text-decoration: none;
+}*/
+
+ /*   .custom-dropdown-menu a:hover {
+        background-color: #007bff;
+        color: #fff;
+    }*/
+
+/* Divider line */
+/*.custom-divider {
+    height: 1px;
+    background-color: #ddd;
+    margin: 5px 0;
+}*/
+
+
+/* Small, subtle logout button */
+.logout-btn {
+    background-color: dodgerblue; /* Transparent by default */
+    color: red; /* Red text */
+    border: 1px solid #ff4d4f; /* Thin red border */
+    padding: 1px 2px 2px; /* Smaller size */
+    font-size: 0.85rem; /* Slightly smaller text */
+    border-radius: 5px; /* Rounded corners */
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+    /* On hover, red background */
+    .logout-btn:hover {
+        background-color: #ff4d4f;
+        color: white;
+    }
+
+/*.img-fluid {
+    flex: 1;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    background: url('https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEg5wIVGScLbfJP-U8NokGAi4UroYmTJFgv9IpImlCoUelTlfmHuu6MlfOT8SxEVK_-EtIM27eg7cYIb6xadkrydWSUaG4amwhc-siq8EFwVo7cyO5Vj5p89tPF7bVnMcIH4n6mTipWogU5ns_RfnwWTAtWRe1OvIM2UWWx9EV4HRDtlTm2LML1vyZ-dIA/s1920/kishore-v-kgH64ekcq4I-unsplash.jpg') no-repeat center center fixed;
+    background-size: cover;
+    padding: 40px 20px;
+    overflow: hidden;
+}*/

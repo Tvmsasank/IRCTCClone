@@ -1,0 +1,63 @@
+﻿@model IEnumerable<IrctcClone.Models.Train>
+@{
+    ViewData["Title"] = "Train Results";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var journey = ViewBag.JourneyDate ?? DateTime.Today.ToString("yyyy-MM-dd");
+}
+
+<section class="results-page fadeInUp">
+    <div class="results-container">
+        <h2 class="results-title">Available Trains for <span class="highlight">@journey</span></h2>
+
+        @if (!Model.Any())
+        {
+            <p class="no-results">No trains found for your selected route.</p>
+        }
+        else
+        {
+            <div class="table-wrapper">
+                <table class="train-table">
+                    <thead>
+                        <tr>
+                            <th>Number</th>
+                            <th>Name</th>
+                            <th>From</th>
+                            <th>Departure</th>
+                            <th>Duration</th>
+                            <th>To</th>
+                            <th>Arrival</th>
+                            <th>Classes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var t in Model)
+                        {
+                            <tr>
+                                <td>@t.Number</td>
+                                <td><a href="/Train/Details/@t.Id" class="train-link">@t.Name</a></td>
+                                <td>@t.FromStation?.Code</td>
+                                <td>@t.Departure.ToString(@"hh\:mm")</td>
+                                <td>@t.Duration.ToString(@"hh\:mm")</td>
+                                <td>@t.ToStation?.Code</td>
+                                <td>@t.Arrival.ToString(@"hh\:mm")</td>
+                                <td>
+                                    <div class="class-buttons">
+                                        @foreach (var c in t.Classes)
+                                        {
+                                            <form method="get" action="/Booking/Checkout" class="inline-form">
+                                                <input type="hidden" name="trainId" value="@t.Id" />
+                                                <input type="hidden" name="classId" value="@c.Id" />
+                                                <input type="hidden" name="journeyDate" value="@journey" />
+                                                <button type="submit" class="class-btn">@c.Code - ₹@c.Fare (@c.SeatsAvailable)</button>
+                                            </form>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</section>

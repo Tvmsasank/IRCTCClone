@@ -1,0 +1,64 @@
+﻿@model IEnumerable<IrctcClone.Models.Booking>
+
+@{
+    ViewData["Title"] = "My Bookings";
+}
+
+<h2 class="history-title">📄 My Bookings</h2>
+
+@if (TempData["Message"] != null)
+{
+    <div style="text-align:center; padding:10px; background-color:#d4edda; color:#155724; border:1px solid #c3e6cb; border-radius:5px; display:inline-block; margin:10px auto;">
+        @TempData["Message"]
+    </div>
+}
+
+
+@if (!Model.Any())
+{
+    <p class="no-bookings-msg">No bookings found.</p>
+}
+else
+{
+    <div class="history-container">
+        <table class="history-table">
+            <thead>
+                <tr>
+                    <th>PNR</th>
+                    <th>Train</th>
+                    <th>Class</th>
+                    <th>Journey Date</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Details</th>
+                    <th>Cancel</th> 
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var b in Model)
+                {
+                    <tr>
+                        <td>@b.PNR</td>
+                        <td>@b.TrainNumber - @b.TrainName</td>
+                        <td>@b.ClassCode</td>
+                        <td>@b.JourneyDate.ToString("dd-MM-yyyy")</td>
+                        <td>₹@b.Amount</td>
+                        <td class="@(b.Status == "CONFIRMED" ? "status-confirmed" : "status-cancelled")">
+                            @b.Status
+                        </td>
+                        <td>
+                            <a asp-controller="Booking" asp-action="Details" asp-route-id="@b.BookingId" class="view-details-btn">
+                                View
+                            </a> 
+                        </td>
+                        <td>
+                            <form asp-controller="Booking" asp-action="Cancel" asp-route-id="@b.BookingId" method="post" class="inline-cancel-form">
+                                <button type="submit" class="cancel-btn" onclick="return confirm('Are you sure you want to cancel this booking?')">Cancel</button>
+                            </form> 
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

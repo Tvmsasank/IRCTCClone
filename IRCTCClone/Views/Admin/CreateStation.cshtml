@@ -1,0 +1,23 @@
+﻿@model IrctcClone.Models.Station
+@{
+    ViewData["Title"] = "Add Station";
+}
+
+<link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+<div class="station-card">
+    <h3>🚉 Add New Station</h3>
+    <form method="post" asp-action="CreateStation">
+        <div class="mb-3 d-sm-block w-25">
+            <label class="form-label">Station Code</label>
+            <input asp-for="Code" class="form-control" placeholder="e.g. SC" required />
+        </div>
+
+        <div class="mb-3 d-sm-grid w-25">
+            <label class="form-label">Station Name</label>
+            <input asp-for="Name" class="form-control" placeholder="e.g. Secunderabad" required />
+        </div>
+
+        <button type="submit" class="btn btn-primary mb-0">💾 Save Station</button>
+        <a asp-action="StationList" class="btn btn-secondary">↩ Cancel</a>
+    </form>
+</div>

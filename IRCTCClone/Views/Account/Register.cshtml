@@ -1,0 +1,35 @@
+﻿@{
+    ViewData["Title"] = "Register";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<section class="page-centered">
+    <div class="card auth-card">
+        <h2>Register</h2>
+        <form method="post" action="/Account/Register" class="auth-form">
+            <label>
+                Full name
+                <input type="text" name="FullName" required />
+            </label>
+
+            <label>
+                Email
+                <input type="email" name="Email" required />
+            </label>
+
+            <label>
+                Password
+                <input type="password" name="Password" required />
+            </label>
+
+            <label>
+                Confirm Password
+                <input type="password" name="ConfirmPassword" required />
+            </label>
+
+            <button type="submit" class="btn-primary">Create account</button>
+        </form>
+
+        <p class="muted small">Already have an account? <a href="/Account/Login">Login</a></p>
+    </div>
+</section>
