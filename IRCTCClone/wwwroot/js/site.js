@@ -1,6 +1,6 @@
 ﻿// --- Small helper for AJAX station autocomplete ---
 
-/*// --- Autocomplete Setup Function ---
+// --- Autocomplete Setup Function ---
 function setupAutocomplete(inputId, listId) {
     const $input = $("#" + inputId);
     const $list = $("#" + listId);
