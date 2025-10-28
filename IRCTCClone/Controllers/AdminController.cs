@@ -1,4 +1,4 @@
-﻿using IrctcClone.Models;
+﻿using IRCTCClone.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;

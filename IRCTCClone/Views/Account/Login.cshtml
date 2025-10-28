@@ -1,4 +1,4 @@
-﻿@model IrctcClone.Models.ViewModels
+﻿@model IRCTCClone.Models.ViewModels
 
 @{
     ViewData["Title"] = "Login";
@@ -8,6 +8,18 @@
 <section class="page-centered">
     <div class="card auth-card">
         <h2>Login</h2>
+
+        <!-- Show ModelState errors (for invalid email/password) -->
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div class="alert alert-danger" role="alert">
+                @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                {
+                    <p>@error.ErrorMessage</p>
+                }
+            </div>
+        }
+
         <form method="post" action="/Account/Login" class="auth-form">
             <label>
                 Email

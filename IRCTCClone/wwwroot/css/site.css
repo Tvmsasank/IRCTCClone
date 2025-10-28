@@ -72,7 +72,7 @@ body {
     overflow: hidden;
 }
 
-.search-box {
+/*.search-box {
     background-color: rgba(255, 255, 255, 0.95);
     padding: 20px 40px;
     border-radius: 10px;
@@ -114,7 +114,7 @@ body {
         .search-box button:hover {
             background-color: #005fa3;
             transform: scale(1.03);
-        }
+        }*/
     .form-control{
 
     }
@@ -142,6 +142,7 @@ body {
 }
 
 .auth-card {
+    margin-bottom: 50px;
     background-color: rgba(255, 255, 255, 0.94);
     padding: 5px 50px;
     border-radius: 12px;
@@ -172,6 +173,7 @@ body {
     width: 100%;
     padding: 9px;
     margin-top: 1px;
+    margin-bottom: 1px;
     border: 1px solid #ccc;
     border-radius: 6px;
     font-size: 15px;
@@ -736,7 +738,8 @@ main {
 */
 
 .swapStations button{
-    width: 19%;
+    width: 20%;
+    margin-bottom: 20px;
     background-color: dodgerblue;
     border-radius: 50px;
 }
@@ -870,3 +873,121 @@ hr {
     padding: 40px 20px;
     overflow: hidden;
 }*/
+
+.new-search-box {
+    background-color: rgba(255, 255, 255, 0.95);
+    padding: 20px 40px;
+    border-radius: 10px;
+    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.2);
+    max-width: 300px;
+    width: 50%;
+    position: absolute;
+    animation: fadeInUp 0.6s ease-in-out;
+}
+
+    .new-search-box h2 {
+        text-align: center;
+        color: #0078D7;
+        margin-bottom: 20px;
+    }
+
+    .new-search-box select,
+    .new-search-box input[type="date"],
+    .new-search-box input[type="text"] {
+        width: 100%;
+        padding: 11px;
+        margin-bottom: 10px;
+        border: 1px solid #b6d6ff;
+        border-radius: 10px;
+        font-size: 15px;
+    }
+
+/*    .new-search-box button {
+        width: 40%;
+        padding: 5px;
+        margin-bottom: 10px;
+        background: linear-gradient(90deg, #0078d7, #00b7ff);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }*/
+
+        .new-search-box button:hover {
+            background-color: #005fa3;
+            transform: scale(1.03);
+        }
+
+.forgot-card {
+    background-color: #fff;
+    padding: 20px 40px;
+    border-radius: 12px;
+    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.2);
+    width: 100%;
+    max-width: 325px;
+    text-align: center;
+    animation: fadeIn 0.6s ease-in-out;
+}
+
+    .forgot-card h2 {
+        color: #0078d7;
+        margin-bottom: 10px;
+    }
+
+.form-group-body,
+.form-group {
+    text-align: left;
+    margin-bottom: 15px;
+}
+
+.fgbtn {
+    background: linear-gradient(90deg, #0078d7, #00b7ff);
+    border: none;
+    width: 55%;
+    border-radius: 8px;
+    font-size: 16px;
+    transition: transform 0.3s ease;
+}
+
+    .fgbtn:hover {
+        transform: scale(1.03);
+        background: #005fa3;
+    }
+
+.message {
+    font-size: 15px;
+}
+
+.fgbl {
+    display: inline-block;
+    margin-top: 10px;
+    margin-bottom: 0px;
+    text-decoration: none;
+    color: #0078d7;
+    font-weight: 500;
+}
+
+    .fgbl:hover {
+        text-decoration: underline;
+    }
+
+.page-centered-password{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 80vh; /* full screen height */
+   
+    font-family: 'Segoe UI', sans-serif;
+}
+
+.auth-card .alert {
+    margin-bottom: 1px;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    font-size: 15px;
+    padding: 0px;
+    color: red;
+    text-align: center;
+}
