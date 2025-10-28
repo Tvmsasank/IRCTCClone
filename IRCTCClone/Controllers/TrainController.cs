@@ -130,7 +130,37 @@ namespace IRCTCClone.Controllers
 
             return View("Results", trains);
         }
+      
+        
+        [HttpGet]
+        public JsonResult GetStations(string term)
+        {
+            var stations = new List<object>();
 
+            using (var conn = new SqlConnection(_connectionString))
+            {
+                conn.Open();
+                string sql = "SELECT TOP 50 Id, Code, Name FROM Stations WHERE Name LIKE @term + '%' OR Code LIKE @term + '%' ORDER BY Name";
+                using (var cmd = new SqlCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@term", term ?? "");
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            stations.Add(new
+                            {
+                                id = reader.GetInt32(0),
+                                code = reader.GetString(1),
+                                name = reader.GetString(2)
+                            });
+                        }
+                    }
+                }
+            }
+
+            return Json(stations);
+        }
 
 
         [HttpPost]

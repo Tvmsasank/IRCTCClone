@@ -1,4 +1,157 @@
-﻿@model IEnumerable<IRCTCClone.Models.Station>
+﻿@model List<IRCTCClone.Models.Station>
+
+<div class="home-page">
+    <div class="search-box">
+        <h2>Search Trains</h2>
+        <form method="post" action="/Train/Results">
+            <div class="form-group position-relative">
+                <input type="text" id="fromStation" placeholder="From Station" autocomplete="off" required />
+                <input type="hidden" id="fromStationId" name="fromStationId" />  <!-- hidden -->
+                <div id="fromStationList" class="autocomplete-list"></div>
+            </div>
+
+            <div class="swapStations">
+                <button type="button" id="swapStations">⇄</button>
+            </div>
+
+            <div class="form-group position-relative">
+                <input type="text" id="toStation" placeholder="To Station" autocomplete="off" required />
+                <input type="hidden" id="toStationId" name="toStationId" />  <!-- hidden -->
+                <div id="toStationList" class="autocomplete-list"></div>
+            </div>
+
+            <input type="date" name="journeyDate" value="@DateTime.Today.ToString("yyyy-MM-dd")" required />
+            <button type="submit" class="btn btn-primary">Search</button>
+        </form>
+    </div>
+</div>
+
+<!-- jQuery CDN -->
+@* <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> *@
+
+@* <style>
+    .autocomplete-list {
+        position: absolute;
+        background: white;
+        border: 1px solid #ccc;
+        width: 100%;
+        max-height: 200px;
+        overflow-y: auto;
+        display: none;
+        z-index: 1000;
+    }
+
+    .autocomplete-item {
+        padding: 8px;
+        cursor: pointer;
+    }
+
+        .autocomplete-item:hover {
+            background: #f0f0f0;
+        }
+
+    .form-group {
+        margin-bottom: 10px;
+    }
+</style> *@
+
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="~/js/site.js"></script>
+
+
+@* <script>
+    // ✅ Debounce helper (prevents too many requests)
+    function debounce(fn, delay) {
+        let timer;
+        return function () {
+            clearTimeout(timer);
+            timer = setTimeout(fn, delay);
+        };
+    }
+
+    // ✅ Autocomplete function
+    function wireAutocomplete($input, $list) {
+        // --- Fetch station list via AJAX ---
+        function fetchStations(term, callback) {
+            $.get('/Train/GetStations', { term: term }, function (data) {
+                callback(data);
+            });
+        }
+
+        // --- Render the dropdown list ---
+        function renderList($listEl, items) {
+            $listEl.empty();
+            if (!items.length) {
+                $listEl.hide();
+                return;
+            }
+
+            items.forEach(function (s) {
+                $('<div class="autocomplete-item">')
+                    .text(s.name + ' (' + s.code + ')')
+                    .data('id', s.id)
+                    .appendTo($listEl);
+            });
+
+            $listEl.show();
+        }
+
+        // --- Typing event ---
+        $input.on('input', debounce(function () {
+            const term = $input.val().trim();
+
+            if (term.length === 0) {
+                $list.hide();
+                // Reset hidden field when cleared
+                if ($input.attr('id') === 'fromStation') {
+                    $('#fromStationId').val('');
+                } else if ($input.attr('id') === 'toStation') {
+                    $('#toStationId').val('');
+                }
+                return;
+            }
+
+            fetchStations(term, function (items) {
+                renderList($list, items);
+            });
+        }, 200));
+
+        // --- Selecting from dropdown ---
+        $list.on('click', '.autocomplete-item', function () {
+            const stationName = $(this).text();
+            const stationId = $(this).data('id');
+
+            $input.val(stationName);
+            $list.hide();
+
+            // ✅ set hidden field value
+            if ($input.attr('id') === 'fromStation') {
+                $('#fromStationId').val(stationId);
+            } else if ($input.attr('id') === 'toStation') {
+                $('#toStationId').val(stationId);
+            }
+        });
+
+        // --- Hide dropdown when clicking outside ---
+        $(document).on('click', function (e) {
+            if (!$(e.target).closest($input).length && !$(e.target).closest($list).length) {
+                $list.hide();
+            }
+        });
+    }
+
+    // ✅ Initialize both inputs
+    $(function () {
+        wireAutocomplete($('#fromStation'), $('#fromStationList'));
+        wireAutocomplete($('#toStation'), $('#toStationList'));
+    });
+</script> *@
+
+
+
+
+@* @model IEnumerable<IRCTCClone.Models.Station>
 @{
     ViewData["Title"] = "Home";
 }
@@ -31,4 +184,8 @@
 </div>
 
 
+<!-- jQuery CDN --> <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script> // ✅ Debounce helper to avoid too many requests function debounce(fn, delay) { let timer; return function () { clearTimeout(timer); timer = setTimeout(fn, delay); }; } // ✅ Autocomplete wiring logic function wireAutocomplete($input, $list) { function fetchStations(term, callback) { $.get('/Train/GetStations', { term: term }, function (data) { callback(data); }); } function renderList($listEl, items) { $listEl.empty(); if (!items.length) { $listEl.hide(); return; } items.forEach(function (s) { $('<div class="autocomplete-item">') .text(s.name + ' (' + s.code + ')') .data('id', s.id) .appendTo($listEl); }); $listEl.show(); } // 🔹 Typing triggers search $input.on('input', debounce(function () { const term = $input.val().trim(); if (term.length === 0) { $list.hide(); // hide if cleared return; } fetchStations(term, function (items) { renderList($list, items); }); }, 200)); // 🔹 Click on item $list.on('click', '.autocomplete-item', function () { const stationName = $(this).text(); const stationId = $(this).data('id'); $input.val(stationName); // show name in textbox // ✅ set hidden field value if ($input.attr('id') === 'fromStation') { $('#fromStationId').val(stationId); } else if ($input.attr('id') === 'toStation') { $('#toStationId').val(stationId); } $input.val($(this).text()); $list.hide(); }); // 🔹 Hide when clicking outside $(document).on('click', function (e) { if (!$(e.target).closest($input).length && !$(e.target).closest($list).length) { $list.hide(); } }); } // ✅ Initialize for both inputs $(function () { wireAutocomplete($('#fromStation'), $('#fromStationList')); wireAutocomplete($('#toStation'), $('#toStationList')); }); var swapBtn = document.getElementById("swapStations"); var fromSelect = document.getElementById("fromStation"); var toSelect = document.getElementById("toStation"); if (swapBtn && fromSelect && toSelect) { swapBtn.onclick = function () { var tempValue = fromSelect.value; fromSelect.value = toSelect.value; toSelect.value = tempValue; }; } </script>
 
+
+ *@

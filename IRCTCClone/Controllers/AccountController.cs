@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Configuration;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -138,6 +139,49 @@ namespace IRCTCClone.Controllers
                 var hash = sha.ComputeHash(bytes);
                 return Convert.ToBase64String(hash);
             }
+        }
+
+
+        [HttpGet]
+        public IActionResult ForgotPassword()
+        {
+            return View();
+        }
+
+        // POST: /Account/ForgotPassword
+        [HttpPost]
+        public IActionResult ForgotPassword(string email, string newPassword)
+        {
+        
+
+            using (SqlConnection con = new SqlConnection(_connectionString))
+            {
+                con.Open();
+
+                // Check if user exists
+                string checkQuery = "SELECT COUNT(*) FROM Usrs WHERE Email = @Email";
+                SqlCommand checkCmd = new SqlCommand(checkQuery, con);
+                checkCmd.Parameters.AddWithValue("@Email", email);
+                int count = (int)checkCmd.ExecuteScalar();
+
+                if (count == 0)
+                {
+                    ViewBag.Error = "❌ Email not found!";
+                    return View();
+                }
+
+                // Update password
+                string updateQuery = "UPDATE Usrs SET PasswordHash = @Password WHERE Email = @Email";
+                SqlCommand cmd = new SqlCommand(updateQuery, con);
+                cmd.Parameters.AddWithValue("@Password", HashPassword(newPassword));
+                cmd.Parameters.AddWithValue("@Email", email);
+                cmd.ExecuteNonQuery();
+
+                ViewBag.Message = "✅ Password updated successfully! You can now login.";
+                con.Close();
+            }
+
+            return View();
         }
     }
 }
