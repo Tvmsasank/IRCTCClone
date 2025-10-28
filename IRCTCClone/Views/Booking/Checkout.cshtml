@@ -73,3 +73,52 @@ else
 }
 </div>
 </section>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<script> 
+    $(function () {
+        // --- Update Total Fare ---
+        function updateTotal() {
+            var fare = parseFloat($("#totalFare").data("fare") || 0);
+            var count = $("#passengers .passenger-card").length;
+            $("#totalFare").text((count * fare).toFixed(2));
+        }
+
+        // --- Add Passenger ---
+        $("#addPassenger").on("click", function () {
+            var passengerHtml = `
+                <div class="passenger-card">
+                    <input name="passengerNames" placeholder="Name" required />
+                    <input name="passengerAges" type="number" placeholder="Age" required />
+                    <select name="passengerGenders" required>
+                        <option value="">Select Gender</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                    </select>
+                    <select name="passengerBerths" required>
+                        <option value="">Select Berth</option>
+                        <option value="Lower">Lower</option>
+                        <option value="Middle">Middle</option>
+                        <option value="Upper">Upper</option>
+                        <option value="Side Lower">Side Lower</option>
+                        <option value="Side Upper">Side Upper</option>
+                    </select>
+                    <button type="button" class="remove-passenger">❌</button>
+                </div>
+            `;
+            $("#passengers").append(passengerHtml);
+            updateTotal();
+        });
+
+        // --- Remove Passenger (Delegated Event) ---
+        $(document).on("click", ".remove-passenger", function () {
+            $(this).closest(".passenger-card").remove();
+            updateTotal();
+        });
+
+        // --- Initial Fare Update ---
+        updateTotal();
+    });
+</script>

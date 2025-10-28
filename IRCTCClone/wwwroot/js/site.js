@@ -1,55 +1,6 @@
 ﻿$(function () {
 
     ///////////////////////////////////////////////////////////////////////////
-    // 1. PASSENGER HANDLING
-    ///////////////////////////////////////////////////////////////////////////
-
-    // Calculate total fare dynamically
-    function updateTotal() {
-        var fare = parseFloat($("#totalFare").data("fare") || 0);
-        var count = $("#passengers .passenger-card").length;
-        $("#totalFare").text((count * fare).toFixed(2));
-    }
-
-    // ✅ Add passenger
-    $("#addPassenger").on("click", function () {
-        console.log("Add Passenger clicked"); // Debug log
-        var passengerHtml = `
-            <div class="passenger-card mt-2 p-2 border rounded">
-                <input name="passengerNames" placeholder="Name" required class="form-control mb-1"/>
-                <input name="passengerAges" type="number" placeholder="Age" required class="form-control mb-1"/>
-                <select name="passengerGenders" required class="form-select mb-1">
-                    <option value="">Select Gender</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Other">Other</option>
-                </select>
-                <select name="passengerBerths" required class="form-select mb-1">
-                    <option value="">Select Berth</option>
-                    <option value="Lower">Lower</option>
-                    <option value="Middle">Middle</option>
-                    <option value="Upper">Upper</option>
-                    <option value="Side Lower">Side Lower</option>
-                    <option value="Side Upper">Side Upper</option>
-                </select>
-                <button type="button" class="remove-passenger btn btn-danger btn-sm">Remove</button>
-            </div>
-        `;
-        $("#passengers").append(passengerHtml);
-        updateTotal();
-    });
-
-    // ✅ Remove passenger (delegated — works for dynamically added elements)
-    $(document).on("click", ".remove-passenger", function () {
-        console.log("Remove Passenger clicked"); // Debug log
-        $(this).closest(".passenger-card").remove();
-        updateTotal();
-    });
-
-    updateTotal(); // initial call
-
-
-    ///////////////////////////////////////////////////////////////////////////
     // 2. CANCEL BOOKING CONFIRMATION
     ///////////////////////////////////////////////////////////////////////////
     $(document).on('click', '.cancel-btn', function (e) {
