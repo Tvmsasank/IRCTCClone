@@ -1,0 +1,55 @@
+﻿@using IRCTCClone.Models
+@model List<IRCTCClone.Models.TrainRoute>
+@{
+    ViewBag.Title = "Add Train Route";
+    var stations = ViewBag.Stations as List<Station>;
+    int trainId = ViewBag.TrainId;
+}
+
+<h3>Add Route Stops</h3>
+
+<form method="post" action="/Admin/AddRoute?trainId=@trainId">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Stop #</th>
+                <th>Station</th>
+                <th>Arrival</th>
+                <th>Departure</th>
+            </tr>
+        </thead>
+        <tbody id="routeTableBody">
+            <tr>
+                <td><input name="routes[0].StopNumber" type="number" class="form-control" /></td>
+                <td>
+                    <select name="routes[0].StationId" class="form-control">
+                        @foreach (var s in stations)
+                        {
+                            <option value="@s.Id">@s.Name</option>
+                        }
+                    </select>
+                </td>
+                <td><input name="routes[0].ArrivalTime" type="time" class="form-control" /></td>
+                <td><input name="routes[0].DepartureTime" type="time" class="form-control" /></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <button type="button" id="addRow" class="btn btn-secondary">+ Add Stop</button>
+    <button type="submit" class="btn btn-primary">Save Route</button>
+</form>
+
+<script>
+    document.getElementById("addRow").addEventListener("click", function () {
+        var tableBody = document.getElementById("routeTableBody");
+        var rowCount = tableBody.rows.length;
+        var newRow = tableBody.rows[0].cloneNode(true);
+
+        // update input names for model binding
+        newRow.querySelectorAll("input, select").forEach(function (input) {
+            input.name = input.name.replace("[0]", "[" + rowCount + "]");
+            input.value = "";
+        });
+        tableBody.appendChild(newRow);
+    });
+</script>

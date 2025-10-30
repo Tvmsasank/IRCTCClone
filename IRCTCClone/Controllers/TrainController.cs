@@ -196,13 +196,11 @@ namespace IRCTCClone.Controllers
                                 FromStationId = reader.GetInt32(3),
                                 FromStation = new Station
                                 {
-                                    Id = reader.GetInt32(3),
                                     Code = reader.GetString(4)   // 👈 Code instead of Name
                                 },
                                 ToStationId = reader.GetInt32(5),
                                 ToStation = new Station
                                 {
-                                    Id = reader.GetInt32(5),
                                     Code = reader.GetString(6)   // 👈 Code instead of Name
                                 },
                                 Departure = reader.GetTimeSpan(7),
@@ -233,6 +231,7 @@ namespace IRCTCClone.Controllers
                                     Code = reader.GetString(2),
                                     Fare = reader.GetDecimal(3),
                                     SeatsAvailable = reader.GetInt32(4)
+
                                 });
                             }
                         }

@@ -252,8 +252,72 @@ namespace IrctcClone.Controllers
             }
 
             TempData["SuccessMessage"] = "✅ Train created successfully!";
-            return RedirectToAction("CreateTrain");
+            return RedirectToAction("AddRoute", new { trainId = train.Id });
         }
+
+
+        public IActionResult AddRoute(int trainId)
+        {
+            ViewBag.TrainId = trainId;
+            ViewBag.Stations = GetAllStations();
+            return View();
+        }
+
+        [HttpPost]
+        public IActionResult AddRoute(int trainId, List<TrainRoute> routes)
+        {
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            {
+                conn.Open();
+                foreach (var r in routes)
+                {
+                    SqlCommand cmd = new SqlCommand(@"
+                INSERT INTO TrainRoutes (TrainId, StationId, StopNumber, ArrivalTime, DepartureTime)
+                VALUES (@TrainId, @StationId, @StopNumber, @ArrivalTime, @DepartureTime)", conn);
+
+                    cmd.Parameters.AddWithValue("@TrainId", trainId);
+                    cmd.Parameters.AddWithValue("@StationId", r.StationId);
+                    cmd.Parameters.AddWithValue("@StopNumber", r.StopNumber);
+                    cmd.Parameters.AddWithValue("@ArrivalTime", (object?)r.ArrivalTime ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@DepartureTime", (object?)r.DepartureTime ?? DBNull.Value);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+
+            return RedirectToAction("Index");
+        }
+
+
+        private List<Station> GetAllStations()
+        {
+            var stations = new List<Station>();
+
+            using (var conn = new SqlConnection(_connectionString))
+            {
+                conn.Open();
+                string query = "SELECT Id, Code, Name FROM Stations ORDER BY Name";
+
+                using (var cmd = new SqlCommand(query, conn))
+                using (var reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        stations.Add(new Station
+                        {
+                            Id = reader.GetInt32(0),
+                            Code = reader.GetString(1),
+                            Name = reader.GetString(2)
+                        });
+                    }
+                }
+            }
+
+            return stations;
+        }
+
+
+
+
 
 
         // Delete Train
@@ -616,6 +680,14 @@ namespace IrctcClone.Controllers
             using (var conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
+
+                // 1️⃣ Delete routes first (since TrainRoutes references Trains)
+                var deleteRoutes = "DELETE FROM TrainRoutes WHERE TrainId = @TrainId";
+                using (var cmd = new SqlCommand(deleteRoutes, conn))
+                {
+                    cmd.Parameters.AddWithValue("@TrainId", id);
+                    cmd.ExecuteNonQuery();
+                }
 
                 // Delete classes first (foreign key constraint)
                 var deleteClasses = "DELETE FROM TrainClasses WHERE TrainId = @TrainId";

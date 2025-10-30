@@ -22,5 +22,9 @@ namespace IRCTCClone.Models
         public int TrainNumber { get; set; } 
         public string TrainName { get; set; } = null!;
         public string ClassCode { get; set; }
+        public string Frmst { get; set; }
+        public string Tost { get; set; }
+/*        public string FromStationName { get; set; } = string.Empty;
+        public string ToStationName { get; set; } = string.Empty;*/
     }
 }
