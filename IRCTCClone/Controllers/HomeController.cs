@@ -21,22 +21,28 @@ namespace IRCTCClone.Controllers
             using (var conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
-                using (var cmd = new SqlCommand("SELECT Id, Code, Name FROM Stations ORDER BY Name", conn))
-                using (var reader = cmd.ExecuteReader())
+
+                using (var cmd = new SqlCommand("spgetallstatns", conn))
                 {
-                    while (reader.Read())
+                    cmd.CommandType = System.Data.CommandType.StoredProcedure;
+
+                    using (var reader = cmd.ExecuteReader())
                     {
-                        stations.Add(new Station
+                        while (reader.Read())
                         {
-                            Id = reader.GetInt32(0),
-                            Code = reader.GetString(1),
-                            Name = reader.GetString(2)
-                        });
+                            stations.Add(new Station
+                            {
+                                Id = reader.GetInt32(0),
+                                Code = reader.GetString(1),
+                                Name = reader.GetString(2)
+                            });
+                        }
                     }
                 }
             }
 
             return View(stations);
         }
+
     }
 }

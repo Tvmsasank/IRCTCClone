@@ -14,5 +14,7 @@ namespace IRCTCClone.Models
         // Navigation properties
         public Train Train { get; set; }
         public Station Station { get; set; }
+
+
     }
 }

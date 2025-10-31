@@ -1,4 +1,9 @@
 ﻿@model IEnumerable<IRCTCClone.Models.Train>
+@using IRCTCClone.E_D
+
+@{
+    string encryptedDate = UrlEncryptionHelper.Encrypt(ViewBag.JourneyDate.ToString());
+}
 
 @{
     ViewData["Title"] = "Train Results";
@@ -35,7 +40,7 @@
                         {
                             <tr>
                                 <td>@t.Number</td>
-                                <td><a href="/Train/Details/@t.Id" class="train-link">@t.Name</a></td>
+                                <td>@t.Name</td>
                                 <td>@t.FromStation?.Code</td>
                                 <td>@t.Departure.ToString(@"hh\:mm")</td>
                                 <td>@t.Duration.ToString(@"hh\:mm")</td>

@@ -5,6 +5,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.SqlServer.Server;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Security.Claims;
 
@@ -21,7 +22,6 @@ namespace IRCTCClone.Controllers
         }
 
         // GET: /Booking/Checkout
-
         [HttpGet]
         public IActionResult Checkout(int trainId, int classId, string journeyDate)
         {
@@ -31,77 +31,61 @@ namespace IRCTCClone.Controllers
             using (var conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
-
-                // Get Train
-                using (var cmd = new SqlCommand(@"
-            SELECT t.Id, t.Number, t.Name, t.Departure, t.Arrival, t.Duration,
-                   fs.Id AS FromStationId, fs.Name AS FromStationName, fs.Code AS FromStationCode,
-                   ts.Id AS ToStationId, ts.Name AS ToStationName, ts.Code AS ToStationCode
-            FROM Trains t
-            INNER JOIN Stations fs ON t.FromStationId = fs.Id
-            INNER JOIN Stations ts ON t.ToStationId = ts.Id
-            WHERE t.Id = @TrainId", conn))
+                using (var cmd = new SqlCommand("spGetTrainForCheckout", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@TrainId", trainId);
+                    cmd.Parameters.AddWithValue("@ClassId", classId);
 
                     using (var reader = cmd.ExecuteReader())
                     {
+                        // Read train details
                         if (reader.Read())
                         {
                             train = new Train
                             {
-                                Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                                Id = reader.GetInt32(reader.GetOrdinal("TrainId")),
                                 Number = reader.GetInt32(reader.GetOrdinal("Number")),
-                                Name = reader.GetString(reader.GetOrdinal("Name")),
+                                Name = reader.GetString(reader.GetOrdinal("TrainName")),
                                 Departure = reader.GetTimeSpan(reader.GetOrdinal("Departure")),
                                 Arrival = reader.GetTimeSpan(reader.GetOrdinal("Arrival")),
                                 Duration = reader.GetTimeSpan(reader.GetOrdinal("Duration")),
+
                                 FromStationId = reader.GetInt32(reader.GetOrdinal("FromStationId")),
                                 ToStationId = reader.GetInt32(reader.GetOrdinal("ToStationId")),
+
                                 FromStation = new Station
                                 {
-                                  //  Id = reader.GetInt32(reader.GetOrdinal("FromStationId")),
+                                    Id = reader.GetInt32(reader.GetOrdinal("FromStationId")),
                                     Name = reader.GetString(reader.GetOrdinal("FromStationName")),
                                     Code = reader.GetString(reader.GetOrdinal("FromStationCode"))
                                 },
                                 ToStation = new Station
                                 {
-                                   // Id = reader.GetInt32(reader.GetOrdinal("ToStationId")),
+                                    Id = reader.GetInt32(reader.GetOrdinal("ToStationId")),
                                     Name = reader.GetString(reader.GetOrdinal("ToStationName")),
                                     Code = reader.GetString(reader.GetOrdinal("ToStationCode"))
                                 }
-
                             };
                         }
-                    }
-                }
 
-                if (train == null)
-                    return NotFound();
-
-                // Get Class
-                using (var cmdClass = new SqlCommand(
-                    "SELECT Id, TrainId, Code, Fare, SeatsAvailable FROM TrainClasses WHERE Id = @ClassId", conn))
-                {
-                    cmdClass.Parameters.AddWithValue("@ClassId", classId);
-                    using (var reader = cmdClass.ExecuteReader())
-                    {
-                        if (reader.Read())
+                        // Move to next result set for class
+                        if (reader.NextResult() && reader.Read())
                         {
                             cls = new TrainClass
                             {
-                                Id = reader.GetInt32(0),
-                                TrainId = reader.GetInt32(1),
-                                Code = reader.GetString(2),
-                                Fare = reader.GetDecimal(3),
-                                SeatsAvailable = reader.GetInt32(4)
+                                Id = reader.GetInt32(reader.GetOrdinal("ClassId")),
+                                TrainId = reader.GetInt32(reader.GetOrdinal("TrainId")),
+                                Code = reader.GetString(reader.GetOrdinal("Code")),
+                                Fare = reader.GetDecimal(reader.GetOrdinal("Fare")),
+                                SeatsAvailable = reader.GetInt32(reader.GetOrdinal("SeatsAvailable"))
                             };
                         }
                     }
                 }
             }
 
-            if (cls == null)
+            if (train == null || cls == null)
                 return NotFound();
 
             ViewBag.Train = train;
@@ -110,6 +94,7 @@ namespace IRCTCClone.Controllers
 
             return View("Checkout");
         }
+
 
         /* [HttpGet]
          public IActionResult Checkout(int trainId, int classId, string journeyDate)
@@ -199,7 +184,11 @@ namespace IRCTCClone.Controllers
  */
         // POST: /Booking/Confirm
         [HttpPost]
-        public IActionResult Confirm(int trainId, int classId, string journeyDate, List<string> passengerNames, List<int> passengerAges, List<string> passengerGenders, string trainName, string trainNumber, string Class,int FromStationId,int ToStationId)
+        public IActionResult Confirm(
+            int trainId, int classId, string journeyDate,
+            List<string> passengerNames, List<int> passengerAges, List<string> passengerGenders,
+            string trainName, string trainNumber, string Class,
+            int FromStationId, int ToStationId)
         {
             if (passengerNames == null || passengerNames.Count == 0)
             {
@@ -207,72 +196,82 @@ namespace IRCTCClone.Controllers
                 return RedirectToAction("Checkout", new { trainId, classId, journeyDate });
             }
 
-            Station fromStation = null;
-            Station toStation = null;
-
-            using (SqlConnection con = new SqlConnection(_connectionString))
+            if (passengerAges == null || passengerGenders == null ||
+                passengerAges.Count != passengerNames.Count || passengerGenders.Count != passengerNames.Count)
             {
-                con.Open();
-
-                // ✅ Get FROM Station 
-                string fromQuery = "SELECT * FROM Stations WHERE Id = @fromId";
-                using (SqlCommand fromCmd = new SqlCommand(fromQuery, con))
-                {
-                    fromCmd.Parameters.AddWithValue("@fromId", FromStationId);
-                    using (SqlDataReader reader = fromCmd.ExecuteReader())
-                    {
-                        if (reader.Read())
-                        {
-                            fromStation = new Station
-                            {
-                                Id = Convert.ToInt32(reader["Id"]),
-                                Code = reader["Code"].ToString(),
-                                Name = reader["Name"].ToString()
-                            };
-                        }
-                    }
-                }
-
-                // ✅ Get TO Station
-                string toQuery = "SELECT * FROM Stations WHERE Id = @toId";
-                using (SqlCommand toCmd = new SqlCommand(toQuery, con))
-                {
-                    toCmd.Parameters.AddWithValue("@toId", ToStationId);
-                    using (SqlDataReader reader = toCmd.ExecuteReader())
-                    {
-                        if (reader.Read())
-                        {
-                            toStation = new Station
-                            {
-                                Id = Convert.ToInt32(reader["Id"]),
-                                Code = reader["Code"].ToString(),
-                                Name = reader["Name"].ToString()
-                            };
-                        }
-                    }
-                }
+                TempData["Error"] = "Passenger details are incomplete.";
+                return RedirectToAction("Checkout", new { trainId, classId, journeyDate });
             }
 
-            // ✅ Store values for the next step
-            ViewBag.FromStation = fromStation;
-            ViewBag.ToStation = toStation;
-            ViewBag.JourneyDate = journeyDate;
-
-
-
-            string userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? throw new Exception("Not logged in");
-
-            int seatsAvailable = 0;
-            decimal fare = 0;
-            TrainClass cls = null;
+            Station fromStation = null;
+            Station toStation = null;
 
             using (var conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
 
-                // Get TrainClass
-                using (var cmd = new SqlCommand("SELECT Id, Code, Fare, SeatsAvailable FROM TrainClasses WHERE Id = @ClassId", conn))
+                // Get FROM Station
+                using (var cmd = new SqlCommand("GetStationById", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@StationId", FromStationId);
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            fromStation = new Station
+                            {
+                                Id = reader["Id"] != DBNull.Value ? Convert.ToInt32(reader["Id"]) : 0,
+                                Code = reader["Code"]?.ToString(),
+                                Name = reader["Name"]?.ToString()
+                            };
+                        }
+                    }
+                }
+
+                // Get TO Station
+                using (var cmd = new SqlCommand("GetStationById", conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@StationId", ToStationId);
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            toStation = new Station
+                            {
+                                Id = reader["Id"] != DBNull.Value ? Convert.ToInt32(reader["Id"]) : 0,
+                                Code = reader["Code"]?.ToString(),
+                                Name = reader["Name"]?.ToString()
+                            };
+                        }
+                    }
+                }
+
+                if (fromStation == null || toStation == null || string.IsNullOrEmpty(fromStation.Name) || string.IsNullOrEmpty(toStation.Name))
+                {
+                    TempData["Error"] = "Invalid station selection.";
+                    return RedirectToAction("Checkout", new { trainId, classId, journeyDate });
+                }
+
+                ViewBag.FromStation = fromStation;
+                ViewBag.ToStation = toStation;
+                ViewBag.JourneyDate = journeyDate;
+
+                string userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(userId))
+                {
+                    TempData["Error"] = "Please log in to continue.";
+                    return RedirectToAction("Login", "Account");
+                }
+
+                // Get TrainClass
+                TrainClass cls = null;
+                int seatsAvailable = 0;
+                decimal fare = 0;
+                using (var cmd = new SqlCommand("GetTrainClassById", conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@ClassId", classId);
                     using (var reader = cmd.ExecuteReader())
                     {
@@ -280,16 +279,21 @@ namespace IRCTCClone.Controllers
                         {
                             cls = new TrainClass
                             {
-                                Id = reader.GetInt32(0),
-                                Code = reader.GetString(1),
-                                Fare = reader.GetDecimal(2),
-                                SeatsAvailable = reader.GetInt32(3)
+                                Id = reader["Id"] != DBNull.Value ? Convert.ToInt32(reader["Id"]) : 0,
+                                Code = reader["Code"]?.ToString(),
+                                Fare = reader["Fare"] != DBNull.Value ? Convert.ToDecimal(reader["Fare"]) : 0,
+                                SeatsAvailable = reader["SeatsAvailable"] != DBNull.Value ? Convert.ToInt32(reader["SeatsAvailable"]) : 0
                             };
                             seatsAvailable = cls.SeatsAvailable;
                             fare = cls.Fare;
                         }
-                        else return NotFound();
                     }
+                }
+
+                if (cls == null || string.IsNullOrEmpty(cls.Code))
+                {
+                    TempData["Error"] = "Train class not found.";
+                    return RedirectToAction("Checkout", new { trainId, classId, journeyDate });
                 }
 
                 int passengerCount = passengerNames.Count;
@@ -299,22 +303,21 @@ namespace IRCTCClone.Controllers
                     return RedirectToAction("Checkout", new { trainId, classId, journeyDate });
                 }
 
-                // Update seats
-                using (var cmd = new SqlCommand("UPDATE TrainClasses SET SeatsAvailable = SeatsAvailable - @Count WHERE Id = @ClassId", conn))
+                // Update TrainClass seats
+                using (var cmd = new SqlCommand("UpdateTrainClassSeats", conn))
                 {
-                    cmd.Parameters.AddWithValue("@Count", passengerCount);
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@ClassId", cls.Id);
+                    cmd.Parameters.AddWithValue("@SeatsBooked", passengerCount);
                     cmd.ExecuteNonQuery();
                 }
 
                 // Insert Booking
                 int bookingId;
                 string pnr = GeneratePnr();
-                using (var cmd = new SqlCommand(
-                    @"INSERT INTO Bookings (PNR, UserId, TrainId, TrainClassId, JourneyDate, BookingDate, Amount, Status, TrainNumber, TrainName, Class, Frmst, Tost)
-                      VALUES (@PNR, @UserId, @TrainId, @TrainClassId, @JourneyDate, @BookingDate, @Amount, @Status, @TrainNumber, @TrainName, @Class, @Frmst, @Tost);
-                      SELECT SCOPE_IDENTITY();", conn))
+                using (var cmd = new SqlCommand("InsertBooking", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@PNR", pnr);
                     cmd.Parameters.AddWithValue("@UserId", userId);
                     cmd.Parameters.AddWithValue("@TrainId", trainId);
@@ -341,17 +344,17 @@ namespace IRCTCClone.Controllers
                     "1A" => "B",
                     "3E" => "M",
                     "AC CC" => "C",
-                    "2S" => "D"
+                    "2S" => "D",
+                    _ => "X"
                 };
 
                 // Insert passengers
                 for (int i = 0; i < passengerCount; i++)
                 {
-                    var seatNumber = $"{seatPrefix}{seatsAvailable + i + 1}";
-                    using (var cmd = new SqlCommand(
-                        @"INSERT INTO Passengers (BookingId, Name, Age, Gender, SeatNumber)
-                          VALUES (@BookingId, @Name, @Age, @Gender, @SeatNumber)", conn))
+                    string seatNumber = $"{seatPrefix}{seatsAvailable + i + 1}";
+                    using (var cmd = new SqlCommand("InsertPassenger", conn))
                     {
+                        cmd.CommandType = CommandType.StoredProcedure;
                         cmd.Parameters.AddWithValue("@BookingId", bookingId);
                         cmd.Parameters.AddWithValue("@Name", passengerNames[i]);
                         cmd.Parameters.AddWithValue("@Age", passengerAges[i]);
@@ -365,6 +368,9 @@ namespace IRCTCClone.Controllers
             }
         }
 
+
+
+
         // GET: /Booking/Confirmation
         [HttpGet]
         public IActionResult Confirmation(int id)
@@ -375,12 +381,14 @@ namespace IRCTCClone.Controllers
             {
                 conn.Open();
 
-                // Get Booking
-                using (var cmd = new SqlCommand("SELECT * FROM Bookings WHERE Id = @Id", conn))
+                using (var cmd = new SqlCommand("spGetBookingDetails", conn))
                 {
-                    cmd.Parameters.AddWithValue("@Id", id);
+                    cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@BookingId", id);
+
                     using (var reader = cmd.ExecuteReader())
                     {
+                        // 1️⃣ Read Booking details
                         if (reader.Read())
                         {
                             booking = new Booking
@@ -396,30 +404,29 @@ namespace IRCTCClone.Controllers
                                 BookingDate = reader.GetDateTime(reader.GetOrdinal("BookingDate")),
                                 Amount = reader.GetDecimal(reader.GetOrdinal("Amount")),
                                 Status = reader.GetString(reader.GetOrdinal("Status")),
-                                ClassCode = reader.GetString(reader.GetOrdinal("Class")),
+                                ClassCode = reader.GetString(reader.GetOrdinal("ClassCode")),
                                 Passengers = new List<Passenger>()
                             };
                         }
-                        else return NotFound();
-                    }
-                }
-
-                // Get Passengers
-                using (var cmd = new SqlCommand("SELECT * FROM Passengers WHERE BookingId = @BookingId", conn))
-                {
-                    cmd.Parameters.AddWithValue("@BookingId", booking.Id);
-                    using (var reader = cmd.ExecuteReader())
-                    {
-                        while (reader.Read())
+                        else
                         {
-                            booking.Passengers.Add(new Passenger
+                            return NotFound();
+                        }
+
+                        // 2️⃣ Move to next result set for passengers
+                        if (reader.NextResult())
+                        {
+                            while (reader.Read())
                             {
-                                Id = reader.GetInt32(reader.GetOrdinal("Id")),
-                                Name = reader.GetString(reader.GetOrdinal("Name")),
-                                Age = reader.GetInt32(reader.GetOrdinal("Age")),
-                                Gender = reader.GetString(reader.GetOrdinal("Gender")),
-                                SeatNumber = reader.GetString(reader.GetOrdinal("SeatNumber"))
-                            });
+                                booking.Passengers.Add(new Passenger
+                                {
+                                    Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                                    Name = reader.GetString(reader.GetOrdinal("Name")),
+                                    Age = reader.GetInt32(reader.GetOrdinal("Age")),
+                                    Gender = reader.GetString(reader.GetOrdinal("Gender")),
+                                    SeatNumber = reader.GetString(reader.GetOrdinal("SeatNumber"))
+                                });
+                            }
                         }
                     }
                 }
@@ -428,6 +435,7 @@ namespace IRCTCClone.Controllers
             return View(booking);
         }
 
+
         [HttpGet]
         public IActionResult History()
         {
@@ -435,35 +443,31 @@ namespace IRCTCClone.Controllers
             if (string.IsNullOrEmpty(userId))
                 return RedirectToAction("Login", "Account");
 
-            // Fetch bookings for this user
             var bookings = new List<Booking>();
+
             using (var conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
-                using (var cmd = new SqlCommand(
-                    @"SELECT b.Id, b.PNR, b.JourneyDate, b.Amount, b.Status,
-                     t.Number AS TrainNumber, t.Name AS TrainName, tc.Code AS ClassCode
-              FROM Bookings b
-              JOIN Trains t ON b.TrainId = t.Id
-              JOIN TrainClasses tc ON b.TrainClassId = tc.Id
-              WHERE b.UserId = @UserId
-              ORDER BY b.BookingDate DESC", conn))
+
+                using (var cmd = new SqlCommand("spGetUserBookingHistory", conn))
                 {
+                    cmd.CommandType = System.Data.CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@UserId", userId);
+
                     using (var reader = cmd.ExecuteReader())
                     {
                         while (reader.Read())
                         {
                             bookings.Add(new Booking
                             {
-                                BookingId = reader.GetInt32(0),
-                                PNR = reader.GetString(1),
-                                JourneyDate = reader.GetDateTime(2),
-                                Amount = reader.GetDecimal(3),
-                                Status = reader.GetString(4),
-                                TrainNumber = reader.GetInt32(5),
-                                TrainName = reader.GetString(6),
-                                ClassCode = reader.GetString(7)
+                                BookingId = reader.GetInt32(reader.GetOrdinal("BookingId")),
+                                PNR = reader.GetString(reader.GetOrdinal("PNR")),
+                                JourneyDate = reader.GetDateTime(reader.GetOrdinal("JourneyDate")),
+                                Amount = reader.GetDecimal(reader.GetOrdinal("Amount")),
+                                Status = reader.GetString(reader.GetOrdinal("Status")),
+                                TrainNumber = reader.GetInt32(reader.GetOrdinal("TrainNumber")),
+                                TrainName = reader.GetString(reader.GetOrdinal("TrainName")),
+                                ClassCode = reader.GetString(reader.GetOrdinal("ClassCode"))
                             });
                         }
                     }
@@ -487,148 +491,40 @@ namespace IRCTCClone.Controllers
             {
                 conn.Open();
 
-                // Get booking info
-                using (var cmd = new SqlCommand(
-                    @"SELECT b.Id, b.PNR, b.JourneyDate, b.Amount, b.Status,
-                     t.Number AS TrainNumber, t.Name AS TrainName, tc.Code AS ClassCode,b.Frmst, b.Tost
-              FROM Bookings b
-              JOIN Trains t ON b.TrainId = t.Id
-              JOIN TrainClasses tc ON b.TrainClassId = tc.Id
-              WHERE b.Id = @BookingId AND b.UserId = @UserId", conn))
+                using (var cmd = new SqlCommand("spGetBookingDtls", conn))
                 {
+                    cmd.CommandType = System.Data.CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@BookingId", id);
                     cmd.Parameters.AddWithValue("@UserId", userId);
 
                     using (var reader = cmd.ExecuteReader())
                     {
+                        // First result: booking info
                         if (reader.Read())
                         {
                             booking = new Booking
                             {
-                                BookingId = reader.GetInt32(0),
-                                PNR = reader.GetString(1),
-                                JourneyDate = reader.GetDateTime(2),
-                                Amount = reader.GetDecimal(3),
-                                Status = reader.GetString(4),
-                                TrainNumber = reader.GetInt32(5),
-                                TrainName = reader.GetString(6),
-                                ClassCode = reader.GetString(7),
-                                Frmst = reader.GetString(8),
-                                Tost = reader.GetString(9)
-                            };
-                        }
-                    }
-                }
-
-                if (booking == null)
-                    return NotFound();
-
-                // Get passengers for this booking
-                using (var cmd = new SqlCommand(
-                    @"SELECT Name, Age, Gender, SeatNumber
-              FROM Passengers
-              WHERE BookingId = @BookingId", conn))
-                {
-                    cmd.Parameters.AddWithValue("@BookingId", id);
-                    using (var reader = cmd.ExecuteReader())
-                    {
-                        while (reader.Read())
-                        {
-                            passengers.Add(new Passenger
-                            {
-                                Name = reader.GetString(0),
-                                Age = reader.GetInt32(1),
-                                Gender = reader.GetString(2),
-                                SeatNumber = reader.GetString(3)
-                            });
-                        }
-                    }
-                }
-            }
-
-            var model = new Booking
-            {
-                Id = booking.Id,  // use Id instead of Booking object
-                PNR = booking.PNR,
-                JourneyDate = booking.JourneyDate,
-                Amount = booking.Amount,
-                Status = booking.Status,
-                TrainNumber = booking.TrainNumber,
-                TrainName = booking.TrainName,
-                ClassCode = booking.ClassCode,
-                Passengers = passengers,
-                Frmst = booking.Frmst,
-                Tost = booking.Tost
-            };
-
-
-            return View(model);
-        }
-
-
-        // GET: /Booking/MyBookings
-        [HttpGet]
-        public IActionResult MyBookings()
-        {
-            string userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            var bookings = new List<Booking>();
-
-            using (var conn = new SqlConnection(_connectionString))
-            {
-                conn.Open();
-
-                // Get all confirmed bookings for this user
-                using (var cmd = new SqlCommand(
-                    @"SELECT b.Id, b.PNR, b.JourneyDate, b.Amount, b.Status,
-                             t.Id AS TrainId, t.Number, t.Name,
-                             c.Id AS ClassId, c.Code
-                      FROM Bookings b
-                      INNER JOIN Trains t ON b.TrainId = t.Id
-                      INNER JOIN TrainClasses c ON b.TrainClassId = c.Id
-                      WHERE b.UserId = @UserId AND b.Status = 'CONFIRMED'
-                      ORDER BY b.BookingDate DESC", conn))
-                {
-                    cmd.Parameters.AddWithValue("@UserId", userId);
-                    using (var reader = cmd.ExecuteReader())
-                    {
-                        while (reader.Read())
-                        {
-                            bookings.Add(new Booking
-                            {
-                                Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                                BookingId = reader.GetInt32(reader.GetOrdinal("BookingId")),
                                 PNR = reader.GetString(reader.GetOrdinal("PNR")),
                                 JourneyDate = reader.GetDateTime(reader.GetOrdinal("JourneyDate")),
                                 Amount = reader.GetDecimal(reader.GetOrdinal("Amount")),
                                 Status = reader.GetString(reader.GetOrdinal("Status")),
-                                Train = new Train
-                                {
-                                    Id = reader.GetInt32(reader.GetOrdinal("TrainId")),
-                                    Number = reader.GetInt32(reader.GetOrdinal("Number")),
-                                    Name = reader.GetString(reader.GetOrdinal("Name"))
-                                },
-                                TrainClass = new TrainClass
-                                {
-                                    Id = reader.GetInt32(reader.GetOrdinal("ClassId")),
-                                    Code = reader.GetString(reader.GetOrdinal("Code"))
-                                },
-                                Passengers = new List<Passenger>()
-                            });
+                                TrainNumber = reader.GetInt32(reader.GetOrdinal("TrainNumber")),
+                                TrainName = reader.GetString(reader.GetOrdinal("TrainName")),
+                                ClassCode = reader.GetString(reader.GetOrdinal("ClassCode")),
+                                Frmst = reader.GetString(reader.GetOrdinal("Frmst")),
+                                Tost = reader.GetString(reader.GetOrdinal("Tost"))
+                            };
                         }
-                    }
-                }
+                        else
+                            return NotFound();
 
-                // Get passengers for each booking
-                foreach (var booking in bookings)
-                {
-                    using (var cmd = new SqlCommand(
-                        "SELECT Name, Age, Gender, SeatNumber FROM Passengers WHERE BookingId = @BookingId", conn))
-                    {
-                        cmd.Parameters.AddWithValue("@BookingId", booking.Id);
-                        using (var reader = cmd.ExecuteReader())
+                        // Move to second result set: passengers
+                        if (reader.NextResult())
                         {
                             while (reader.Read())
                             {
-                                booking.Passengers.Add(new Passenger
+                                passengers.Add(new Passenger
                                 {
                                     Name = reader.GetString(reader.GetOrdinal("Name")),
                                     Age = reader.GetInt32(reader.GetOrdinal("Age")),
@@ -641,6 +537,85 @@ namespace IRCTCClone.Controllers
                 }
             }
 
+            booking.Passengers = passengers;
+            return View(booking);
+        }
+
+        // GET: /Booking/MyBookings
+        [HttpGet]
+        public IActionResult MyBookings()
+        {
+            string userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var bookings = new List<Booking>();
+            var passengerLookup = new Dictionary<int, List<Passenger>>();
+
+            using (var conn = new SqlConnection(_connectionString))
+            {
+                conn.Open();
+
+                using (var cmd = new SqlCommand("spGetUserBookingsWithPassengers", conn))
+                {
+                    cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@UserId", userId);
+
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        // First result set: bookings
+                        while (reader.Read())
+                        {
+                            bookings.Add(new Booking
+                            {
+                                Id = reader.GetInt32(reader.GetOrdinal("BookingId")),
+                                PNR = reader.GetString(reader.GetOrdinal("PNR")),
+                                JourneyDate = reader.GetDateTime(reader.GetOrdinal("JourneyDate")),
+                                Amount = reader.GetDecimal(reader.GetOrdinal("Amount")),
+                                Status = reader.GetString(reader.GetOrdinal("Status")),
+                                Train = new Train
+                                {
+                                    Id = reader.GetInt32(reader.GetOrdinal("TrainId")),
+                                    Number = reader.GetInt32(reader.GetOrdinal("TrainNumber")),
+                                    Name = reader.GetString(reader.GetOrdinal("TrainName"))
+                                },
+                                TrainClass = new TrainClass
+                                {
+                                    Id = reader.GetInt32(reader.GetOrdinal("ClassId")),
+                                    Code = reader.GetString(reader.GetOrdinal("ClassCode"))
+                                },
+                                Passengers = new List<Passenger>()
+                            });
+                        }
+
+                        // Second result set: passengers
+                        if (reader.NextResult())
+                        {
+                            while (reader.Read())
+                            {
+                                int bookingId = reader.GetInt32(reader.GetOrdinal("BookingId"));
+                                var passenger = new Passenger
+                                {
+                                    Name = reader.GetString(reader.GetOrdinal("Name")),
+                                    Age = reader.GetInt32(reader.GetOrdinal("Age")),
+                                    Gender = reader.GetString(reader.GetOrdinal("Gender")),
+                                    SeatNumber = reader.GetString(reader.GetOrdinal("SeatNumber"))
+                                };
+
+                                if (!passengerLookup.ContainsKey(bookingId))
+                                    passengerLookup[bookingId] = new List<Passenger>();
+
+                                passengerLookup[bookingId].Add(passenger);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Assign passengers to bookings
+            foreach (var booking in bookings)
+            {
+                if (passengerLookup.TryGetValue(booking.Id, out var list))
+                    booking.Passengers = list;
+            }
+
             return View(bookings);
         }
 
@@ -651,62 +626,31 @@ namespace IRCTCClone.Controllers
             if (string.IsNullOrEmpty(userId))
                 return RedirectToAction("Login", "Account");
 
-            using (var conn = new SqlConnection(_connectionString))
+            try
             {
-                conn.Open();
-
-                // Step 1: Get booking details
-                int trainClassId = 0;
-                int passengerCount = 0;
-                using (var cmd = new SqlCommand(
-                    @"SELECT TrainClassId FROM Bookings WHERE Id = @BookingId AND UserId = @UserId", conn))
+                using (var conn = new SqlConnection(_connectionString))
                 {
-                    cmd.Parameters.AddWithValue("@BookingId", id);
-                    cmd.Parameters.AddWithValue("@UserId", userId);
-                    var result = cmd.ExecuteScalar();
-                    if (result == null)
-                        return NotFound(); // Booking not found or not owned by this user
-                    trainClassId = Convert.ToInt32(result);
+                    conn.Open();
+
+                    using (var cmd = new SqlCommand("spCancelBooking", conn))
+                    {
+                        cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                        cmd.Parameters.AddWithValue("@BookingId", id);
+                        cmd.Parameters.AddWithValue("@UserId", userId);
+
+                        cmd.ExecuteNonQuery();
+                    }
                 }
 
-                // Step 2: Count how many passengers were booked
-                using (var cmd = new SqlCommand("SELECT COUNT(*) FROM Passengers WHERE BookingId = @BookingId", conn))
-                {
-                    cmd.Parameters.AddWithValue("@BookingId", id);
-                    passengerCount = Convert.ToInt32(cmd.ExecuteScalar());
-                }
-
-                // Step 3: Increase seat availability back
-                using (var cmd = new SqlCommand(
-                    "UPDATE TrainClasses SET SeatsAvailable = SeatsAvailable + @Count WHERE Id = @ClassId", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Count", passengerCount);
-                    cmd.Parameters.AddWithValue("@ClassId", trainClassId);
-                    cmd.ExecuteNonQuery();
-                }
-
-                // Step 4: Delete passengers for this booking
-                using (var cmd = new SqlCommand("DELETE FROM Passengers WHERE BookingId = @BookingId", conn))
-                {
-                    cmd.Parameters.AddWithValue("@BookingId", id);
-                    cmd.ExecuteNonQuery();
-                }
-
-                // Step 5: Delete booking
-                using (var cmd = new SqlCommand("DELETE FROM Bookings WHERE Id = @BookingId", conn))
-                {
-                    cmd.Parameters.AddWithValue("@BookingId", id);
-                    cmd.ExecuteNonQuery();
-                }
-
-                conn.Close();
+                TempData["Message"] = "Booking cancelled successfully!";
+            }
+            catch (SqlException ex)
+            {
+                TempData["Error"] = ex.Message;
             }
 
-            TempData["Message"] = "Booking cancelled successfully!";
             return RedirectToAction("History");
         }
-
-
 
         private string GeneratePnr()
         {

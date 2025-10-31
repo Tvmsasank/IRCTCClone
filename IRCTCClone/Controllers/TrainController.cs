@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using System;
 using System.Collections.Generic;
+using System.Data;
 
 namespace IRCTCClone.Controllers
 {
@@ -56,15 +57,16 @@ namespace IRCTCClone.Controllers
             if (Request.IsAjaxRequest())
             {
                 var stations = new List<object>();
+
                 using (var conn = new SqlConnection(_connectionString))
                 {
                     conn.Open();
-                    using (var cmd = new SqlCommand(
-                        @"SELECT TOP 10 Id, Name, Code 
-                                  FROM Stations 
-                                  WHERE Name LIKE @From OR Code LIKE @From", conn))
+
+                    using (var cmd = new SqlCommand("spSearchStations", conn))
                     {
-                        cmd.Parameters.AddWithValue("@From", $"%{from}%");
+                        cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                        cmd.Parameters.AddWithValue("@SearchText", from);
+
                         using (var reader = cmd.ExecuteReader())
                         {
                             while (reader.Read())
@@ -79,6 +81,7 @@ namespace IRCTCClone.Controllers
                         }
                     }
                 }
+
                 return Json(stations);
             }
 
@@ -94,13 +97,10 @@ namespace IRCTCClone.Controllers
             using (var conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
-                using (var cmd = new SqlCommand(
-                    @"SELECT t.Id, t.Number, t.Name, t.FromStationId, t.ToStationId, t.Departure, t.Arrival, t.Duration
-                      FROM Trains t
-                      INNER JOIN Stations fs ON fs.Id = t.FromStationId
-                      INNER JOIN Stations ts ON ts.Id = t.ToStationId
-                      WHERE fs.Name = @From AND ts.Name = @To", conn))
+
+                using (var cmd = new SqlCommand("spSearchTrains", conn))
                 {
+                    cmd.CommandType = System.Data.CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@From", from);
                     cmd.Parameters.AddWithValue("@To", to);
 
@@ -130,8 +130,7 @@ namespace IRCTCClone.Controllers
 
             return View("Results", trains);
         }
-      
-        
+
         [HttpGet]
         public JsonResult GetStations(string term)
         {
@@ -140,10 +139,12 @@ namespace IRCTCClone.Controllers
             using (var conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
-                string sql = "SELECT TOP 50 Id, Code, Name FROM Stations WHERE Name LIKE @term + '%' OR Code LIKE @term + '%' ORDER BY Name";
-                using (var cmd = new SqlCommand(sql, conn))
+
+                using (var cmd = new SqlCommand("spGetStations", conn))
                 {
-                    cmd.Parameters.AddWithValue("@term", term ?? "");
+                    cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@Term", term ?? "");
+
                     using (var reader = cmd.ExecuteReader())
                     {
                         while (reader.Read())
@@ -162,7 +163,6 @@ namespace IRCTCClone.Controllers
             return Json(stations);
         }
 
-
         [HttpPost]
         public IActionResult Results(int fromStationId, int toStationId, DateTime journeyDate)
         {
@@ -171,16 +171,11 @@ namespace IRCTCClone.Controllers
             using (var conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
-                using (var cmd = new SqlCommand(
-                @"SELECT t.Id, t.Number, t.Name,
-                fs.Id AS FromStationId, fs.Code AS FromStationCode,
-                ts.Id AS ToStationId, ts.Code AS ToStationCode,
-                t.Departure, t.Arrival, t.Duration
-                FROM Trains t
-                INNER JOIN Stations fs ON t.FromStationId = fs.Id
-                INNER JOIN Stations ts ON t.ToStationId = ts.Id
-                WHERE t.FromStationId = @FromStationId AND t.ToStationId = @ToStationId", conn))
+
+                // 1️⃣ Call spSearchTrains
+                using (var cmd = new SqlCommand("spSearchTrains", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@FromStationId", fromStationId);
                     cmd.Parameters.AddWithValue("@ToStationId", toStationId);
 
@@ -196,12 +191,12 @@ namespace IRCTCClone.Controllers
                                 FromStationId = reader.GetInt32(3),
                                 FromStation = new Station
                                 {
-                                    Code = reader.GetString(4)   // 👈 Code instead of Name
+                                    Code = reader.GetString(4)
                                 },
                                 ToStationId = reader.GetInt32(5),
                                 ToStation = new Station
                                 {
-                                    Code = reader.GetString(6)   // 👈 Code instead of Name
+                                    Code = reader.GetString(6)
                                 },
                                 Departure = reader.GetTimeSpan(7),
                                 Arrival = reader.GetTimeSpan(8),
@@ -212,14 +207,14 @@ namespace IRCTCClone.Controllers
                     }
                 }
 
-
-                // Load classes for each train
+                // 2️⃣ Load classes for each train using spLoadTrainClasses
                 foreach (var train in trains)
                 {
-                    using (var cmd = new SqlCommand(
-                        "SELECT Id, TrainId, Code, Fare, SeatsAvailable FROM TrainClasses WHERE TrainId = @TrainId", conn))
+                    using (var cmd = new SqlCommand("spLoadTrainClasses", conn))
                     {
+                        cmd.CommandType = CommandType.StoredProcedure;
                         cmd.Parameters.AddWithValue("@TrainId", train.Id);
+
                         using (var reader = cmd.ExecuteReader())
                         {
                             while (reader.Read())
@@ -231,7 +226,6 @@ namespace IRCTCClone.Controllers
                                     Code = reader.GetString(2),
                                     Fare = reader.GetDecimal(3),
                                     SeatsAvailable = reader.GetInt32(4)
-
                                 });
                             }
                         }
@@ -243,6 +237,8 @@ namespace IRCTCClone.Controllers
             return View(trains);
         }
 
+
+
         public IActionResult Details(int id)
         {
             Train train = null;
@@ -251,74 +247,60 @@ namespace IRCTCClone.Controllers
             {
                 conn.Open();
 
-                // Get train info
-                using (var cmd = new SqlCommand(@"
-            SELECT 
-                t.Id, t.Number, t.Name, 
-                t.FromStationId, fs.Name AS FromName, fs.Code AS FromCode,
-                t.ToStationId, ts.Name AS ToName, ts.Code AS ToCode,
-                t.Departure, t.Arrival, t.Duration
-            FROM Trains t
-            INNER JOIN Stations fs ON t.FromStationId = fs.Id
-            INNER JOIN Stations ts ON t.ToStationId = ts.Id
-            WHERE t.Id = @TrainId", conn))
+                using (var cmd = new SqlCommand("spGetTrainDetails", conn))
                 {
+                    cmd.CommandType = System.Data.CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@TrainId", id);
 
                     using (var reader = cmd.ExecuteReader())
                     {
-                        if (reader.Read())
-                        {
-                            train = new Train
-                            {
-                                Id = reader.GetInt32(0),
-                                Number = reader.GetInt32(1),
-                                Name = reader.GetString(2),
-                                FromStationId = reader.GetInt32(3),
-                                FromStation = new Station
-                                {
-                                    Name = reader.GetString(4),
-                                    Code = reader.GetString(5)
-                                },
-                                ToStationId = reader.GetInt32(6),
-                                ToStation = new Station
-                                {
-                                    Name = reader.GetString(7),
-                                    Code = reader.GetString(8)
-                                },
-                                Departure = reader.GetTimeSpan(9),
-                                Arrival = reader.GetTimeSpan(10),
-                                Duration = reader.GetTimeSpan(11),
-                                Classes = new List<TrainClass>()
-                            };
-                        }
-                        else return NotFound();
-                    }
-                }
-
-
-                // ✅ Fetch available classes
-                using (var cmd = new SqlCommand(
-                    "SELECT Id, TrainId, Code, Fare, SeatsAvailable FROM TrainClasses WHERE TrainId = @TrainId", conn))
-                {
-                    cmd.Parameters.AddWithValue("@TrainId", id);
-                    using (var reader = cmd.ExecuteReader())
-                    {
+                        train = null;
                         while (reader.Read())
                         {
-                            train.Classes.Add(new TrainClass
+                            if (train == null)
                             {
-                                Id = reader.GetInt32(0),
-                                TrainId = reader.GetInt32(1),
-                                Code = reader.GetString(2),
-                                Fare = reader.GetDecimal(3),
-                                SeatsAvailable = reader.GetInt32(4)
-                            });
+                                train = new Train
+                                {
+                                    Id = reader.GetInt32(reader.GetOrdinal("TrainId")),
+                                    Number = reader.GetInt32(reader.GetOrdinal("TrainNumber")),
+                                    Name = reader.GetString(reader.GetOrdinal("TrainName")),
+                                    FromStationId = reader.GetInt32(reader.GetOrdinal("FromStationId")),
+                                    FromStation = new Station
+                                    {
+                                        Name = reader.GetString(reader.GetOrdinal("FromName")),
+                                        Code = reader.GetString(reader.GetOrdinal("FromCode"))
+                                    },
+                                    ToStationId = reader.GetInt32(reader.GetOrdinal("ToStationId")),
+                                    ToStation = new Station
+                                    {
+                                        Name = reader.GetString(reader.GetOrdinal("ToName")),
+                                        Code = reader.GetString(reader.GetOrdinal("ToCode"))
+                                    },
+                                    Departure = reader.GetTimeSpan(reader.GetOrdinal("Departure")),
+                                    Arrival = reader.GetTimeSpan(reader.GetOrdinal("Arrival")),
+                                    Duration = reader.GetTimeSpan(reader.GetOrdinal("Duration")),
+                                    Classes = new List<TrainClass>()
+                                };
+                            }
+
+                            // Add class if exists
+                            if (!reader.IsDBNull(reader.GetOrdinal("ClassId")))
+                            {
+                                train.Classes.Add(new TrainClass
+                                {
+                                    Id = reader.GetInt32(reader.GetOrdinal("ClassId")),
+                                    TrainId = train.Id,
+                                    Code = reader.GetString(reader.GetOrdinal("ClassCode")),
+                                    Fare = reader.GetDecimal(reader.GetOrdinal("Fare")),
+                                    SeatsAvailable = reader.GetInt32(reader.GetOrdinal("SeatsAvailable"))
+                                });
+                            }
                         }
                     }
                 }
             }
 
+            if (train == null) return NotFound();
             return View(train);
         }
     }

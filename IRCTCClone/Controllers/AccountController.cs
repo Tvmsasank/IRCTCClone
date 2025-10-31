@@ -7,6 +7,7 @@ using Microsoft.Extensions.Configuration;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using System.Data;
 
 namespace IRCTCClone.Controllers
 {
@@ -19,11 +20,10 @@ namespace IRCTCClone.Controllers
             _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
 
+        // -------------------- LOGIN --------------------
         [HttpGet]
         public IActionResult Login()
         {
-            // Pass ReturnUrl to View via ViewData
-       
             return View(new ViewModels());
         }
 
@@ -33,12 +33,15 @@ namespace IRCTCClone.Controllers
             if (!ModelState.IsValid) return View(model);
 
             bool validUser = false;
+
             using (var conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
-                using (var cmd = new SqlCommand("SELECT PasswordHash FROM Usrs WHERE Email=@Email", conn))
+                using (var cmd = new SqlCommand("sp_CheckUserLogin", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@Email", model.Email);
+
                     var result = cmd.ExecuteScalar();
                     if (result != null)
                     {
@@ -54,35 +57,28 @@ namespace IRCTCClone.Controllers
             }
 
             // Sign in user
-            var claims = new List<Claim> { new Claim(ClaimTypes.Name, model.Email), new Claim(ClaimTypes.NameIdentifier, model.Email) };
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.Name, model.Email),
+                new Claim(ClaimTypes.NameIdentifier, model.Email)
+            };
             var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
             var principal = new ClaimsPrincipal(identity);
+
             await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
-
-            //// Redirect to booking page if present
-            //if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
-            //{
-            //    return Redirect(returnUrl);
-            //}
-
             return RedirectToAction("Index", "Home");
         }
 
-
+        // -------------------- LOGOUT --------------------
         [HttpPost]
         public async Task<IActionResult> Logout()
         {
-            // Sign out the user and clear the authentication cookie
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-
-            // Optionally clear all session data
             HttpContext.Session.Clear();
-
-            // Redirect to Home page
             return RedirectToAction("Index", "Home");
         }
 
-
+        // -------------------- REGISTER --------------------
         [HttpGet]
         public IActionResult Register()
         {
@@ -103,27 +99,19 @@ namespace IRCTCClone.Controllers
             using (var conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
-
-                // Check if email exists
-                using (var checkCmd = new SqlCommand("SELECT COUNT(*) FROM Usrs WHERE Email = @Email", conn))
+                using (var cmd = new SqlCommand("sp_RegisterUser", conn))
                 {
-                    checkCmd.Parameters.AddWithValue("@Email", model.Email);
-                    int exists = (int)checkCmd.ExecuteScalar();
-                    if (exists > 0)
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@Email", model.Email);
+                    cmd.Parameters.AddWithValue("@PasswordHash", HashPassword(model.Password));
+                    cmd.Parameters.AddWithValue("@FullName", model.FullName);
+
+                    var result = cmd.ExecuteScalar();
+                    if (result != null && result.ToString() == "-1")
                     {
                         ModelState.AddModelError("", "Email already registered.");
                         return View(model);
                     }
-                }
-
-                // Insert new user
-                using (var cmd = new SqlCommand(
-                    "INSERT INTO Usrs (Email, PasswordHash, FullName) VALUES (@Email, @PasswordHash, @FullName)", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Email", model.Email);
-                    cmd.Parameters.AddWithValue("@PasswordHash", HashPassword(model.Password));
-                    cmd.Parameters.AddWithValue("@FullName", (model.FullName));
-                    cmd.ExecuteNonQuery();
                 }
             }
 
@@ -131,6 +119,41 @@ namespace IRCTCClone.Controllers
             return RedirectToAction("Login");
         }
 
+        // -------------------- FORGOT PASSWORD --------------------
+        [HttpGet]
+        public IActionResult ForgotPassword()
+        {
+            return View();
+        }
+
+        [HttpPost]
+        public IActionResult ForgotPassword(string email, string newPassword)
+        {
+            using (var conn = new SqlConnection(_connectionString))
+            {
+                conn.Open();
+                using (var cmd = new SqlCommand("sp_UpdatePassword", conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@Email", email);
+                    cmd.Parameters.AddWithValue("@PasswordHash", HashPassword(newPassword));
+
+                    var result = cmd.ExecuteScalar();
+
+                    if (result != null && result.ToString() == "-1")
+                    {
+                        ViewBag.Error = "❌ Email not found!";
+                        return View();
+                    }
+
+                    ViewBag.Message = "✅ Password updated successfully! You can now login.";
+                }
+            }
+
+            return View();
+        }
+
+        // -------------------- PASSWORD HASH --------------------
         private string HashPassword(string password)
         {
             using (var sha = SHA256.Create())
@@ -139,49 +162,6 @@ namespace IRCTCClone.Controllers
                 var hash = sha.ComputeHash(bytes);
                 return Convert.ToBase64String(hash);
             }
-        }
-
-
-        [HttpGet]
-        public IActionResult ForgotPassword()
-        {
-            return View();
-        }
-
-        // POST: /Account/ForgotPassword
-        [HttpPost]
-        public IActionResult ForgotPassword(string email, string newPassword)
-        {
-        
-
-            using (SqlConnection con = new SqlConnection(_connectionString))
-            {
-                con.Open();
-
-                // Check if user exists
-                string checkQuery = "SELECT COUNT(*) FROM Usrs WHERE Email = @Email";
-                SqlCommand checkCmd = new SqlCommand(checkQuery, con);
-                checkCmd.Parameters.AddWithValue("@Email", email);
-                int count = (int)checkCmd.ExecuteScalar();
-
-                if (count == 0)
-                {
-                    ViewBag.Error = "❌ Email not found!";
-                    return View();
-                }
-
-                // Update password
-                string updateQuery = "UPDATE Usrs SET PasswordHash = @Password WHERE Email = @Email";
-                SqlCommand cmd = new SqlCommand(updateQuery, con);
-                cmd.Parameters.AddWithValue("@Password", HashPassword(newPassword));
-                cmd.Parameters.AddWithValue("@Email", email);
-                cmd.ExecuteNonQuery();
-
-                ViewBag.Message = "✅ Password updated successfully! You can now login.";
-                con.Close();
-            }
-
-            return View();
         }
     }
 }

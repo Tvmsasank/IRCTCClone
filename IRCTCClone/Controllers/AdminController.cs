@@ -5,7 +5,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.AspNetCore.Http;
 using System;
 using System.Collections.Generic;
-using IRCTCClone.Models;
+using System.Data;
 
 
 
@@ -38,9 +38,9 @@ namespace IrctcClone.Controllers
             using (var conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
-                var query = "SELECT COUNT(*) FROM Admins WHERE Username = @Username AND Password = @Password";
-                using (var cmd = new SqlCommand(query, conn))
+                using (var cmd = new SqlCommand("sp_AdminLogin", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@Username", username);
                     cmd.Parameters.AddWithValue("@Password", password);
 
@@ -87,51 +87,46 @@ namespace IrctcClone.Controllers
             using (var conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
-                var query = @"
-                SELECT t.Id, t.Number, t.Name, t.FromStationId, t.ToStationId, t.Departure, t.Arrival, t.Duration,
-                       f.Code AS FromCode, f.Name AS FromName,
-                       tt.Code AS ToCode, tt.Name AS ToName
-                FROM Trains t
-                INNER JOIN Stations f ON t.FromStationId = f.Id
-                INNER JOIN Stations tt ON t.ToStationId = tt.Id
-                ORDER BY t.Name";
-
-                using (var cmd = new SqlCommand(query, conn))
-                using (var reader = cmd.ExecuteReader())
+                using (var cmd = new SqlCommand("sp_GetAllTrains", conn))
                 {
-                    while (reader.Read())
+                    cmd.CommandType = CommandType.StoredProcedure;
+
+                    using (var reader = cmd.ExecuteReader())
                     {
-                        trains.Add(new Train
+                        while (reader.Read())
                         {
-                            Id = reader.GetInt32(0),
-                            Number = reader.GetInt32(1),
-                            Name = reader.GetString(2),
-                            FromStationId = reader.GetInt32(3),
-                            ToStationId = reader.GetInt32(4),
-                            Departure = reader.GetTimeSpan(5),
-                            Arrival = reader.GetTimeSpan(6),
-                            Duration = reader.GetTimeSpan(7),
-                            FromStation = new Station
+                            trains.Add(new Train
                             {
-                                Id = reader.GetInt32(3),
-                                Code = reader.GetString(8),
-                                Name = reader.GetString(9)
-                            },
-                            ToStation = new Station
-                            {
-                                Id = reader.GetInt32(4),
-                                Code = reader.GetString(10),
-                                Name = reader.GetString(11)
-                            }
-                        });
+                                Id = reader.GetInt32(0),
+                                Number = reader.GetInt32(1),
+                                Name = reader.GetString(2),
+                                FromStationId = reader.GetInt32(3),
+                                ToStationId = reader.GetInt32(4),
+                                Departure = reader.GetTimeSpan(5),
+                                Arrival = reader.GetTimeSpan(6),
+                                Duration = reader.GetTimeSpan(7),
+                                FromStation = new Station
+                                {
+                                    Id = reader.GetInt32(3),
+                                    Code = reader.GetString(8),
+                                    Name = reader.GetString(9)
+                                },
+                                ToStation = new Station
+                                {
+                                    Id = reader.GetInt32(4),
+                                    Code = reader.GetString(10),
+                                    Name = reader.GetString(11)
+                                }
+                            });
+                        }
                     }
                 }
-            }
 
-            return View(trains);
+                return View(trains);
+            }
         }
 
-        // Create Train (GET)
+        // ✅ 1. GET - Create Train
         [HttpGet]
         public IActionResult CreateTrain()
         {
@@ -140,16 +135,20 @@ namespace IrctcClone.Controllers
             using (var conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
-                var cmd = new SqlCommand("SELECT Id, Name FROM Stations ORDER BY Name", conn);
-                using (var reader = cmd.ExecuteReader())
+
+                using (var cmd = new SqlCommand("spGetAllStations", conn))
                 {
-                    while (reader.Read())
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    using (var reader = cmd.ExecuteReader())
                     {
-                        stations.Add(new Station
+                        while (reader.Read())
                         {
-                            Id = reader.GetInt32(0),
-                            Name = reader.GetString(1)
-                        });
+                            stations.Add(new Station
+                            {
+                                Id = reader.GetInt32(0),
+                                Name = reader.GetString(1)
+                            });
+                        }
                     }
                 }
             }
@@ -166,18 +165,15 @@ namespace IrctcClone.Controllers
             {
                 conn.Open();
 
-                // ===== Check for duplicate Train =====
-                var duplicateQuery = @"
-            SELECT COUNT(*) FROM Trains 
-            WHERE Number = @Number 
-               OR (FromStationId = @FromStationId AND ToStationId = @ToStationId)";
-                using (var checkCmd = new SqlCommand(duplicateQuery, conn))
+                // 1️⃣ Check Duplicate Train
+                using (var cmd = new SqlCommand("spCheckDuplicateTrain", conn))
                 {
-                    checkCmd.Parameters.AddWithValue("@Number", train.Number);
-                    checkCmd.Parameters.AddWithValue("@FromStationId", train.FromStationId);
-                    checkCmd.Parameters.AddWithValue("@ToStationId", train.ToStationId);
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@Number", train.Number);
+                    cmd.Parameters.AddWithValue("@FromStationId", train.FromStationId);
+                    cmd.Parameters.AddWithValue("@ToStationId", train.ToStationId);
 
-                    int existingCount = Convert.ToInt32(checkCmd.ExecuteScalar());
+                    int existingCount = Convert.ToInt32(cmd.ExecuteScalar());
                     if (existingCount > 0)
                     {
                         TempData["ErrorMessage"] = "⚠️ A train with the same number or route already exists!";
@@ -185,42 +181,10 @@ namespace IrctcClone.Controllers
                     }
                 }
 
-                // ===== Get both station names =====
-                var stationQuery = "SELECT Id, Name FROM Stations WHERE Id IN (@FromId, @ToId)";
-                using (var cmd = new SqlCommand(stationQuery, conn))
+                // 2️⃣ Insert Train and get ID
+                using (var cmd = new SqlCommand("spInsertTrain", conn))
                 {
-                    cmd.Parameters.AddWithValue("@FromId", train.FromStationId);
-                    cmd.Parameters.AddWithValue("@ToId", train.ToStationId);
-
-                    using (var reader = cmd.ExecuteReader())
-                    {
-                        while (reader.Read())
-                        {
-                            int id = Convert.ToInt32(reader["Id"]);
-                            string name = reader["Name"].ToString();
-
-                            if (id == train.FromStationId)
-                                train.FromStationName = name;
-                            if (id == train.ToStationId)
-                                train.ToStationName = name;
-                        }
-                    }
-                }
-
-                // ===== Assign Station objects =====
-                train.FromStation = new Station { Id = train.FromStationId, Name = train.FromStationName };
-                train.ToStation = new Station { Id = train.ToStationId, Name = train.ToStationName };
-
-                // ===== Insert Train =====
-                var insertTrain = @"
-            INSERT INTO Trains 
-            (Number, Name, FromStationId, ToStationId, Departure, Arrival, Duration, FromStationName, ToStationName)
-            VALUES
-            (@Number, @Name, @FromStationId, @ToStationId, @Departure, @Arrival, @Duration, @FromStationName, @ToStationName);
-            SELECT SCOPE_IDENTITY();";
-
-                using (var cmd = new SqlCommand(insertTrain, conn))
-                {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@Number", train.Number);
                     cmd.Parameters.AddWithValue("@Name", train.Name);
                     cmd.Parameters.AddWithValue("@FromStationId", train.FromStationId);
@@ -228,20 +192,16 @@ namespace IrctcClone.Controllers
                     cmd.Parameters.AddWithValue("@Departure", train.Departure);
                     cmd.Parameters.AddWithValue("@Arrival", train.Arrival);
                     cmd.Parameters.AddWithValue("@Duration", train.Duration);
-                    cmd.Parameters.AddWithValue("@FromStationName", train.FromStationName);
-                    cmd.Parameters.AddWithValue("@ToStationName", train.ToStationName);
 
                     train.Id = Convert.ToInt32(cmd.ExecuteScalar());
                 }
 
-                // ===== Insert Train Classes =====
+                // 3️⃣ Insert Classes
                 for (int i = 0; i < classCodes.Count; i++)
                 {
-                    var insertClass = @"
-                INSERT INTO TrainClasses (TrainId, Code, Fare, SeatsAvailable)
-                VALUES (@TrainId, @Code, @Fare, @SeatsAvailable)";
-                    using (var cmd = new SqlCommand(insertClass, conn))
+                    using (var cmd = new SqlCommand("spInsertTrainClass", conn))
                     {
+                        cmd.CommandType = CommandType.StoredProcedure;
                         cmd.Parameters.AddWithValue("@TrainId", train.Id);
                         cmd.Parameters.AddWithValue("@Code", classCodes[i]);
                         cmd.Parameters.AddWithValue("@Fare", fares[i]);
@@ -256,34 +216,64 @@ namespace IrctcClone.Controllers
         }
 
 
+
+        // ✅ GET: Add Route
         public IActionResult AddRoute(int trainId)
         {
             ViewBag.TrainId = trainId;
-            ViewBag.Stations = GetAllStations();
-            return View();
-        }
 
-        [HttpPost]
-        public IActionResult AddRoute(int trainId, List<TrainRoute> routes)
-        {
-            using (SqlConnection conn = new SqlConnection(_connectionString))
+            var stations = new List<Station>();
+            using (var conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
-                foreach (var r in routes)
-                {
-                    SqlCommand cmd = new SqlCommand(@"
-                INSERT INTO TrainRoutes (TrainId, StationId, StopNumber, ArrivalTime, DepartureTime)
-                VALUES (@TrainId, @StationId, @StopNumber, @ArrivalTime, @DepartureTime)", conn);
 
-                    cmd.Parameters.AddWithValue("@TrainId", trainId);
-                    cmd.Parameters.AddWithValue("@StationId", r.StationId);
-                    cmd.Parameters.AddWithValue("@StopNumber", r.StopNumber);
-                    cmd.Parameters.AddWithValue("@ArrivalTime", (object?)r.ArrivalTime ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@DepartureTime", (object?)r.DepartureTime ?? DBNull.Value);
-                    cmd.ExecuteNonQuery();
+                using (var cmd = new SqlCommand("spGetAllStations", conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            stations.Add(new Station
+                            {
+                                Id = reader.GetInt32(0),
+                                Name = reader.GetString(1)
+                            });
+                        }
+                    }
                 }
             }
 
+            ViewBag.Stations = stations;
+            return View();
+        }
+
+        // ✅ POST: Add Route
+        [HttpPost]
+        public IActionResult AddRoute(int trainId, List<TrainRoute> routes)
+        {
+            using (var conn = new SqlConnection(_connectionString))
+            {
+                conn.Open();
+
+                foreach (var route in routes)
+                {
+                    using (var cmd = new SqlCommand("spInsertTrainRoute", conn))
+                    {
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.AddWithValue("@TrainId", trainId);
+                        cmd.Parameters.AddWithValue("@StationId", route.StationId);
+                        cmd.Parameters.AddWithValue("@StopNumber", route.StopNumber);
+                        cmd.Parameters.AddWithValue("@ArrivalTime", (object?)route.ArrivalTime ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@DepartureTime", (object?)route.DepartureTime ?? DBNull.Value);
+
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+            }
+
+            TempData["SuccessMessage"] = "✅ Train routes added successfully!";
             return RedirectToAction("Index");
         }
 
@@ -295,19 +285,22 @@ namespace IrctcClone.Controllers
             using (var conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
-                string query = "SELECT Id, Code, Name FROM Stations ORDER BY Name";
 
-                using (var cmd = new SqlCommand(query, conn))
-                using (var reader = cmd.ExecuteReader())
+                using (var cmd = new SqlCommand("spgetallstatns", conn))
                 {
-                    while (reader.Read())
+                    cmd.CommandType = CommandType.StoredProcedure;
+
+                    using (var reader = cmd.ExecuteReader())
                     {
-                        stations.Add(new Station
+                        while (reader.Read())
                         {
-                            Id = reader.GetInt32(0),
-                            Code = reader.GetString(1),
-                            Name = reader.GetString(2)
-                        });
+                            stations.Add(new Station
+                            {
+                                Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                                Code = reader.GetString(reader.GetOrdinal("Code")),
+                                Name = reader.GetString(reader.GetOrdinal("Name"))
+                            });
+                        }
                     }
                 }
             }
@@ -316,11 +309,6 @@ namespace IrctcClone.Controllers
         }
 
 
-
-
-
-
-        // Delete Train
         [HttpGet]
         public IActionResult Delete(int id)
         {
@@ -328,23 +316,26 @@ namespace IrctcClone.Controllers
             {
                 conn.Open();
 
-                var deleteClasses = "DELETE FROM TrainClasses WHERE TrainId = @TrainId";
-                using (var cmd = new SqlCommand(deleteClasses, conn))
+                // Delete TrainClasses first
+                using (var cmd = new SqlCommand("spDeleteTrainClasses", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@TrainId", id);
                     cmd.ExecuteNonQuery();
                 }
 
-                var deleteTrain = "DELETE FROM Trains WHERE Id = @Id";
-                using (var cmd = new SqlCommand(deleteTrain, conn))
+                // Delete Train next
+                using (var cmd = new SqlCommand("spDeleteTrain", conn))
                 {
-                    cmd.Parameters.AddWithValue("@Id", id);
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@TrainId", id);
                     cmd.ExecuteNonQuery();
                 }
             }
 
             return RedirectToAction("Index");
         }
+
 
         // =====================================================
         // STATIONS MANAGEMENT
@@ -356,24 +347,29 @@ namespace IrctcClone.Controllers
             using (var conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
-                var query = "SELECT Id, Code, Name FROM Stations ORDER BY Name";
-                using (var cmd = new SqlCommand(query, conn))
-                using (var reader = cmd.ExecuteReader())
+
+                using (var cmd = new SqlCommand("spgetallstatns", conn))
                 {
-                    while (reader.Read())
+                    cmd.CommandType = CommandType.StoredProcedure;
+
+                    using (var reader = cmd.ExecuteReader())
                     {
-                        stations.Add(new Station
+                        while (reader.Read())
                         {
-                            Id = reader.GetInt32(0),
-                            Code = reader.GetString(1),
-                            Name = reader.GetString(2)
-                        });
+                            stations.Add(new Station
+                            {
+                                Id = reader.GetInt32(0),
+                                Code = reader.GetString(1),
+                                Name = reader.GetString(2)
+                            });
+                        }
                     }
                 }
             }
 
             return View(stations);
         }
+
 
         [HttpGet]
         public IActionResult CreateStation()
@@ -391,42 +387,25 @@ namespace IrctcClone.Controllers
             {
                 conn.Open();
 
-                // ✅ Check if a station with the same Name or Code already exists
-                string checkDuplicate = @"
-            SELECT COUNT(*) FROM Stations 
-            WHERE LOWER(Name) = LOWER(@Name) OR LOWER(Code) = LOWER(@Code)";
-
-                using (var checkCmd = new SqlCommand(checkDuplicate, conn))
+                using (var cmd = new SqlCommand("spCreateStation", conn))
                 {
-                    checkCmd.Parameters.AddWithValue("@Name", station.Name.Trim());
-                    checkCmd.Parameters.AddWithValue("@Code", station.Code.Trim());
-
-                    int existingCount = (int)checkCmd.ExecuteScalar();
-
-                    if (existingCount > 0)
-                    {
-                        // ❌ Station already exists
-                        TempData["ErrorMessage"] = "⚠️ Station with the same name or code already exists!";
-                        return RedirectToAction("CreateStation"); // ✅ Redirect so TempData shows in view
-                    }
-                }
-
-                // ✅ Insert new station if no duplicates
-                string insert = "INSERT INTO Stations (Code, Name) VALUES (@Code, @Name)";
-                using (var cmd = new SqlCommand(insert, conn))
-                {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@Code", station.Code.Trim());
                     cmd.Parameters.AddWithValue("@Name", station.Name.Trim());
-                    cmd.ExecuteNonQuery();
+
+                    var result = cmd.ExecuteScalar();
+
+                    if (result != null && Convert.ToInt32(result) == -1)
+                    {
+                        TempData["ErrorMessage"] = "⚠️ Station with the same name or code already exists!";
+                        return RedirectToAction("CreateStation");
+                    }
                 }
             }
 
             TempData["SuccessMessage"] = "✅ Station added successfully!";
-            return RedirectToAction("CreateStation"); // Redirect back to show message
+            return RedirectToAction("CreateStation");
         }
-
-
-
 
         [HttpGet]
         public IActionResult EditStation(int id)
@@ -436,10 +415,12 @@ namespace IrctcClone.Controllers
             using (var conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
-                var query = "SELECT Id, Code, Name FROM Stations WHERE Id = @Id";
-                using (var cmd = new SqlCommand(query, conn))
+
+                using (var cmd = new SqlCommand("spGetStationById", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@Id", id);
+
                     using (var reader = cmd.ExecuteReader())
                     {
                         if (reader.Read())
@@ -457,13 +438,12 @@ namespace IrctcClone.Controllers
 
             if (station == null)
             {
-                // Debug message to help during development
-                TempData["ErrorMessage"] = $"Station not found with ID: {id}";
+                TempData["ErrorMessage"] = $"⚠️ Station not found with ID: {id}";
                 return RedirectToAction("StationList");
             }
-            return View(station); 
-        }
 
+            return View(station);
+        }
 
         [HttpPost]
         public IActionResult EditStation(Station station)
@@ -475,32 +455,30 @@ namespace IrctcClone.Controllers
             {
                 conn.Open();
 
-                string checkDuplicate = @"
-            SELECT COUNT(*) FROM Stations
-            WHERE (LOWER(Name) = LOWER(@Name) OR LOWER(Code) = LOWER(@Code))
-            AND Id <> @Id";
-
-                using (var checkCmd = new SqlCommand(checkDuplicate, conn))
+                // 🔹 Check for duplicate station (excluding current ID)
+                using (var checkCmd = new SqlCommand("spCheckDuplicateStation_Update", conn))
                 {
+                    checkCmd.CommandType = CommandType.StoredProcedure;
+                    checkCmd.Parameters.AddWithValue("@Id", station.Id);
                     checkCmd.Parameters.AddWithValue("@Name", station.Name.Trim());
                     checkCmd.Parameters.AddWithValue("@Code", station.Code.Trim());
-                    checkCmd.Parameters.AddWithValue("@Id", station.Id);
 
-                    int existingCount = (int)checkCmd.ExecuteScalar();
+                    int existingCount = Convert.ToInt32(checkCmd.ExecuteScalar());
 
                     if (existingCount > 0)
                     {
-                        TempData["ErrorMessage"] = "⚠️ Station with same name or code already exists!";
+                        TempData["ErrorMessage"] = "⚠️ Station with the same name or code already exists!";
                         return View(station);
                     }
                 }
 
-                string updateQuery = "UPDATE Stations SET Code = @Code, Name = @Name WHERE Id = @Id";
-                using (var cmd = new SqlCommand(updateQuery, conn))
+                // 🔹 Update the station details
+                using (var cmd = new SqlCommand("spUpdateStation", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@Id", station.Id);
                     cmd.Parameters.AddWithValue("@Code", station.Code.Trim());
                     cmd.Parameters.AddWithValue("@Name", station.Name.Trim());
-                    cmd.Parameters.AddWithValue("@Id", station.Id);
                     cmd.ExecuteNonQuery();
                 }
             }
@@ -509,30 +487,31 @@ namespace IrctcClone.Controllers
             return RedirectToAction("StationList");
         }
 
-
         [HttpPost]
         public IActionResult DeleteStation(int id)
         {
             using (var conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
-                var delete = "DELETE FROM Stations WHERE Id = @Id";
-                using (var cmd = new SqlCommand(delete, conn))
+
+                using (var cmd = new SqlCommand("spDeleteStation", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@Id", id);
                     cmd.ExecuteNonQuery();
                 }
             }
 
+            TempData["SuccessMessage"] = "✅ Station deleted successfully!";
             return RedirectToAction("StationList");
         }
+
 
         // GET: /Admin/EditTrain/5
         [HttpGet]
         public IActionResult EditTrain(int id)
         {
-            Train train = null;  // ✅ Declare at the top
-
+            Train train = null;
             var stations = new List<Station>();
             var classes = new List<TrainClass>();
 
@@ -541,10 +520,11 @@ namespace IrctcClone.Controllers
                 conn.Open();
 
                 // --- Get train details ---
-                var query = "SELECT * FROM Trains WHERE Id = @Id";
-                using (var cmd = new SqlCommand(query, conn))
+                using (var cmd = new SqlCommand("spGetTrainById", conn))
                 {
-                    cmd.Parameters.AddWithValue("@Id", id);
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@TrainId", id);
+
                     using (var reader = cmd.ExecuteReader())
                     {
                         if (reader.Read())
@@ -568,44 +548,48 @@ namespace IrctcClone.Controllers
                     return NotFound();
 
                 // --- Get stations ---
-                var stationCmd = new SqlCommand("SELECT Id, Name FROM Stations ORDER BY Name", conn);
-                using (var reader = stationCmd.ExecuteReader())
+                using (var cmd = new SqlCommand("spGetAllStations", conn))
                 {
-                    while (reader.Read())
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    using (var reader = cmd.ExecuteReader())
                     {
-                        stations.Add(new Station
+                        while (reader.Read())
                         {
-                            Id = Convert.ToInt32(reader["Id"]),
-                            Name = reader["Name"].ToString()
-                        });
+                            stations.Add(new Station
+                            {
+                                Id = Convert.ToInt32(reader["Id"]),
+                                Name = reader["Name"].ToString()
+                            });
+                        }
                     }
                 }
 
                 // --- Get train classes ---
-                var classCmd = new SqlCommand("SELECT Code, Fare, SeatsAvailable FROM TrainClasses WHERE TrainId = @TrainId", conn);
-                classCmd.Parameters.AddWithValue("@TrainId", id);
-                using (var reader = classCmd.ExecuteReader())
+                using (var cmd = new SqlCommand("spGetTrainClassesByTrainId", conn))
                 {
-                    while (reader.Read())
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@TrainId", id);
+
+                    using (var reader = cmd.ExecuteReader())
                     {
-                        classes.Add(new TrainClass
+                        while (reader.Read())
                         {
-                            Code = reader["Code"].ToString(),
-                            Fare = Convert.ToDecimal(reader["Fare"]),
-                            SeatsAvailable = Convert.ToInt32(reader["SeatsAvailable"])
-                        });
+                            classes.Add(new TrainClass
+                            {
+                                Code = reader["Code"].ToString(),
+                                Fare = Convert.ToDecimal(reader["Fare"]),
+                                SeatsAvailable = Convert.ToInt32(reader["SeatsAvailable"])
+                            });
+                        }
                     }
                 }
             }
 
-            // ✅ Send data to View
             ViewBag.Stations = stations;
             ViewBag.TrainClasses = classes;
 
-            return View(train);  // ✅ Return the train model
+            return View(train);
         }
-
-
 
         // POST: /Admin/EditTrain
         [HttpPost]
@@ -615,16 +599,11 @@ namespace IrctcClone.Controllers
             {
                 conn.Open();
 
-                // Update Train
-                var updateTrain = @"
-                    UPDATE Trains
-                    SET Number=@Number, Name=@Name, FromStationId=@FromStationId, ToStationId=@ToStationId,
-                        Departure=@Departure, Arrival=@Arrival, Duration=@Duration
-                    WHERE Id=@Id";
-
-                using (var cmd = new SqlCommand(updateTrain, conn))
+                // Update train
+                using (var cmd = new SqlCommand("spUpdateTrain", conn))
                 {
-                    cmd.Parameters.AddWithValue("@Id", train.Id);
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@TrainId", train.Id);
                     cmd.Parameters.AddWithValue("@Number", train.Number);
                     cmd.Parameters.AddWithValue("@Name", train.Name);
                     cmd.Parameters.AddWithValue("@FromStationId", train.FromStationId);
@@ -635,38 +614,20 @@ namespace IrctcClone.Controllers
                     cmd.ExecuteNonQuery();
                 }
 
-                // Update or insert Train Classes
+                // Update or insert train classes
                 for (int i = 0; i < classCodes.Count; i++)
                 {
-                    if (classIds != null && i < classIds.Count && classIds[i] > 0)
+                    using (var cmd = new SqlCommand("spUpsertTrainClass", conn))
                     {
-                        var updateClass = @"
-                            UPDATE TrainClasses
-                            SET Code=@Code, Fare=@Fare, SeatsAvailable=@SeatsAvailable
-                            WHERE Id=@Id";
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        int classId = (classIds != null && i < classIds.Count) ? classIds[i] : 0;
 
-                        using (var cmd = new SqlCommand(updateClass, conn))
-                        {
-                            cmd.Parameters.AddWithValue("@Id", classIds[i]);
-                            cmd.Parameters.AddWithValue("@Code", classCodes[i]);
-                            cmd.Parameters.AddWithValue("@Fare", fares[i]);
-                            cmd.Parameters.AddWithValue("@SeatsAvailable", seats[i]);
-                            cmd.ExecuteNonQuery();
-                        }
-                    }
-                    else
-                    {
-                        var insertClass = @"
-                            INSERT INTO TrainClasses (TrainId, Code, Fare, SeatsAvailable)
-                            VALUES (@TrainId, @Code, @Fare, @SeatsAvailable)";
-                        using (var cmd = new SqlCommand(insertClass, conn))
-                        {
-                            cmd.Parameters.AddWithValue("@TrainId", train.Id);
-                            cmd.Parameters.AddWithValue("@Code", classCodes[i]);
-                            cmd.Parameters.AddWithValue("@Fare", fares[i]);
-                            cmd.Parameters.AddWithValue("@SeatsAvailable", seats[i]);
-                            cmd.ExecuteNonQuery();
-                        }
+                        cmd.Parameters.AddWithValue("@ClassId", classId);
+                        cmd.Parameters.AddWithValue("@TrainId", train.Id);
+                        cmd.Parameters.AddWithValue("@Code", classCodes[i]);
+                        cmd.Parameters.AddWithValue("@Fare", fares[i]);
+                        cmd.Parameters.AddWithValue("@SeatsAvailable", seats[i]);
+                        cmd.ExecuteNonQuery();
                     }
                 }
             }
@@ -681,27 +642,10 @@ namespace IrctcClone.Controllers
             {
                 conn.Open();
 
-                // 1️⃣ Delete routes first (since TrainRoutes references Trains)
-                var deleteRoutes = "DELETE FROM TrainRoutes WHERE TrainId = @TrainId";
-                using (var cmd = new SqlCommand(deleteRoutes, conn))
+                using (var cmd = new SqlCommand("spDeleteTrain", conn))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@TrainId", id);
-                    cmd.ExecuteNonQuery();
-                }
-
-                // Delete classes first (foreign key constraint)
-                var deleteClasses = "DELETE FROM TrainClasses WHERE TrainId = @TrainId";
-                using (var cmd = new SqlCommand(deleteClasses, conn))
-                {
-                    cmd.Parameters.AddWithValue("@TrainId", id);
-                    cmd.ExecuteNonQuery();
-                }
-
-                // Then delete train
-                var deleteTrain = "DELETE FROM Trains WHERE Id = @Id";
-                using (var cmd = new SqlCommand(deleteTrain, conn))
-                {
-                    cmd.Parameters.AddWithValue("@Id", id);
                     cmd.ExecuteNonQuery();
                 }
             }
@@ -716,32 +660,35 @@ namespace IrctcClone.Controllers
             using (var conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
-                var cmd = new SqlCommand("SELECT * FROM Trains", conn);
-                using (var reader = cmd.ExecuteReader())
+                using (var cmd = new SqlCommand("spGetAllTrains", conn))
                 {
-                    while (reader.Read())
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    using (var reader = cmd.ExecuteReader())
                     {
-                        trains.Add(new Train
+                        while (reader.Read())
                         {
-                            Id = Convert.ToInt32(reader["Id"]),
-                            Number = Convert.ToInt32(reader["Number"]),
-                            Name = reader["Name"].ToString(),
-                            FromStationId = Convert.ToInt32(reader["FromStationId"]),
-                            ToStationId = Convert.ToInt32(reader["ToStationId"]),
-                            Departure = TimeSpan.Parse(reader["Departure"].ToString()),
-                            Arrival = TimeSpan.Parse(reader["Arrival"].ToString()),
-                            Duration = TimeSpan.Parse(reader["Duration"].ToString()),
-                            FromStation = new Station
+                            trains.Add(new Train
                             {
-                                Id = Convert.ToInt32(reader["FromStationId"]),
-                                Name = reader["FromStationName"].ToString()
-                            },
-                            ToStation = new Station
-                            {
-                                Id = Convert.ToInt32(reader["ToStationId"]),
-                                Name = reader["ToStationName"].ToString()
-                            }
-                        });
+                                Id = Convert.ToInt32(reader["Id"]),
+                                Number = Convert.ToInt32(reader["Number"]),
+                                Name = reader["Name"].ToString(),
+                                FromStationId = Convert.ToInt32(reader["FromStationId"]),
+                                ToStationId = Convert.ToInt32(reader["ToStationId"]),
+                                Departure = TimeSpan.Parse(reader["Departure"].ToString()),
+                                Arrival = TimeSpan.Parse(reader["Arrival"].ToString()),
+                                Duration = TimeSpan.Parse(reader["Duration"].ToString()),
+                                FromStation = new Station
+                                {
+                                    Id = Convert.ToInt32(reader["FromStationId"]),
+                                    Name = reader["FromStationName"].ToString()
+                                },
+                                ToStation = new Station
+                                {
+                                    Id = Convert.ToInt32(reader["ToStationId"]),
+                                    Name = reader["ToStationName"].ToString()
+                                }
+                            });
+                        }
                     }
                 }
             }
