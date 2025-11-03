@@ -121,13 +121,18 @@ body {
 
 /* ---------- FOOTER ---------- */
 .site-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
     background: linear-gradient(90deg, #0078d7, #0098ff);
     color: white;
     text-align: center;
     padding: 15.3px;
     font-size: 14px;
-    margin-top: auto;
+    z-index: 1050;
 }
+
 
 
 /* ---------- LOGIN / REGISTER PAGE STYLING ---------- */

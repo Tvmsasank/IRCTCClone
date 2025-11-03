@@ -21,9 +21,7 @@ namespace IrctcClone.Controllers
             _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
 
-        // =====================================================
-        // ADMIN LOGIN
-        // =====================================================
+        //------------------------------------------ADMIN LOGIN-------------------------------------------//
         [AllowAnonymous]
         [HttpGet]
         public IActionResult AdminLogin()
@@ -31,33 +29,24 @@ namespace IrctcClone.Controllers
             return View();
         }
 
+
         [AllowAnonymous]
         [HttpPost]
         public IActionResult AdminLogin(string username, string password)
         {
-            using (var conn = new SqlConnection(_connectionString))
+            if (Admin.ValidateLogin(_connectionString, username, password))
             {
-                conn.Open();
-                using (var cmd = new SqlCommand("sp_AdminLogin", conn))
-                {
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@Username", username);
-                    cmd.Parameters.AddWithValue("@Password", password);
-
-                    int count = (int)cmd.ExecuteScalar();
-                    if (count > 0)
-                    {
-                        HttpContext.Session.SetString("AdminUser", username);
-                        return RedirectToAction("Dashboard");
-                    }
-                    else
-                    {
-                        ViewBag.Error = "Invalid username or password!";
-                        return View();
-                    }
-                }
+                HttpContext.Session.SetString("AdminUser", username);
+                return RedirectToAction("Dashboard");
             }
+
+            ViewBag.Error = "Invalid username or password!";
+            return View();
         }
+
+
+        //------------------------------------------ADMIN LOGOUT------------------------------------------//
+
 
         public IActionResult Logout()
         {
@@ -65,9 +54,7 @@ namespace IrctcClone.Controllers
             return RedirectToAction("AdminLogin");
         }
 
-        // =====================================================
-        // DASHBOARD
-        // =====================================================
+        //--------------------------------------------DASHBOARD-------------------------------------------//
         public IActionResult Dashboard()
         {
             if (HttpContext.Session.GetString("AdminUser") == null)
@@ -76,146 +63,55 @@ namespace IrctcClone.Controllers
             return View();
         }
 
-        // =====================================================
-        // TRAINS MANAGEMENT
-        // =====================================================
+        //------------------------------------------TRAINS MANAGEMENT------------------------------------//
         // List all trains
         public IActionResult Index()
         {
-            var trains = new List<Train>();
-
-            using (var conn = new SqlConnection(_connectionString))
-            {
-                conn.Open();
-                using (var cmd = new SqlCommand("sp_GetAllTrains", conn))
-                {
-                    cmd.CommandType = CommandType.StoredProcedure;
-
-                    using (var reader = cmd.ExecuteReader())
-                    {
-                        while (reader.Read())
-                        {
-                            trains.Add(new Train
-                            {
-                                Id = reader.GetInt32(0),
-                                Number = reader.GetInt32(1),
-                                Name = reader.GetString(2),
-                                FromStationId = reader.GetInt32(3),
-                                ToStationId = reader.GetInt32(4),
-                                Departure = reader.GetTimeSpan(5),
-                                Arrival = reader.GetTimeSpan(6),
-                                Duration = reader.GetTimeSpan(7),
-                                FromStation = new Station
-                                {
-                                    Id = reader.GetInt32(3),
-                                    Code = reader.GetString(8),
-                                    Name = reader.GetString(9)
-                                },
-                                ToStation = new Station
-                                {
-                                    Id = reader.GetInt32(4),
-                                    Code = reader.GetString(10),
-                                    Name = reader.GetString(11)
-                                }
-                            });
-                        }
-                    }
-                }
-
-                return View(trains);
-            }
+            var trains = Train.GetAllTrains(_connectionString);
+            return View(trains);
         }
+
 
         // ✅ 1. GET - Create Train
         [HttpGet]
         public IActionResult CreateTrain()
         {
-            var stations = new List<Station>();
-
-            using (var conn = new SqlConnection(_connectionString))
-            {
-                conn.Open();
-
-                using (var cmd = new SqlCommand("spGetAllStations", conn))
-                {
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    using (var reader = cmd.ExecuteReader())
-                    {
-                        while (reader.Read())
-                        {
-                            stations.Add(new Station
-                            {
-                                Id = reader.GetInt32(0),
-                                Name = reader.GetString(1)
-                            });
-                        }
-                    }
-                }
-            }
-
+            var stations = Station.GetAllStations(_connectionString);
             ViewBag.Stations = stations;
             return View();
         }
+
 
         // Create Train (POST)
         [HttpPost]
         public IActionResult CreateTrain(Train train, List<string> classCodes, List<decimal> fares, List<int> seats)
         {
-            using (var conn = new SqlConnection(_connectionString))
+            // ✅ 1. Check for duplicates
+            if (Train.CheckDuplicate(_connectionString, train.Number, train.FromStationId, train.ToStationId))
             {
-                conn.Open();
+                TempData["ErrorMessage"] = "⚠️ A train with the same number or route already exists!";
+                return RedirectToAction("CreateTrain");
+            }
 
-                // 1️⃣ Check Duplicate Train
-                using (var cmd = new SqlCommand("spCheckDuplicateTrain", conn))
+            // ✅ 2. Insert Train
+            train.InsertTrain(_connectionString);
+
+            // ✅ 3. Insert Train Classes
+            for (int i = 0; i < classCodes.Count; i++)
+            {
+                var trainClass = new TrainClass
                 {
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@Number", train.Number);
-                    cmd.Parameters.AddWithValue("@FromStationId", train.FromStationId);
-                    cmd.Parameters.AddWithValue("@ToStationId", train.ToStationId);
-
-                    int existingCount = Convert.ToInt32(cmd.ExecuteScalar());
-                    if (existingCount > 0)
-                    {
-                        TempData["ErrorMessage"] = "⚠️ A train with the same number or route already exists!";
-                        return RedirectToAction("CreateTrain");
-                    }
-                }
-
-                // 2️⃣ Insert Train and get ID
-                using (var cmd = new SqlCommand("spInsertTrain", conn))
-                {
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@Number", train.Number);
-                    cmd.Parameters.AddWithValue("@Name", train.Name);
-                    cmd.Parameters.AddWithValue("@FromStationId", train.FromStationId);
-                    cmd.Parameters.AddWithValue("@ToStationId", train.ToStationId);
-                    cmd.Parameters.AddWithValue("@Departure", train.Departure);
-                    cmd.Parameters.AddWithValue("@Arrival", train.Arrival);
-                    cmd.Parameters.AddWithValue("@Duration", train.Duration);
-
-                    train.Id = Convert.ToInt32(cmd.ExecuteScalar());
-                }
-
-                // 3️⃣ Insert Classes
-                for (int i = 0; i < classCodes.Count; i++)
-                {
-                    using (var cmd = new SqlCommand("spInsertTrainClass", conn))
-                    {
-                        cmd.CommandType = CommandType.StoredProcedure;
-                        cmd.Parameters.AddWithValue("@TrainId", train.Id);
-                        cmd.Parameters.AddWithValue("@Code", classCodes[i]);
-                        cmd.Parameters.AddWithValue("@Fare", fares[i]);
-                        cmd.Parameters.AddWithValue("@SeatsAvailable", seats[i]);
-                        cmd.ExecuteNonQuery();
-                    }
-                }
+                    TrainId = train.Id,
+                    Code = classCodes[i],
+                    Fare = fares[i],
+                    SeatsAvailable = seats[i]
+                };
+                trainClass.Insert(_connectionString);
             }
 
             TempData["SuccessMessage"] = "✅ Train created successfully!";
             return RedirectToAction("AddRoute", new { trainId = train.Id });
         }
-
-
 
         // ✅ GET: Add Route
         public IActionResult AddRoute(int trainId)
@@ -655,44 +551,7 @@ namespace IrctcClone.Controllers
 
         public IActionResult TrainList()
         {
-            var trains = new List<Train>();
-
-            using (var conn = new SqlConnection(_connectionString))
-            {
-                conn.Open();
-                using (var cmd = new SqlCommand("spGetAllTrains", conn))
-                {
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    using (var reader = cmd.ExecuteReader())
-                    {
-                        while (reader.Read())
-                        {
-                            trains.Add(new Train
-                            {
-                                Id = Convert.ToInt32(reader["Id"]),
-                                Number = Convert.ToInt32(reader["Number"]),
-                                Name = reader["Name"].ToString(),
-                                FromStationId = Convert.ToInt32(reader["FromStationId"]),
-                                ToStationId = Convert.ToInt32(reader["ToStationId"]),
-                                Departure = TimeSpan.Parse(reader["Departure"].ToString()),
-                                Arrival = TimeSpan.Parse(reader["Arrival"].ToString()),
-                                Duration = TimeSpan.Parse(reader["Duration"].ToString()),
-                                FromStation = new Station
-                                {
-                                    Id = Convert.ToInt32(reader["FromStationId"]),
-                                    Name = reader["FromStationName"].ToString()
-                                },
-                                ToStation = new Station
-                                {
-                                    Id = Convert.ToInt32(reader["ToStationId"]),
-                                    Name = reader["ToStationName"].ToString()
-                                }
-                            });
-                        }
-                    }
-                }
-            }
-
+            var trains = Train.GetTrainsList(_connectionString);
             return View(trains);
         }
 

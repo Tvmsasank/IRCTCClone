@@ -16,31 +16,8 @@ namespace IRCTCClone.Controllers
 
         public IActionResult Index()
         {
-            var stations = new List<Station>();
-
-            using (var conn = new SqlConnection(_connectionString))
-            {
-                conn.Open();
-
-                using (var cmd = new SqlCommand("spgetallstatns", conn))
-                {
-                    cmd.CommandType = System.Data.CommandType.StoredProcedure;
-
-                    using (var reader = cmd.ExecuteReader())
-                    {
-                        while (reader.Read())
-                        {
-                            stations.Add(new Station
-                            {
-                                Id = reader.GetInt32(0),
-                                Code = reader.GetString(1),
-                                Name = reader.GetString(2)
-                            });
-                        }
-                    }
-                }
-            }
-
+            // ✅ Simply call the static method in the model
+            var stations = Station.GetAll(_connectionString);
             return View(stations);
         }
 
