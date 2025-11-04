@@ -1,0 +1,33 @@
+﻿@model IEnumerable<IRCTCClone.Models.TrainRoute>
+
+@if (Model.Any())
+{
+    <table class="table table-sm table-bordered mt-2">
+        <thead class="table-light">
+            <tr>
+                <th>Stop No</th>
+                <th>Station</th>
+                <th>Arrival</th>
+                <th>Departure</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var route in Model)
+            {
+                <tr>
+                    <td>@route.StopNumber</td>
+                    <td>@route.Station?.Name</td>
+                    <td>@route.ArrivalTime?.ToString(@"hh\:mm")</td>
+                    <td>@route.DepartureTime?.ToString(@"hh\:mm")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+else
+{
+    <div class="text-muted small">No route details available.</div>
+}
+
+
+

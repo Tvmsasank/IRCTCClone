@@ -9,6 +9,7 @@ namespace IRCTCClone.Models
         public int TrainId { get; set; }
         public Train? Train { get; set; }
         public string Code { get; set; } = null!; // e.g., 1A, 2A, CC, SL
+        public string SeatPrefix { get; set; } = null!; // e.g., 1A, 2A, CC, SL
         public decimal Fare { get; set; }
         public int SeatsAvailable { get; set; }
 
@@ -61,6 +62,22 @@ namespace IRCTCClone.Models
                     cmd.Parameters.AddWithValue("@Code", Code);
                     cmd.Parameters.AddWithValue("@Fare", Fare);
                     cmd.Parameters.AddWithValue("@SeatsAvailable", SeatsAvailable);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+
+        // ✅ Method to delete train via stored procedure
+        public static void DeleteTrain(string connectionString, int trainId)
+        {
+            using (var conn = new SqlConnection(connectionString))
+            {
+                conn.Open();
+                using (var cmd = new SqlCommand("spDeleteTrain", conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@TrainId", trainId);
                     cmd.ExecuteNonQuery();
                 }
             }

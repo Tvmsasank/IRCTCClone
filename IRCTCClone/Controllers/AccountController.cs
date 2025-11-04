@@ -116,7 +116,7 @@ namespace IRCTCClone.Controllers
             }
 
             TempData["Success"] = "Registration successful! Please login.";
-            return RedirectToAction("Login");
+            return RedirectToAction("Register");
         }
 
         // -------------------- FORGOT PASSWORD --------------------

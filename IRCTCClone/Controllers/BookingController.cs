@@ -282,7 +282,8 @@ namespace IRCTCClone.Controllers
                                 Id = reader["Id"] != DBNull.Value ? Convert.ToInt32(reader["Id"]) : 0,
                                 Code = reader["Code"]?.ToString(),
                                 Fare = reader["Fare"] != DBNull.Value ? Convert.ToDecimal(reader["Fare"]) : 0,
-                                SeatsAvailable = reader["SeatsAvailable"] != DBNull.Value ? Convert.ToInt32(reader["SeatsAvailable"]) : 0
+                                SeatsAvailable = reader["SeatsAvailable"] != DBNull.Value ? Convert.ToInt32(reader["SeatsAvailable"]) : 0,
+                                SeatPrefix = reader["SeatPrefix"]?.ToString()
                             };
                             seatsAvailable = cls.SeatsAvailable;
                             fare = cls.Fare;
@@ -336,22 +337,41 @@ namespace IRCTCClone.Controllers
                 }
 
                 // Determine seat prefix
-                string seatPrefix = cls.Code switch
-                {
-                    "SL" => "S",
-                    "2A" => "H",
-                    "3A" => "A",
-                    "1A" => "B",
-                    "3E" => "M",
-                    "AC CC" => "C",
-                    "2S" => "D",
-                    _ => "X"
-                };
+                /*   string seatPrefix = cls.Code switch
+                   {
+                       "SL" => "S",
+                       "2A" => "H",
+                       "3A" => "A",
+                       "1A" => "B",
+                       "3E" => "M",
+                       "AC CC" => "C",
+                       "2S" => "D",
+                       "EC CC" => "EC",
+                       _ => "X"
+                   };
+   */
 
+                // Determine seat prefix dynamically from database
+                string seatPrefix = !string.IsNullOrWhiteSpace(cls.SeatPrefix)
+                    ? cls.SeatPrefix.Trim()
+                    : (cls.Code ?? "X").Replace(" ", "").Substring(0, Math.Min(2, (cls.Code ?? "X").Length));
+                Random random = new Random();
+                HashSet<int> usedSeats = new HashSet<int>();
                 // Insert passengers
                 for (int i = 0; i < passengerCount; i++)
                 {
-                    string seatNumber = $"{seatPrefix}{seatsAvailable + i + 1}";
+                    /*string seatNumber = $"{seatPrefix}{seatsAvailable}";*/
+
+
+                    int seatNumberValue;
+                    do
+                    {
+                        seatNumberValue = random.Next(1, seatsAvailable + 1); // 1 to total seats
+                    }
+                    while (!usedSeats.Add(seatNumberValue)); // ensure unique seat number
+
+                    string seatNumber = $"{seatPrefix}{seatNumberValue}";
+
                     using (var cmd = new SqlCommand("InsertPassenger", conn))
                     {
                         cmd.CommandType = CommandType.StoredProcedure;

@@ -30,6 +30,24 @@
             <button type="submit" class="btn-primary">Create account</button>
         </form>
 
+        @if (TempData["Success"] != null)
+        {
+            <div style="color: green">
+                @TempData["Success"]
+            </div>
+        }
+
+        <!-- ✅ Show validation or error messages -->
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div class="alert alert-danger" role="alert">
+                @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                {
+                    <p>@error.ErrorMessage</p>
+                }
+            </div>
+        }
+
         <p class="muted small">Already have an account? <a href="/Account/Login">Login</a></p>
     </div>
 </section>

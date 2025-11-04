@@ -1,5 +1,4 @@
 ﻿$(function () {
-
     ///////////////////////////////////////////////////////////////////////////
     // 2. CANCEL BOOKING CONFIRMATION
     ///////////////////////////////////////////////////////////////////////////
@@ -27,7 +26,7 @@
         function fetchStations(term, callback) {
             $.get('/Train/GetStations', { term: term }, function (data) {
                 callback(data || []);
-            });
+            }); 
         }
 
         function renderList(items) {
@@ -36,12 +35,16 @@
                 $list.hide();
                 return;
             }
-            items.forEach(function (s) {
-                $('<div class="autocomplete-item">')
+
+            items.forEach(function (s, i) {
+                const $item = $('<div class="autocomplete-item">')
                     .text(s.name + ' (' + s.code + ')')
-                    .data('id', s.id)
-                    .appendTo($list);
+                    .data('id', s.id);
+
+                if (i === 0) $item.addClass('active'); // ✅ highlight first item
+                $list.append($item);
             });
+
             $list.show();
         }
 
@@ -57,16 +60,46 @@
             fetchStations(term, renderList);
         }, 200));
 
-        // Selecting from dropdown
+        // Selecting from dropdown (click)
         $list.on('click', '.autocomplete-item', function () {
-            const text = $(this).text();
-            const id = $(this).data('id');
+            selectItem($(this));
+        });
+
+        // Keyboard navigation
+        $input.on('keydown', function (e) {
+            const $items = $list.find('.autocomplete-item');
+            let $active = $items.filter('.active');
+            let index = $active.index();
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                $items.removeClass('active');
+                if (index < $items.length - 1) index++;
+                $items.eq(index).addClass('active');
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                $items.removeClass('active');
+                if (index > 0) index--;
+                $items.eq(index).addClass('active');
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if ($active.length) {
+                    selectItem($active);
+                } else if ($items.length) {
+                    selectItem($items.first());
+                }
+            }
+        });
+
+        function selectItem($item) {
+            const text = $item.text();
+            const id = $item.data('id');
             $input.val(text);
             $list.hide();
 
             if ($input.is('#fromStation')) $('#fromStationId').val(id);
             if ($input.is('#toStation')) $('#toStationId').val(id);
-        });
+        }
 
         // Hide dropdown when clicking outside
         $(document).on('click', function (e) {
@@ -76,6 +109,7 @@
         });
     }
 
+    // Initialize both inputs
     wireAutocomplete($('#fromStation'), $('#fromStationList'));
     wireAutocomplete($('#toStation'), $('#toStationList'));
 
@@ -94,8 +128,8 @@
         $('#fromStationId').val(toId);
         $('#toStationId').val(fromId);
     });
-
 });
+
 
 
 

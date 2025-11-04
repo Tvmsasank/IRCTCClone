@@ -22,6 +22,7 @@ else
     <table class="table table-bordered table-hover">
         <thead class="table-light">
             <tr>
+                <th class="d-none">id</th>
                 <th>Number</th>
                 <th>Name</th>
                 <th>From</th>
@@ -36,8 +37,13 @@ else
             @foreach (var train in Model)
             {
                 <tr>
+                  <td class="d-none">@train.Id</td>
                     <td>@train.Number</td>
-                    <td>@train.Name</td>
+                        <td>
+                            <a href="#" class="train-link" data-train-id="@train.Id">
+                            @train.Name
+                            </a>
+                        </td>
                     <td>@train.FromStation?.Name</td>
                     <td>@train.ToStation?.Name</td>
                     <td>@train.Departure</td>
@@ -45,7 +51,6 @@ else
                     <td>@train.Duration</td>
                     <td class="text-center">
                         <a asp-controller="Admin" asp-action="EditTrain" asp-route-id="@train.Id" class="btn btn-sm btn-warning me-1">Edit</a>
-
                         <!-- Delete = only opens modal (no immediate navigation) -->
                         <button type="button" class="btn btn-sm btn-danger"
                                 data-bs-toggle="modal"
@@ -54,8 +59,17 @@ else
                                 data-train-name="@train.Name">
                             <i class="bi bi-trash"></i> Delete
                         </button>
+                        <a asp-controller="Admin" asp-action="AddRoute" asp-route-id="@train.Id" class="btn btn-sm btn-info ms-1">Add/Edit Routes</a>
                     </td>
                 </tr>
+
+                    <!-- Add/Edit Routes --> 
+
+                    <tr id="route-row-@train.Id" class="route-row" style="display:none;">
+                        <td colspan="8" class="p-0">
+                            <div id="route-container-@train.Id" class="p-2"></div>
+                        </td>
+                    </tr>
             }
         </tbody>
     </table>
@@ -117,6 +131,29 @@ else
                 // populate modal fields
                 trainNameSpan.textContent = trainName || '';
                 confirmDeleteBtn.setAttribute('href', '/Admin/DeleteTrain/' + trainId);
+            });
+        });
+    </script>
+
+    <script>
+        $(document).on("click", ".train-link", function (e) {
+            e.preventDefault();
+            var trainId = $(this).data("train-id");
+            var $routeRow = $("#route-row-" + trainId);
+            var $container = $("#route-container-" + trainId);
+
+            if ($routeRow.is(":visible")) {
+                $routeRow.hide();
+                return;
+            }
+
+            // Hide other open routes
+            $(".route-row").hide();
+
+            // Load route via AJAX
+            $.get("/Admin/GetTrainRoute", { trainId: trainId }, function (html) {
+                $container.html(html);
+                $routeRow.show();
             });
         });
     </script>

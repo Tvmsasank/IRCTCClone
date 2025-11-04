@@ -86,19 +86,36 @@ namespace IrctcClone.Controllers
         [HttpPost]
         public IActionResult CreateTrain(Train train, List<string> classCodes, List<decimal> fares, List<int> seats)
         {
-            // ✅ 1. Check for duplicates
+            // 1️⃣ Validate class input
+            if (classCodes == null || fares == null || seats == null || classCodes.Count != fares.Count || classCodes.Count != seats.Count)
+            {
+                TempData["ErrorMessage"] = "Please provide valid class details!";
+                return RedirectToAction("CreateTrain");
+            }
+
+            // 2️⃣ Check for duplicates
             if (Train.CheckDuplicate(_connectionString, train.Number, train.FromStationId, train.ToStationId))
             {
                 TempData["ErrorMessage"] = "⚠️ A train with the same number or route already exists!";
                 return RedirectToAction("CreateTrain");
             }
 
-            // ✅ 2. Insert Train
-            train.InsertTrain(_connectionString);
+            // 3️⃣ Insert Train and get ID
+            train.InsertTrain(_connectionString); // make sure this sets train.Id
 
-            // ✅ 3. Insert Train Classes
+            if (train.Id == 0)
+            {
+                TempData["ErrorMessage"] = "❌ Failed to create train!";
+                return RedirectToAction("AddRoute", new { trainId = train.Id });
+            }
+
+            // 4️⃣ Insert Train Classes safely
             for (int i = 0; i < classCodes.Count; i++)
             {
+                // Skip empty inputs
+                if (string.IsNullOrWhiteSpace(classCodes[i]) || fares[i] <= 0 || seats[i] < 0)
+                    continue;
+
                 var trainClass = new TrainClass
                 {
                     TrainId = train.Id,
@@ -110,23 +127,55 @@ namespace IrctcClone.Controllers
             }
 
             TempData["SuccessMessage"] = "✅ Train created successfully!";
-            return RedirectToAction("AddRoute", new { trainId = train.Id });
+            return RedirectToAction("CreateTrain", new { trainId = train.Id });
         }
 
-        // ✅ GET: Add Route
-        public IActionResult AddRoute(int trainId)
+
+        private List<TrainRoute> GetTrainRoutes(int trainId)
         {
-            ViewBag.TrainId = trainId;
+            var routes = new List<TrainRoute>();
+
+            using (var conn = new SqlConnection(_connectionString))
+            {
+                conn.Open();
+                using (var cmd = new SqlCommand("spGetTrainRoutesByTrainId", conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@TrainId", trainId);
+
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            routes.Add(new TrainRoute
+                            {
+                                Id = Convert.ToInt32(reader["Id"]),
+                                TrainId = trainId,
+                                StationId = Convert.ToInt32(reader["StationId"]),
+                                StopNumber = Convert.ToInt32(reader["StopNumber"]),
+                                ArrivalTime = reader["ArrivalTime"] == DBNull.Value ? null : (TimeSpan?)reader["ArrivalTime"],
+                                DepartureTime = reader["DepartureTime"] == DBNull.Value ? null : (TimeSpan?)reader["DepartureTime"]
+                            });
+                        }
+                    }
+                }
+            }
+
+            return routes;
+        }
+
+
+        public IActionResult AddRoute(Train train )
+        {
+            ViewBag.TrainId = train.Id;
 
             var stations = new List<Station>();
             using (var conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
-
                 using (var cmd = new SqlCommand("spGetAllStations", conn))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
-
                     using (var reader = cmd.ExecuteReader())
                     {
                         while (reader.Read())
@@ -141,14 +190,27 @@ namespace IrctcClone.Controllers
                 }
             }
 
-            ViewBag.Stations = stations;
-            return View();
+            ViewBag.Stations = stations ?? new List<Station>();
+
+            // ✅ Fetch existing routes (can be empty)
+            var routes = GetTrainRoutes(train.Id);
+
+            return View("AddRoute", routes); // pass list of existing routes
         }
+
+
 
         // ✅ POST: Add Route
         [HttpPost]
         public IActionResult AddRoute(int trainId, List<TrainRoute> routes)
         {
+            // 👇 Debug check (optional)
+            if (trainId == 0)
+            {
+                TempData["ErrorMessage"] = "Train ID missing! Cannot add routes.";
+                return RedirectToAction("TrainList");
+            }
+
             using (var conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
@@ -163,15 +225,52 @@ namespace IrctcClone.Controllers
                         cmd.Parameters.AddWithValue("@StopNumber", route.StopNumber);
                         cmd.Parameters.AddWithValue("@ArrivalTime", (object?)route.ArrivalTime ?? DBNull.Value);
                         cmd.Parameters.AddWithValue("@DepartureTime", (object?)route.DepartureTime ?? DBNull.Value);
-
                         cmd.ExecuteNonQuery();
                     }
                 }
             }
 
             TempData["SuccessMessage"] = "✅ Train routes added successfully!";
-            return RedirectToAction("Index");
+            return RedirectToAction("TrainList");
         }
+
+
+
+        public IActionResult GetTrainRoute(int trainId)
+        {
+            var routes = new List<TrainRoute>();
+
+            using (var conn = new SqlConnection(_connectionString))
+            {
+                conn.Open();
+                using (var cmd = new SqlCommand("spGetTrainRoutes", conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@TrainId", trainId);
+
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            routes.Add(new TrainRoute
+                            {
+                                StationId = reader.GetInt32(reader.GetOrdinal("StationId")),
+                                StopNumber = reader.GetInt32(reader.GetOrdinal("StopNumber")),
+                                ArrivalTime = reader.IsDBNull(reader.GetOrdinal("ArrivalTime")) ? null : reader.GetTimeSpan(reader.GetOrdinal("ArrivalTime")),
+                                DepartureTime = reader.IsDBNull(reader.GetOrdinal("DepartureTime")) ? null : reader.GetTimeSpan(reader.GetOrdinal("DepartureTime")),
+                                Station = new Station
+                                {
+                                    Name = reader.GetString(reader.GetOrdinal("StationName"))
+                                }
+                            });
+                        }
+                    }
+                }
+            }
+
+            return PartialView("TrainRoutePartial", routes);
+        }
+
 
 
         private List<Station> GetAllStations()
@@ -407,9 +506,10 @@ namespace IrctcClone.Controllers
         [HttpGet]
         public IActionResult EditTrain(int id)
         {
-            Train train = null;
+             Train train = null;
             var stations = new List<Station>();
             var classes = new List<TrainClass>();
+            var routes = new List<TrainRoute>(); // ✅ NEW
 
             using (var conn = new SqlConnection(_connectionString))
             {
@@ -472,30 +572,74 @@ namespace IrctcClone.Controllers
                         {
                             classes.Add(new TrainClass
                             {
+                                Id = Convert.ToInt32(reader["Id"]),
                                 Code = reader["Code"].ToString(),
                                 Fare = Convert.ToDecimal(reader["Fare"]),
-                                SeatsAvailable = Convert.ToInt32(reader["SeatsAvailable"])
+                                SeatsAvailable = Convert.ToInt32(reader["SeatsAvailable"]),
+                                SeatPrefix = reader["SeatPrefix"].ToString()
                             });
                         }
                     }
                 }
+
+                // --- ✅ Get train routes ---
+                using (var cmd = new SqlCommand("spGetTrainRoutesByTrainId", conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@TrainId", id);
+
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            routes.Add(new TrainRoute
+                            {
+                                Id = Convert.ToInt32(reader["Id"]),
+                                TrainId = id,
+                                StationId = Convert.ToInt32(reader["StationId"]),
+
+                                ArrivalTime = string.IsNullOrWhiteSpace(reader["ArrivalTime"]?.ToString())
+                                    ? (TimeSpan?)null
+                                    : TimeSpan.Parse(reader["ArrivalTime"].ToString()),
+
+                                DepartureTime = string.IsNullOrWhiteSpace(reader["DepartureTime"]?.ToString())
+                                    ? (TimeSpan?)null
+                                    : TimeSpan.Parse(reader["DepartureTime"].ToString()),
+
+                                StopNumber = Convert.ToInt32(reader["StopNumber"])
+                            });
+                        }
+                    }
+                }
+
             }
 
             ViewBag.Stations = stations;
             ViewBag.TrainClasses = classes;
+            ViewBag.TrainRoutes = routes; // ✅ Pass routes to view
 
             return View(train);
         }
 
-        // POST: /Admin/EditTrain
+
         [HttpPost]
-        public IActionResult EditTrain(Train train, List<int> classIds, List<string> classCodes, List<decimal> fares, List<int> seats)
+        public IActionResult EditTrain(
+            Train train,
+            List<int> classIds,
+            List<string> classCodes,
+            List<decimal> fares,
+            List<int> seats,
+            List<int> routeStations,          // ✅ NEW
+            List<string> routeArrivals,       // ✅ NEW
+            List<string> routeDepartures,     // ✅ NEW
+            List<int> routeOrder              // ✅ NEW
+        )
         {
             using (var conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
 
-                // Update train
+                // --- Update train ---
                 using (var cmd = new SqlCommand("spUpdateTrain", conn))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
@@ -510,7 +654,7 @@ namespace IrctcClone.Controllers
                     cmd.ExecuteNonQuery();
                 }
 
-                // Update or insert train classes
+                // --- Update / Insert Train Classes ---
                 for (int i = 0; i < classCodes.Count; i++)
                 {
                     using (var cmd = new SqlCommand("spUpsertTrainClass", conn))
@@ -526,27 +670,41 @@ namespace IrctcClone.Controllers
                         cmd.ExecuteNonQuery();
                     }
                 }
+
+                // --- ✅ Update / Insert Train Routes ---
+                // You can first delete old routes (optional) and then insert new ones
+                using (var delCmd = new SqlCommand("spDeleteTrainRoutesByTrainId", conn))
+                {
+                    delCmd.CommandType = CommandType.StoredProcedure;
+                    delCmd.Parameters.AddWithValue("@TrainId", train.Id);
+                    delCmd.ExecuteNonQuery();
+                }
+
+                for (int i = 0; i < routeStations.Count; i++)
+                {
+                    using (var cmd = new SqlCommand("spInsertTrainRoute", conn))
+                    {
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.AddWithValue("@TrainId", train.Id);
+                        cmd.Parameters.AddWithValue("@StationId", routeStations[i]);
+                        cmd.Parameters.AddWithValue("@ArrivalTime", TimeSpan.Parse(routeArrivals[i]));
+                        cmd.Parameters.AddWithValue("@DepartureTime", TimeSpan.Parse(routeDepartures[i]));
+                        cmd.Parameters.AddWithValue("@StopNumber", routeOrder[i]);
+                        cmd.ExecuteNonQuery();
+                    }
+                }
             }
 
-            return RedirectToAction("Index");
+            return RedirectToAction("TrainList");
         }
+
 
         // GET: /Admin/DeleteTrain/5
         public IActionResult DeleteTrain(int id)
         {
-            using (var conn = new SqlConnection(_connectionString))
-            {
-                conn.Open();
-
-                using (var cmd = new SqlCommand("spDeleteTrain", conn))
-                {
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@TrainId", id);
-                    cmd.ExecuteNonQuery();
-                }
-            }
-
-            return RedirectToAction("Index");
+            TrainClass.DeleteTrain(_connectionString, id);
+            TempData["Success"] = "Train deleted successfully!";
+            return RedirectToAction("TrainList");
         }
 
         public IActionResult TrainList()

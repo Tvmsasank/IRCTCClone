@@ -996,3 +996,14 @@ hr {
     color: red;
     text-align: center;
 }
+
+.autocomplete-item {
+    padding: 8px;
+    cursor: pointer;
+}
+
+    .autocomplete-item.active,
+    .autocomplete-item:hover {
+        background-color: #007bff;
+        color: white;
+    }

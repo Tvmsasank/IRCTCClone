@@ -1,4 +1,5 @@
-﻿@model IRCTCClone.Models.Train
+﻿@using Newtonsoft.Json
+@model IRCTCClone.Models.Train
 
 @{
     ViewData["Title"] = "Edit Train";
@@ -60,10 +61,12 @@
         </div>
     </div>
 
+    <!-- Train Classes -->
     <h4 class="mt-4">Train Classes</h4>
     <table id="classTable" class="table table-bordered">
         <thead>
             <tr>
+                 <th></th>
                 <th>Class Code</th>
                 <th>Fare</th>
                 <th>Seats</th>
@@ -74,6 +77,9 @@
             @foreach (var cls in (List<IRCTCClone.Models.TrainClass>)ViewBag.TrainClasses)
             {
                 <tr>
+                    <td class="d-none">
+                        <input type="hidden" name="classIds" value="@cls.Id" />
+                    </td>
                     <td><input name="classCodes" value="@cls.Code" class="form-control" /></td>
                     <td><input name="fares" value="@cls.Fare" class="form-control" /></td>
                     <td><input name="seats" value="@cls.SeatsAvailable" class="form-control" /></td>
@@ -82,8 +88,8 @@
             }
         </tbody>
     </table>
-
     <button type="button" id="addClassRow" class="btn btn-primary btn-sm">+ Add Class</button>
+
     <br /><br />
     <button type="submit" class="btn btn-success">Save Changes</button>
 </form>
@@ -91,25 +97,31 @@
 @section Scripts {
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-            const addBtn = document.getElementById("addClassRow");
-            const tableBody = document.querySelector("#classTable tbody");
 
-            addBtn.addEventListener("click", function () {
+            // --- CLASS TABLE ---
+            const classTable = document.querySelector("#classTable tbody");
+            document.getElementById("addClassRow").addEventListener("click", function () {
                 const newRow = document.createElement("tr");
                 newRow.innerHTML = `
+                      <td class="d-none">
+                                <input type="hidden" name="classIds" value="0" />
+                            </td>
                     <td><input name="classCodes" class="form-control" placeholder="e.g. 1A, 2A, SL" required></td>
                     <td><input name="fares" type="number" step="0.01" class="form-control" placeholder="Fare" required></td>
                     <td><input name="seats" type="number" class="form-control" placeholder="Seats" required></td>
-                    <td><button type="button" class="btn btn-danger btn-sm remove-row">X</button></td>
-                `;
-                tableBody.appendChild(newRow);
+                    <td><button type="button" class="btn btn-danger btn-sm remove-row">X</button></td>`;
+                classTable.appendChild(newRow);
             });
 
-            tableBody.addEventListener("click", function (e) {
+            classTable.addEventListener("click", function (e) {
                 if (e.target.classList.contains("remove-row")) {
                     e.target.closest("tr").remove();
                 }
             });
-        });
+
+            });
+
+            // --- ROUTE TABLE ---
+        
     </script>
 }

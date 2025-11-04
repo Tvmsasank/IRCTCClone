@@ -1,15 +1,17 @@
 ﻿@using IRCTCClone.Models
-@model List<IRCTCClone.Models.TrainRoute>
+@using Newtonsoft.Json
+@model List<TrainRoute>
+
 @{
     ViewBag.Title = "Add Train Route";
-    var stations = ViewBag.Stations as List<Station>;
+    var stations = ViewBag.Stations as List<Station> ?? new List<Station>();
     int trainId = ViewBag.TrainId;
 }
 
-<h3>Add Route Stops</h3>
+<h3 class="mb-3">Add Route Stops</h3>
 
 <form method="post" action="/Admin/AddRoute?trainId=@trainId">
-    <table class="table">
+    <table class="table" id="routeTable">
         <thead>
             <tr>
                 <th>Stop #</th>
@@ -23,7 +25,7 @@
                 <td><input name="routes[0].StopNumber" type="number" class="form-control" /></td>
                 <td>
                     <select name="routes[0].StationId" class="form-control">
-                        @foreach (var s in stations)
+                        @foreach (var s in (List<IRCTCClone.Models.Station>)ViewBag.Stations)
                         {
                             <option value="@s.Id">@s.Name</option>
                         }
@@ -39,17 +41,19 @@
     <button type="submit" class="btn btn-primary">Save Route</button>
 </form>
 
+@section Scripts {
 <script>
-    document.getElementById("addRow").addEventListener("click", function () {
-        var tableBody = document.getElementById("routeTableBody");
-        var rowCount = tableBody.rows.length;
-        var newRow = tableBody.rows[0].cloneNode(true);
+            document.getElementById("addRow").addEventListener("click", function () {
+            var tableBody = document.getElementById("routeTableBody");
+            var rowCount = tableBody.rows.length;
+            var newRow = tableBody.rows[0].cloneNode(true);
 
-        // update input names for model binding
-        newRow.querySelectorAll("input, select").forEach(function (input) {
-            input.name = input.name.replace("[0]", "[" + rowCount + "]");
-            input.value = "";
+            newRow.querySelectorAll("input, select").forEach(function (input) {
+                input.name = input.name.replace("[0]", "[" + rowCount + "]");
+                input.value = "";
+            });
+
+            tableBody.appendChild(newRow);
         });
-        tableBody.appendChild(newRow);
-    });
 </script>
+}

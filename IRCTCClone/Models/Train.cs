@@ -247,27 +247,27 @@ namespace IRCTCClone.Models
         }
 
         // ✅ Insert Train and return new Train ID
-        public int InsertTrain(string connectionString)
+        public void InsertTrain(string connectionString)
         {
             using (var conn = new SqlConnection(connectionString))
+            using (var cmd = new SqlCommand("spInsertTrain", conn))
             {
-                conn.Open();
-                using (var cmd = new SqlCommand("spInsertTrain", conn))
-                {
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@Number", Number);
-                    cmd.Parameters.AddWithValue("@Name", Name);
-                    cmd.Parameters.AddWithValue("@FromStationId", FromStationId);
-                    cmd.Parameters.AddWithValue("@ToStationId", ToStationId);
-                    cmd.Parameters.AddWithValue("@Departure", Departure);
-                    cmd.Parameters.AddWithValue("@Arrival", Arrival);
-                    cmd.Parameters.AddWithValue("@Duration", Duration);
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@Number", Number);
+                cmd.Parameters.AddWithValue("@Name", Name);
+                cmd.Parameters.AddWithValue("@FromStationId", FromStationId);
+                cmd.Parameters.AddWithValue("@ToStationId", ToStationId);
+                cmd.Parameters.AddWithValue("@Departure", (object?)Departure ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@Arrival", (object?)Arrival ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@Duration", (object?)Duration ?? DBNull.Value);
 
-                    Id = Convert.ToInt32(cmd.ExecuteScalar());
-                }
+                conn.Open();
+                var result = cmd.ExecuteScalar(); // 👈 should return the TrainId
+                if (result != null)
+                    Id = Convert.ToInt32(result);  // 👈 store the TrainId in the object
             }
-            return Id;
         }
+
 
         public static List<Train> GetTrainsList(string connectionString)
         {
