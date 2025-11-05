@@ -7,6 +7,7 @@ namespace IRCTCClone.Models
         public int Id { get; set; }
         public int TrainId { get; set; }
         public int StationId { get; set; }
+        public string StationName { get; set; }
         public int StopNumber { get; set; }
         public TimeSpan? ArrivalTime { get; set; }
         public TimeSpan? DepartureTime { get; set; }

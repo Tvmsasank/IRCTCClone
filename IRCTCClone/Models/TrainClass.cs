@@ -37,8 +37,9 @@ namespace IRCTCClone.Models
                                 Id = reader.GetInt32(0),
                                 TrainId = reader.GetInt32(1),
                                 Code = reader.GetString(2),
-                                Fare = reader.GetDecimal(3),
-                                SeatsAvailable = reader.GetInt32(4)
+                                SeatPrefix = reader.GetString(3),
+                                Fare = reader.GetDecimal(4),
+                                SeatsAvailable = reader.GetInt32(5)
                             });
                         }
                     }
@@ -60,6 +61,7 @@ namespace IRCTCClone.Models
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@TrainId", TrainId);
                     cmd.Parameters.AddWithValue("@Code", Code);
+                    cmd.Parameters.AddWithValue("@SeatPrefix", (object?)SeatPrefix ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@Fare", Fare);
                     cmd.Parameters.AddWithValue("@SeatsAvailable", SeatsAvailable);
                     cmd.ExecuteNonQuery();

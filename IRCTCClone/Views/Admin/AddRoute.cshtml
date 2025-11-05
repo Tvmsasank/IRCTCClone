@@ -1,4 +1,163 @@
 ﻿@using IRCTCClone.Models
+@model List<TrainRoute>
+
+@{
+    ViewBag.Title = "Add Train Route";
+    var stations = ViewBag.Stations as List<Station> ?? new List<Station>();
+    var routes = ViewBag.Routes as List<TrainRoute> ?? new List<TrainRoute>();
+    int trainId = ViewBag.TrainId;
+}
+
+<h3 class="mb-3">Add Route Stops</h3>
+
+<form method="post" asp-action="AddRoute" asp-route-trainId="@trainId">
+    <!-- Hidden input to store deleted route IDs -->
+    <input type="hidden" name="deletedIds" id="deletedIds" />
+
+<table class="table" id="routeTable">
+        <thead>
+            <tr>
+                <th>Stop #</th>
+                <th>Station</th>
+                <th>Arrival</th>
+                <th>Departure</th>
+                <th>Action</th> <!-- Add action column -->
+            </tr>
+        </thead>
+        <tbody id="routeTableBody">
+            @if (Model != null && Model.Any())
+            {
+                for (int i = 0; i < Model.Count; i++)
+                {
+                    <tr>
+                        <td>
+                            <input name="routes[@i].StopNumber" type="number" class="form-control"
+                                   value="@Model[i].StopNumber" />
+                        </td>
+                        <td>
+                            <select name="routes[@i].StationId" class="form-control">
+                                @foreach (var s in stations)
+                                {
+                                    if (s.Id == Model[i].StationId)
+                                    {
+                                        <option value="@s.Id" selected>@s.Name</option>
+                                    }
+                                    else
+                                    {
+                                        <option value="@s.Id">@s.Name</option>
+                                    }
+                                }
+                            </select>
+                        </td>
+                        <td>
+                            <input name="routes[@i].ArrivalTime" type="time" class="form-control"
+                                   value="@(Model[i].ArrivalTime?.ToString(@"hh\:mm"))" />
+                        </td>
+                        <td>
+                            <input name="routes[@i].DepartureTime" type="time" class="form-control"
+                                   value="@(Model[i].DepartureTime?.ToString(@"hh\:mm"))" />
+                        </td>
+                        <!-- Hidden input for existing route ID -->
+                        <td style="display:none;">
+                            <input name="routes[@i].Id" type="hidden" value="@Model[i].Id" />
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-danger btn-sm" onclick="deleteRouteRow(this)">Delete</button>
+                        </td>
+                    </tr>
+                }
+            }
+            else
+            {
+                <tr>
+                    <td><input name="routes[0].StopNumber" type="number" class="form-control" /></td>
+                    <td>
+                        <select name="routes[0].StationId" class="form-control">
+                            @foreach (var s in stations)
+                            {
+                                <option value="@s.Id">@s.Name</option>
+                            }
+                        </select>
+                    </td>
+                    <td><input name="routes[0].ArrivalTime" type="time" class="form-control" /></td>
+                    <td><input name="routes[0].DepartureTime" type="time" class="form-control" /></td>
+                    <td style="display:none;">
+                        <input name="routes[0].Id" type="hidden" value="0" />
+                    </td>
+                    <td>
+                        <button type="button" class="btn btn-danger btn-sm" onclick="deleteRouteRow(this)">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <button type="button" id="addRow" class="btn btn-secondary">+ Add Stop</button>
+    <button type="submit" class="btn btn-primary">Save Route</button>
+</form>
+
+@section Scripts {
+    <script>
+        var tableBody = document.getElementById("routeTableBody");
+        var deletedIdsInput = document.getElementById("deletedIds");
+
+        // Add new row
+        document.getElementById("addRow").addEventListener("click", function () {
+            var rowCount = tableBody.rows.length;
+            var newRow = tableBody.rows[0].cloneNode(true);
+
+            newRow.querySelectorAll("input, select").forEach(function (input) {
+                input.name = input.name.replace(/\[\d+\]/, "[" + rowCount + "]");
+                if (input.tagName.toLowerCase() === "select") {
+                    input.selectedIndex = 0;
+                } else {
+                    input.value = "";
+                }
+
+                // Reset Id for new row
+                if (input.name.endsWith(".Id")) {
+                    input.value = 0;
+                }
+            });
+
+            tableBody.appendChild(newRow);
+        });
+
+        // Delete row
+        function deleteRouteRow(btn) {
+            var row = btn.closest("tr");
+            var idInput = row.querySelector("input[name$='.Id']");
+
+            // Track deleted IDs for existing rows
+            if (idInput && idInput.value && idInput.value != "0") {
+                var deletedIds = deletedIdsInput.value ? deletedIdsInput.value.split(",") : [];
+                deletedIds.push(idInput.value);
+                deletedIdsInput.value = deletedIds.join(",");
+            }
+
+            // Remove row and update indices
+            if (tableBody.rows.length > 1) {
+                row.remove();
+                updateRowIndices();
+            } else {
+                alert("At least one stop is required.");
+            }
+        }
+
+        // Update row indices to keep proper model binding
+        function updateRowIndices() {
+            tableBody.querySelectorAll("tr").forEach(function (row, index) {
+                row.querySelectorAll("input, select").forEach(function (input) {
+                    input.name = input.name.replace(/\[\d+\]/, "[" + index + "]");
+                });
+            });
+        }
+    </script>
+}
+
+
+
+@* @using IRCTCClone.Models
 @using Newtonsoft.Json
 @model List<TrainRoute>
 
@@ -57,3 +216,4 @@
         });
 </script>
 }
+ *@

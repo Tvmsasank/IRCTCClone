@@ -84,10 +84,10 @@ namespace IrctcClone.Controllers
 
         // Create Train (POST)
         [HttpPost]
-        public IActionResult CreateTrain(Train train, List<string> classCodes, List<decimal> fares, List<int> seats)
+        public IActionResult CreateTrain(Train train, List<string> classCodes, List<string> BookingCode, List<decimal> fares, List<int> seats)
         {
             // 1️⃣ Validate class input
-            if (classCodes == null || fares == null || seats == null || classCodes.Count != fares.Count || classCodes.Count != seats.Count)
+            if (classCodes == null || BookingCode == null || fares == null || seats == null || classCodes.Count != BookingCode.Count || classCodes.Count != fares.Count || classCodes.Count != seats.Count)
             {
                 TempData["ErrorMessage"] = "Please provide valid class details!";
                 return RedirectToAction("CreateTrain");
@@ -120,6 +120,7 @@ namespace IrctcClone.Controllers
                 {
                     TrainId = train.Id,
                     Code = classCodes[i],
+                    SeatPrefix = !string.IsNullOrWhiteSpace(BookingCode[i]) ? BookingCode[i].Trim() : null, // ✅ add booking code,
                     Fare = fares[i],
                     SeatsAvailable = seats[i]
                 };
@@ -152,6 +153,7 @@ namespace IrctcClone.Controllers
                                 Id = Convert.ToInt32(reader["Id"]),
                                 TrainId = trainId,
                                 StationId = Convert.ToInt32(reader["StationId"]),
+                                StationName = Convert.ToString(reader["StationName"]),
                                 StopNumber = Convert.ToInt32(reader["StopNumber"]),
                                 ArrivalTime = reader["ArrivalTime"] == DBNull.Value ? null : (TimeSpan?)reader["ArrivalTime"],
                                 DepartureTime = reader["DepartureTime"] == DBNull.Value ? null : (TimeSpan?)reader["DepartureTime"]
@@ -194,7 +196,7 @@ namespace IrctcClone.Controllers
 
             // ✅ Fetch existing routes (can be empty)
             var routes = GetTrainRoutes(train.Id);
-
+            ViewBag.Routes = routes ?? new List<TrainRoute>();
             return View("AddRoute", routes); // pass list of existing routes
         }
 
@@ -202,7 +204,7 @@ namespace IrctcClone.Controllers
 
         // ✅ POST: Add Route
         [HttpPost]
-        public IActionResult AddRoute(int trainId, List<TrainRoute> routes)
+        public IActionResult AddRoute(int trainId, List<TrainRoute> routes, string deletedIds)
         {
             // 👇 Debug check (optional)
             if (trainId == 0)
@@ -214,6 +216,15 @@ namespace IrctcClone.Controllers
             using (var conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
+                if (!string.IsNullOrEmpty(deletedIds))
+                {
+                    using (var cmd = new SqlCommand("spDeleteTrainRoute", conn))
+                    {
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.AddWithValue("@Ids", deletedIds);
+                        cmd.ExecuteNonQuery();
+                    }
+                }
 
                 foreach (var route in routes)
                 {
@@ -330,6 +341,8 @@ namespace IrctcClone.Controllers
 
             return RedirectToAction("Index");
         }
+
+
 
 
         // =====================================================
