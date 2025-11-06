@@ -36,7 +36,6 @@ namespace IRCTCClone.Controllers
             return View(new ViewModels());
         }
 
-        [Authorize]
         [HttpPost]
         public async Task<IActionResult> Login(ViewModels model, string returnUrl = null)
         {

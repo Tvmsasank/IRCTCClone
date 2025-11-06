@@ -1,4 +1,4 @@
-/* ---------- GLOBAL RESET ---------- */
+﻿/* ---------- GLOBAL RESET ---------- */
 *{
     margin: 0;
     padding: 0;
@@ -410,7 +410,7 @@ main {
 
 .logout-btn {
     background-color: #0078D7; 
-    color: white;  White text 
+    color: white;
     text-decoration: none;
     padding: 6px 14px;
     border-radius: 6px;
@@ -1007,3 +1007,164 @@ hr {
         background-color: #007bff;
         color: white;
     }
+
+
+.timeline-card {
+    border-radius: 27px;
+    overflow: hidden;
+    box-shadow: 0 7px 25px rgba(0,0,0,0.15);
+    background: #ffffff;
+}
+
+.timeline-header {
+    background: linear-gradient(120deg, #0052D4, #4364F7, #6FB1FC);
+    color: #fff;
+    padding: 5px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+    .timeline-header i {
+        font-size: 2rem;
+    }
+
+.timeline-body {
+    padding: 10px 20px;
+    position: relative;
+}
+
+.timeline-line {
+    position: absolute;
+    left: 50px;
+    top: 0;
+    width: 5px;
+    background: #e0e7ff;
+    height: 100%;
+    border-radius: 4px;
+}
+
+.timeline-item {
+    position: relative;
+    padding-left: 55px;
+    margin-bottom: 7px;
+}
+
+    .timeline-item:last-child {
+        margin-bottom: 0;
+    }
+
+.timeline-icon {
+    position: absolute;
+    left: 18px;
+    top: 0;
+    width: 30px;
+    height: 30px;
+    background: #4364F7;
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    animation: pop 0.4s ease-out;
+}
+
+.timeline-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.timeline-sub {
+    color: #6c757d;
+    margin-bottom: 0px;
+}
+
+.timeline-badge {
+    display: inline-block;
+    background: #eef4ff;
+    color: #0052D4;
+    padding: 3px 14px;
+    border-radius: 20px;
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+.station-badge {
+    display: inline-block;
+    background: #fff2d6;
+    color: #ad7a00;
+    padding: 3px 14px;
+    border-radius: 20px;
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+
+.route-card {
+    border-radius: 30px;
+    box-shadow: 0 7px 25px rgba(0,0,0,0.08);
+    background: #fff;
+    padding: 30px;
+}
+
+.route-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #0052D4;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+    .route-title i {
+        font-size: 1.8rem;
+        color: #0052D4;
+    }
+
+.route-table {
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+    .route-table th {
+        background: #f0f4ff;
+        color: #003b99;
+        font-weight: 600;
+        padding: 10px 0px;
+        font-size: 0.95rem;
+    }
+
+    .route-table td {
+        background: #E0FFFF;
+        vertical-align: middle;
+        padding: 10px 50px;
+    }
+
+    .route-table tr:hover td {
+        background: lightblue;
+    }
+
+.btn-add {
+    border-radius: 20px;
+    padding: 8px 18px;
+    font-weight: 600;
+}
+
+.btn-save {
+    padding: 8px 20px;
+    font-weight: 600;
+    border-radius: 20px;
+}
+
+/* ✅ Smooth fade effect */
+.fade-row {
+    animation: fadeIn .4s ease;
+}
+
+.sticky-timeline {
+    position: sticky;
+    top: 0px;
+    z-index: 10;
+}

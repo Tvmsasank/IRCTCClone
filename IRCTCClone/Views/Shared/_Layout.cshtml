@@ -31,9 +31,19 @@
                     <a asp-controller="Admin" asp-action="Dashboard" class="welcome-text">
                         👋 Welcome, @adminUser
                     </a>
+                    <a href="#" onclick="confirmLogout()" class="logout-btn" style="display:inline">Logout</a>
+
+                    <script>
+                        function confirmLogout() {
+                            if (confirm("Are you sure you want to logout?")) {
+                                window.location.href = "/Admin/Logout";
+                            }
+                        }
+                    </script>
+@* 
                     <form asp-controller="Admin" asp-action="Logout" method="post" style="display:inline;">
                         <button type="submit" class="logout-btn">🚪 Logout</button>
-                    </form> 
+                    </form> *@
                 }
                 else if (User?.Identity?.IsAuthenticated == true)
                 {
@@ -64,6 +74,15 @@
     <footer class="site-footer">
         © 2025 IRCTC Clone — All Rights Reserved
     </footer>
+
+    <script>
+        // Prevent going back to secured pages
+        window.history.pushState(null, "", window.location.href);
+        window.onpopstate = function () {
+            window.history.pushState(null, "", window.location.href);
+        };
+    </script>
+
 
     <!-- ✅ Load scripts first -->
 

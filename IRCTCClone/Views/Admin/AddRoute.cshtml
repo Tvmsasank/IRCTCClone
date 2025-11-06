@@ -8,144 +8,231 @@
     int trainId = ViewBag.TrainId;
 }
 
-<h3 class="mb-3">Add Route Stops</h3>
-<div>
-<!-- ✅ Alert Messages -->
-@if (TempData["SuccessMessage"] != null)
-{
-    <div class="alert alert-success alert-dismissible fade show" role="alert">
-        @TempData["SuccessMessage"]
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
+@{
+    var train = ViewBag.Train as Train;
 }
-</div>
-<form method="post" asp-action="AddRoute" asp-route-trainId="@trainId">
-    <!-- Hidden input to store deleted route IDs -->
-    <input type="hidden" name="deletedIds" id="deletedIds" />
 
-<table class="table" id="routeTable">
-        <thead>
-            <tr>
-                <th>Stop #</th>
-                <th>Station</th>
-                <th>Arrival</th>
-                <th>Departure</th>
-                <th>Action</th> <!-- Add action column -->
-            </tr>
-        </thead>
-        <tbody id="routeTableBody">
-            @if (Model != null && Model.Any())
-            {
-                for (int i = 0; i < Model.Count; i++)
+<!-- Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" />
+
+<!-- ✅ TIMELINE CARD -->
+<div class="timeline-card mb-4 sticky-timeline">
+
+    <div class="timeline-header">
+        <i class="bi bi-train-front-fill"></i>
+        <div>
+            <h4 class="mb-0">@train.Number – @train.Name</h4>
+            <small class="opacity-75">IRCTC Train Timeline View</small>
+        </div>
+    </div>
+
+    <div class="timeline-body">
+        <div class="timeline-line"></div>
+
+        <div class="timeline-item">
+            <div class="timeline-icon bg-danger">
+                <i class="bi bi-geo-alt-fill"></i>
+            </div>
+            <div class="timeline-sub">Source</div>
+            <div class="timeline-title station-badge">@train.FromStation?.Name</div>
+            <div class="mt-2">
+                <span class="timeline-badge">
+                    <i class="bi bi-clock-history me-1"></i>
+                    Departure: @train.Departure.ToString(@"hh\:mm")
+                </span>
+            </div>
+        </div>
+
+        <div class="timeline-item">
+            <div class="timeline-icon bg-success">
+                <i class="bi bi-geo-alt"></i>
+            </div>
+            <div class="timeline-sub">Destination</div>
+            <div class="timeline-title station-badge">@train.ToStation?.Name</div>
+            <div class="mt-2">
+                <span class="timeline-badge">
+                    <i class="bi bi-clock me-1"></i>
+                    Arrival: @train.Arrival.ToString(@"hh\:mm")
+                </span>
+            </div>
+        </div>
+
+        <div class="timeline-item">
+            <div class="timeline-icon bg-info">
+                <i class="bi bi-hourglass-split"></i>
+            </div>
+            <div class="timeline-sub">Total Journey Time</div>
+            <div class="timeline-title">
+                <span class="timeline-badge">@train.Duration.ToString(@"hh\:mm")</span>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Bootstrap Icons  -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+
+<div class="route-card">
+
+    <!-- ✅ Section Title -->
+    <div class="route-title">
+        <i class="bi bi-signpost-split"></i>
+        Add Route Stops
+    </div>
+
+    <a asp-action="TrainList" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Train List
+    </a>
+
+    <!-- ✅ Success Message -->
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            @TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <form method="post" asp-action="AddRoute" asp-route-trainId="@trainId">
+        <input type="hidden" id="deletedIds" name="deletedIds" />
+
+        <!-- ✅ Table -->
+        <table class="table route-table" id="routeTable">
+            <thead>
+                <tr>
+                    <th style="width:90px;">Stop #</th>
+                    <th>Station</th>
+                    <th style="width:150px;">Arrival</th>
+                    <th style="width:150px;">Departure</th>
+                    <th style="width:100px;" class="text-center">Action</th>
+                </tr>
+            </thead>
+
+            <tbody id="routeTableBody">
+
+                @if (Model != null && Model.Any())
                 {
-                    <tr>
+                    for (int i = 0; i < Model.Count; i++)
+                    {
+                        <tr class="fade-row">
+                            <td>
+                                <input name="routes[@i].StopNumber" type="number" min="0" class="form-control" value="@Model[i].StopNumber" />
+                            </td>
+
+                            <td>
+                                <select name="routes[@i].StationId" class="form-select">
+                                    @foreach (var s in stations)
+                                    {
+                                        <option value="@s.Id" selected="@(s.Id == Model[i].StationId)">
+                                            @s.Name
+                                        </option>
+                                    }
+                                </select>
+                            </td>
+
+                            <td>
+                                <input name="routes[@i].ArrivalTime" type="time" class="form-control"
+                                       value="@(Model[i].ArrivalTime?.ToString(@"hh\:mm"))" />
+                            </td>
+
+                            <td>
+                                <input name="routes[@i].DepartureTime" type="time" class="form-control"
+                                       value="@(Model[i].DepartureTime?.ToString(@"hh\:mm"))" />
+                            </td>
+
+                            <!-- Hidden ID -->
+                            <td style="display:none;">
+                                <input name="routes[@i].Id" type="hidden" value="@Model[i].Id" />
+                            </td>
+
+                            <td class="text-center">
+                                <button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteRouteRow(this)">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr class="fade-row">
+                        <td><input name="routes[0].StopNumber" type="number" class="form-control" /></td>
+
                         <td>
-                            <input name="routes[@i].StopNumber" type="number" class="form-control"
-                                   value="@Model[i].StopNumber" />
-                        </td>
-                        <td>
-                            <select name="routes[@i].StationId" class="form-control">
+                            <select name="routes[0].StationId" class="form-select">
                                 @foreach (var s in stations)
                                 {
-                                    if (s.Id == Model[i].StationId)
-                                    {
-                                        <option value="@s.Id" selected>@s.Name</option>
-                                    }
-                                    else
-                                    {
-                                        <option value="@s.Id">@s.Name</option>
-                                    }
+                                    <option value="@s.Id">@s.Name</option>
                                 }
                             </select>
                         </td>
-                        <td>
-                            <input name="routes[@i].ArrivalTime" type="time" class="form-control"
-                                   value="@(Model[i].ArrivalTime?.ToString(@"hh\:mm"))" />
-                        </td>
-                        <td>
-                            <input name="routes[@i].DepartureTime" type="time" class="form-control"
-                                   value="@(Model[i].DepartureTime?.ToString(@"hh\:mm"))" />
-                        </td>
-                        <!-- Hidden input for existing route ID -->
+
+                        <td><input name="routes[0].ArrivalTime" type="time" class="form-control" /></td>
+                        <td><input name="routes[0].DepartureTime" type="time" class="form-control" /></td>
+
                         <td style="display:none;">
-                            <input name="routes[@i].Id" type="hidden" value="@Model[i].Id" />
+                            <input name="routes[0].Id" type="hidden" value="0" />
                         </td>
-                        <td>
-                            <button type="button" class="btn btn-danger btn-sm" onclick="deleteRouteRow(this)">Delete</button>
+
+                        <td class="text-center">
+                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteRouteRow(this)">
+                                <i class="bi bi-trash"></i>
+                            </button>
                         </td>
                     </tr>
                 }
-            }
-            else
-            {
-                <tr>
-                    <td><input name="routes[0].StopNumber" type="number" class="form-control" /></td>
-                    <td>
-                        <select name="routes[0].StationId" class="form-control">
-                            @foreach (var s in stations)
-                            {
-                                <option value="@s.Id">@s.Name</option>
-                            }
-                        </select>
-                    </td>
-                    <td><input name="routes[0].ArrivalTime" type="time" class="form-control" /></td>
-                    <td><input name="routes[0].DepartureTime" type="time" class="form-control" /></td>
-                    <td style="display:none;">
-                        <input name="routes[0].Id" type="hidden" value="0" />
-                    </td>
-                    <td>
-                        <button type="button" class="btn btn-danger btn-sm" onclick="deleteRouteRow(this)">Delete</button>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
+            </tbody>
+        </table>
 
-    <button type="button" id="addRow" class="btn btn-secondary">+ Add Stop</button>
-    <button type="submit" class="btn btn-primary">Save Route</button>
-    <a asp-action="TrainList" class="btn btn-outline-secondary">Back</a>
-</form>
+        <!-- ✅ Buttons -->
+        <div class="mt-3 d-flex gap-2">
+            <button type="button" id="addRow" class="btn btn-primary btn-add">
+                <i class="bi bi-plus-circle me-1"></i> Add Stop
+            </button>
+
+            <button type="submit" class="btn btn-success btn-save">
+                <i class="bi bi-save2 me-1"></i> Save Route
+            </button>
+            <a asp-action="TrainList" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Back
+            </a>
+        </div>
+
+    </form>
+</div>
 
 @section Scripts {
+    <!-- ✅ JAVASCRIPT -->
     <script>
         var tableBody = document.getElementById("routeTableBody");
         var deletedIdsInput = document.getElementById("deletedIds");
 
-        // Add new row
+        // ✅ Add row
         document.getElementById("addRow").addEventListener("click", function () {
             var rowCount = tableBody.rows.length;
             var newRow = tableBody.rows[0].cloneNode(true);
 
             newRow.querySelectorAll("input, select").forEach(function (input) {
                 input.name = input.name.replace(/\[\d+\]/, "[" + rowCount + "]");
-                if (input.tagName.toLowerCase() === "select") {
-                    input.selectedIndex = 0;
-                } else {
-                    input.value = "";
-                }
-
-                // Reset Id for new row
-                if (input.name.endsWith(".Id")) {
-                    input.value = 0;
-                }
+                if (input.tagName.toLowerCase() === "select") input.selectedIndex = 0;
+                else input.value = "";
+                if (input.name.endsWith(".Id")) input.value = 0;
             });
 
+            newRow.classList.add("fade-row");
             tableBody.appendChild(newRow);
         });
 
-        // Delete row
+        // ✅ Delete row
         function deleteRouteRow(btn) {
             var row = btn.closest("tr");
             var idInput = row.querySelector("input[name$='.Id']");
 
-            // Track deleted IDs for existing rows
             if (idInput && idInput.value && idInput.value != "0") {
                 var deletedIds = deletedIdsInput.value ? deletedIdsInput.value.split(",") : [];
                 deletedIds.push(idInput.value);
                 deletedIdsInput.value = deletedIds.join(",");
             }
 
-            // Remove row and update indices
             if (tableBody.rows.length > 1) {
                 row.remove();
                 updateRowIndices();
@@ -154,7 +241,7 @@
             }
         }
 
-        // Update row indices to keep proper model binding
+        // ✅ Fix row indices after deletion
         function updateRowIndices() {
             tableBody.querySelectorAll("tr").forEach(function (row, index) {
                 row.querySelectorAll("input, select").forEach(function (input) {
@@ -164,66 +251,3 @@
         }
     </script>
 }
-
-
-
-@* @using IRCTCClone.Models
-@using Newtonsoft.Json
-@model List<TrainRoute>
-
-@{
-    ViewBag.Title = "Add Train Route";
-    var stations = ViewBag.Stations as List<Station> ?? new List<Station>();
-    int trainId = ViewBag.TrainId;
-}
-
-<h3 class="mb-3">Add Route Stops</h3>
-
-<form method="post" action="/Admin/AddRoute?trainId=@trainId">
-    <table class="table" id="routeTable">
-        <thead>
-            <tr>
-                <th>Stop #</th>
-                <th>Station</th>
-                <th>Arrival</th>
-                <th>Departure</th>
-            </tr>
-        </thead>
-        <tbody id="routeTableBody">
-            <tr>
-                <td><input name="routes[0].StopNumber" type="number" class="form-control" /></td>
-                <td>
-                    <select name="routes[0].StationId" class="form-control">
-                        @foreach (var s in (List<IRCTCClone.Models.Station>)ViewBag.Stations)
-                        {
-                            <option value="@s.Id">@s.Name</option>
-                        }
-                    </select>
-                </td>
-                <td><input name="routes[0].ArrivalTime" type="time" class="form-control" /></td>
-                <td><input name="routes[0].DepartureTime" type="time" class="form-control" /></td>
-            </tr>
-        </tbody>
-    </table>
-
-    <button type="button" id="addRow" class="btn btn-secondary">+ Add Stop</button>
-    <button type="submit" class="btn btn-primary">Save Route</button>
-</form>
-
-@section Scripts {
-<script>
-            document.getElementById("addRow").addEventListener("click", function () {
-            var tableBody = document.getElementById("routeTableBody");
-            var rowCount = tableBody.rows.length;
-            var newRow = tableBody.rows[0].cloneNode(true);
-
-            newRow.querySelectorAll("input, select").forEach(function (input) {
-                input.name = input.name.replace("[0]", "[" + rowCount + "]");
-                input.value = "";
-            });
-
-            tableBody.appendChild(newRow);
-        });
-</script>
-}
- *@

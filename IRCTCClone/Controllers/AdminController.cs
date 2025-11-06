@@ -55,6 +55,7 @@ namespace IrctcClone.Controllers
         }
 
         //--------------------------------------------DASHBOARD-------------------------------------------//
+        [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
         public IActionResult Dashboard()
         {
             if (HttpContext.Session.GetString("AdminUser") == null)
@@ -166,11 +167,15 @@ namespace IrctcClone.Controllers
             return routes;
         }
 
-
-        public IActionResult AddRoute(Train train )
+        [HttpGet]
+        public IActionResult AddRoute(int id)
         {
-            ViewBag.TrainId = train.Id;
+            // ✅ 1. Load the Train using the ID
+            Train train = GetTrainById(id);   // we will write this function below
+            ViewBag.Train = train;
+            ViewBag.TrainId = id;
 
+            // ✅ 2. Load Stations
             var stations = new List<Station>();
             using (var conn = new SqlConnection(_connectionString))
             {
@@ -191,13 +196,49 @@ namespace IrctcClone.Controllers
                     }
                 }
             }
+            ViewBag.Stations = stations;
 
-            ViewBag.Stations = stations ?? new List<Station>();
+            // ✅ 3. Load Train Routes
+            var routes = GetTrainRoutes(id);
+            ViewBag.Routes = routes;
 
-            // ✅ Fetch existing routes (can be empty)
-            var routes = GetTrainRoutes(train.Id);
-            ViewBag.Routes = routes ?? new List<TrainRoute>();
-            return View("AddRoute", routes); // pass list of existing routes
+            // ✅ 4. Return view with routes list
+            return View("AddRoute", routes);
+        }
+
+        private Train GetTrainById(int trainId)
+        {
+            Train train = null;
+
+            using (var conn = new SqlConnection(_connectionString))
+            {
+                conn.Open();
+                using (var cmd = new SqlCommand("spGTById", conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@Id", trainId);
+
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            train = new Train
+                            {
+                                Id = reader.GetInt32(0),
+                                Number = reader.GetInt32(1),
+                                Name = reader.GetString(2),
+                                FromStation = new Station { Name = reader.GetString(3) },
+                                ToStation = new Station { Name = reader.GetString(4) },
+                                Departure = reader.GetTimeSpan(5),
+                                Arrival = reader.GetTimeSpan(6),
+                                Duration = reader.GetTimeSpan(7)
+                            };
+                        }
+                    }
+                }
+            }
+
+            return train;
         }
 
 
@@ -241,7 +282,7 @@ namespace IrctcClone.Controllers
                 }
             }
 
-            TempData["SuccessMessage"] = "✅ Train routes added successfully!";
+            TempData["SuccessMessage"] = "✅ Train routes updated successfully!";
             return RedirectToAction("AddRoute");
         }
 
