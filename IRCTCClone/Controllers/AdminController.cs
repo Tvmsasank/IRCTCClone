@@ -242,7 +242,7 @@ namespace IrctcClone.Controllers
             }
 
             TempData["SuccessMessage"] = "✅ Train routes added successfully!";
-            return RedirectToAction("TrainList");
+            return RedirectToAction("AddRoute");
         }
 
 

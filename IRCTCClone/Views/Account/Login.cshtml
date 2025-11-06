@@ -21,6 +21,8 @@
         }
 
         <form method="post" action="/Account/Login" class="auth-form">
+
+            <input type="hidden" name="returnUrl" value="@ViewBag.ReturnUrl" />
             <label>
                 Email
                 <input type="email" name="Email" value="@Model.Email" required />

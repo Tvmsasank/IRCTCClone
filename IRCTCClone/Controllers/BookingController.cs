@@ -1,4 +1,5 @@
 ﻿using IRCTCClone.Models;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
@@ -22,6 +23,7 @@ namespace IRCTCClone.Controllers
         }
 
         // GET: /Booking/Checkout
+        [Authorize]
         [HttpGet]
         public IActionResult Checkout(int trainId, int classId, string journeyDate)
         {

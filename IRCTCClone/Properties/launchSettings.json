@@ -4,7 +4,7 @@
     "windowsAuthentication": false,
     "anonymousAuthentication": true,
     "iisExpress": {
-      "applicationUrl": "http://irctc-clone.co.in.localhost:23807",
+      "applicationUrl": "http://localhost:23807",
       "sslPort": 44388
     }
   },
@@ -13,7 +13,7 @@
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": true,
-      "applicationUrl": "http://irctc-clone.co.in.localhost:5145",
+      "applicationUrl": "http://localhost:5145",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
@@ -22,7 +22,7 @@
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": true,
-      "applicationUrl": "https://irctc-clone.co.in.localhost:7090;http://irctc-clone.co.in.localhost:5145",
+      "applicationUrl": "https://localhost:7090;http://localhost:5145",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
