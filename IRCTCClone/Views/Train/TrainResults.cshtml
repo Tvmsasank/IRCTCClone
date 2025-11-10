@@ -13,7 +13,9 @@
 
 <section class="results-page fadeInUp">
     <div class="results-container">
-        <h2 class="results-title">Available Trains for <span class="highlight">@journey</span></h2>
+        <h2 class="results-title">
+            Available Trains for <span class="highlight">@journey</span>
+        </h2>
 
         @if (!Model.Any())
         {
@@ -40,23 +42,37 @@
                         {
                             <tr>
                                 <td>@t.Number</td>
-                                <td>@t.Name</td>
-                                <td>@t.FromStation?.Code</td>
+
+                                <td>
+                                    <a href="#" class="train-link"
+                                       data-train-id="@t.Id"
+                                       data-train-name="@t.Name"
+                                       data-train-number="@t.Number">
+                                        @t.Name
+                                    </a>
+                                </td>
+
+                                <td>@t.FromStationName1</td>
                                 <td>@t.Departure.ToString(@"hh\:mm")</td>
                                 <td>@t.Duration.ToString(@"hh\:mm")</td>
-                                <td>@t.ToStation?.Code</td>
+                                <td>@t.ToStationName1</td>
                                 <td>@t.Arrival.ToString(@"hh\:mm")</td>
+
                                 <td>
-                                    <div class="class-buttons">
-                                        @foreach (var c in t.Classes)
-                                        {
-                                            <form method="get" action="/Booking/Checkout" class="inline-form">
-                                                <input type="hidden" name="trainId" value="@t.Id" />
-                                                <input type="hidden" name="classId" value="@c.Id" />
-                                                <input type="hidden" name="journeyDate" value="@journey" />
-                                                <button type="submit" class="class-btn">@c.Code - ₹@c.Fare (@c.SeatsAvailable)</button>
-                                            </form>
-                                        }
+                                    <div class="class-scroll">
+                                        <div class="class-buttons">
+                                            @foreach (var c in t.Classes)
+                                            {
+                                                <form method="get" action="/Booking/Checkout" class="inline-form">
+                                                    <input type="hidden" name="trainId" value="@t.Id" />
+                                                    <input type="hidden" name="classId" value="@c.Id" />
+                                                    <input type="hidden" name="journeyDate" value="@journey" />
+                                                    <button type="submit" class="class-btn">
+                                                        @c.Code - ₹@c.Fare (@c.SeatsAvailable)
+                                                    </button>
+                                                </form>
+                                            }
+                                        </div>
                                     </div>
                                 </td>
                             </tr>
@@ -66,4 +82,51 @@
             </div>
         }
     </div>
+
+    <!-- ✅ Right Side Drawer -->
+    <div id="route-sidebar" class="route-sidebar">
+        <div class="sidebar-header">
+            <h4 class="sidebar-title">Train Route</h4>
+            <button class="sidebar-close" id="close-sidebar">&times;</button>
+        </div>
+
+        <div id="sidebar-content" class="sidebar-content">
+            <!-- AJAX Loaded Route -->
+        </div>
+    </div>
+
+    <!-- Background Overlay -->
+    <div id="sidebar-overlay" class="sidebar-overlay"></div>
+
 </section>
+
+
+@section Scripts {
+    <script>
+        $(document).on("click", ".train-link", function (e) {
+            e.preventDefault();
+
+            var trainId = $(this).data("train-id");
+            var trainName = $(this).data("train-name");
+            var trainNumber = $(this).data("train-number");
+
+            // Update Sidebar Title
+            $(".sidebar-title").text(`Train Route of ${trainNumber} - ${trainName}`);
+
+            // Load via AJAX
+            $.get("/Admin/GetTrainRoute", { trainId: trainId }, function (html) {
+
+                $("#sidebar-content").html(html);
+
+                $("#sidebar-overlay").fadeIn(200);
+                $("#route-sidebar").css("right", "0");
+            });
+        });
+
+        // Close sidebar
+        $(document).on("click", "#close-sidebar, #sidebar-overlay", function () {
+            $("#route-sidebar").css("right", "-450px");
+            $("#sidebar-overlay").fadeOut(200);
+        });
+    </script>
+}

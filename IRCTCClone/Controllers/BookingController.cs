@@ -97,6 +97,35 @@ namespace IRCTCClone.Controllers
             return View("Checkout");
         }
 
+
+/*        [HttpPost]
+        public IActionResult PayViaQR(int trainId, int classId, DateTime journeyDate, decimal fare)
+        {
+            // Create view model for QR page
+            var model = new Booking
+            {
+                TrainId = trainId,
+                ClassId = classId,
+                JourneyDate = journeyDate,
+                TotalFare = fare
+            };
+
+            return View(model);
+        }
+
+        [HttpPost]
+        public IActionResult ConfirmPayment(Booking model)
+        {
+            // ✅ Validate data (optional)
+            if (model == null || model.TotalFare <= 0)
+                return BadRequest("Invalid payment details");
+
+            // ✅ Pass to confirmation page
+            return View("Confirmation", model);
+        }*/
+
+
+
         // POST: /Booking/Confirm
         [HttpPost]
         public IActionResult Confirm(

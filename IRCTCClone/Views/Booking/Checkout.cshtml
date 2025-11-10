@@ -42,7 +42,7 @@
                 <div id="passengers">
                     <div class="passenger-card">
                         <input name="passengerNames" placeholder="Name" required />
-                        <input name="passengerAges" type="number" placeholder="Age" required />
+                        <input name="passengerAges" type="number" placeholder="Age" min="1" oninput="validity.valid||(value='');" required />
                         <select name="passengerGenders" required>
                             <option value="">Select Gender</option>
                             <option value="M">Male</option>
@@ -94,8 +94,8 @@ else
             var passengerHtml = `
                 <div class="passenger-card">
                     <input name="passengerNames" placeholder="Name" required />
-                    <input name="passengerAges" type="number" placeholder="Age" required />
-                    <select name="passengerGenders" required>
+                    <input name="passengerAges" type="number" placeholder="Age" min="1" oninput="validity.valid||(value='');" required />
+                            <select name="passengerGenders" required>
                         <option value="">Select Gender</option>
                         <option value="M">Male</option>
                         <option value="F">Female</option>
@@ -123,6 +123,15 @@ else
             $(this).closest(".passenger-card").remove();
             updateTotal();
         });
+
+        $(document).on("input", "input[name='passengerAges']", function () {
+            let val = parseInt($(this).val());
+            if (val < 1 || isNaN(val)) {
+                $(this).val("");
+            }
+        });
+
+
 
         // --- Initial Fare Update ---
         updateTotal();

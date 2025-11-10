@@ -1,0 +1,23 @@
+﻿@* @model IEnumerable<IRCTCClone.Models.TrainRoute>
+
+<table class="table table-bordered table-sm">
+    <thead>
+        <tr>
+            <th>Station</th>
+            <th>Arrival</th>
+            <th>Departure</th>
+            <th>Day</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var r in Model)
+        {
+            <tr>
+                <td>@r.StationName</td>
+                <td>@(r.ArrivalTime == TimeSpan.Zero ? "-" : r.ArrivalTime?.ToString(@"hh\:mm"))</td>
+                <td>@(r.DepartureTime == TimeSpan.Zero ? "-" : r.DepartureTime?.ToString(@"hh\:mm"))</td>
+            </tr>
+        }
+    </tbody>
+</table>
+ *@

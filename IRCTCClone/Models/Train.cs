@@ -8,6 +8,8 @@ namespace IRCTCClone.Models
         public int Id { get; set; }
         public int Number { get; set; }
         public string Name { get; set; } = null!;
+        public string FromStationName1 { get; set; } = null!;
+        public string ToStationName1 { get; set; } = null!;
         public int FromStationId { get; set; }
         public Station? FromStation { get; set; }
         public int ToStationId { get; set; }
@@ -66,7 +68,7 @@ namespace IRCTCClone.Models
 
 
         // ✅ Fetch trains between 2 stations (calls spSearchTrains)
-        public static List<Train> GetTrains(string connectionString, int fromStationId, int toStationId)
+        public static List<Train> GetTrains(string connectionString, int fromStationId)
         {
             var trains = new List<Train>();
 
@@ -74,11 +76,11 @@ namespace IRCTCClone.Models
             {
                 conn.Open();
 
-                using (var cmd = new SqlCommand("spSearchTrains", conn))
+                using (var cmd = new SqlCommand("spSearchTrains1", conn))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@FromStationId", fromStationId);
-                    cmd.Parameters.AddWithValue("@ToStationId", toStationId);
+       
 
                     using (var reader = cmd.ExecuteReader())
                     {
@@ -86,18 +88,23 @@ namespace IRCTCClone.Models
                         {
                             trains.Add(new Train
                             {
-                                Id = reader.GetInt32(0),
-                                Number = reader.GetInt32(1),
-                                Name = reader.GetString(2),
-                                FromStationId = reader.GetInt32(3),
-                                FromStation = new Station { Code = reader.GetString(4) },
-                                ToStationId = reader.GetInt32(5),
-                                ToStation = new Station { Code = reader.GetString(6) },
-                                Departure = reader.GetTimeSpan(7),
-                                Arrival = reader.GetTimeSpan(8),
-                                Duration = reader.GetTimeSpan(9),
+                                Id = reader.GetInt32(0),                     // Id
+                                Number = reader.GetInt32(1),                 // Number
+                                Name = reader.GetString(2),                  // Name
+                                       
+                                ToStationId = reader.GetInt32(4),            // ToStationId
+
+                                Departure = reader.GetTimeSpan(5),           // Departure
+                                Arrival = reader.GetTimeSpan(6),             // Arrival
+                                Duration = reader.GetTimeSpan(7),            // Duration
+                                FromStationName1= reader.GetString(8),
+                                ToStationName1 = reader.GetString(9),
+
+
+
                                 Classes = new List<TrainClass>()
                             });
+
                         }
                     }
                 }

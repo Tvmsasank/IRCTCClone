@@ -35,166 +35,44 @@
     </div>
 </div>
 
-<!-- jQuery CDN -->
-@* <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> *@
+<!-- ==== IRCTC Announcement Modal ==== -->
+<div id="irctc-warning-overlay" class="irctc-overlay">
+    <div class="irctc-modal">
+        <h3 class="title">Alert</h3>
+        <br />
+        <p class="msg">
+            <strong></strong>
+            With effect from <b>28th October 2025</b>, only <b>Aadhaar authenticated users</b>
+            are allowed to book tickets between <b>8 AM to 10 AM</b> on the first day
+            of opening of reserved ticket booking.
+        </p>
 
-@* <style>
-    .autocomplete-list {
-        position: absolute;
-        background: white;
-        border: 1px solid #ccc;
-        width: 100%;
-        max-height: 200px;
-        overflow-y: auto;
-        display: none;
-        z-index: 1000;
-    }
+        <p class="msg">
+            <strong></strong>
+            <b>28 अक्टूबर 2025</b> से, केवल <b>आधार प्रमाणित उपयोगकर्ताओं</b> को
+            आरक्षित टिकट बुकिंग खुलने के पहले दिन
+            <b>सुबह 8 बजे से 10 बजे</b> के बीच टिकट बुक करने की अनुमति होगी।
+        </p>
 
-    .autocomplete-item {
-        padding: 8px;
-        cursor: pointer;
-    }
-
-        .autocomplete-item:hover {
-            background: #f0f0f0;
-        }
-
-    .form-group {
-        margin-bottom: 10px;
-    }
-</style> *@
-
+        <button id="close-warning" class="warning-close-btn">OK</button>
+    </div>
+</div>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="~/js/site.js"></script>
 
 
-@* <script>
-    // ✅ Debounce helper (prevents too many requests)
-    function debounce(fn, delay) {
-        let timer;
-        return function () {
-            clearTimeout(timer);
-            timer = setTimeout(fn, delay);
-        };
-    }
+<script>
+    // Close announcement and enable page
+    document.addEventListener("DOMContentLoaded", function () {
 
-    // ✅ Autocomplete function
-    function wireAutocomplete($input, $list) {
-        // --- Fetch station list via AJAX ---
-        function fetchStations(term, callback) {
-            $.get('/Train/GetStations', { term: term }, function (data) {
-                callback(data);
+        var closeBtn = document.getElementById("close-warning");
+        var overlay = document.getElementById("irctc-warning-overlay");
+
+        if (closeBtn) {
+            closeBtn.addEventListener("click", function () {
+                overlay.style.display = "none";
             });
         }
-
-        // --- Render the dropdown list ---
-        function renderList($listEl, items) {
-            $listEl.empty();
-            if (!items.length) {
-                $listEl.hide();
-                return;
-            }
-
-            items.forEach(function (s) {
-                $('<div class="autocomplete-item">')
-                    .text(s.name + ' (' + s.code + ')')
-                    .data('id', s.id)
-                    .appendTo($listEl);
-            });
-
-            $listEl.show();
-        }
-
-        // --- Typing event ---
-        $input.on('input', debounce(function () {
-            const term = $input.val().trim();
-
-            if (term.length === 0) {
-                $list.hide();
-                // Reset hidden field when cleared
-                if ($input.attr('id') === 'fromStation') {
-                    $('#fromStationId').val('');
-                } else if ($input.attr('id') === 'toStation') {
-                    $('#toStationId').val('');
-                }
-                return;
-            }
-
-            fetchStations(term, function (items) {
-                renderList($list, items);
-            });
-        }, 200));
-
-        // --- Selecting from dropdown ---
-        $list.on('click', '.autocomplete-item', function () {
-            const stationName = $(this).text();
-            const stationId = $(this).data('id');
-
-            $input.val(stationName);
-            $list.hide();
-
-            // ✅ set hidden field value
-            if ($input.attr('id') === 'fromStation') {
-                $('#fromStationId').val(stationId);
-            } else if ($input.attr('id') === 'toStation') {
-                $('#toStationId').val(stationId);
-            }
-        });
-
-        // --- Hide dropdown when clicking outside ---
-        $(document).on('click', function (e) {
-            if (!$(e.target).closest($input).length && !$(e.target).closest($list).length) {
-                $list.hide();
-            }
-        });
-    }
-
-    // ✅ Initialize both inputs
-    $(function () {
-        wireAutocomplete($('#fromStation'), $('#fromStationList'));
-        wireAutocomplete($('#toStation'), $('#toStationList'));
     });
-</script> *@
-
-
-
-
-@* @model IEnumerable<IRCTCClone.Models.Station>
-@{
-    ViewData["Title"] = "Home";
-}
-
-<div class="home-page">
-    <div class="search-box">
-        <h2>Search Trains</h2>
-        <form method="post" action="/Train/Results">
-            <select id="fromStation" name="fromStationId" required>
-                <option value="">-- From Station --</option>
-                @foreach (var s in Model)
-                {
-                    <option value="@s.Id">@s.Name (@s.Code)</option>
-                }  
-            </select> 
-            <div class="swapStations">
-                <button type="button" id="swapStations">⇄</button>
-            </div>
-            <select id="toStation" name="toStationId" class="mt-2" required>
-                <option value="">-- To Station --</option>
-                @foreach (var s in Model)
-                {
-                    <option value="@s.Id">@s.Name (@s.Code)</option>
-                }
-            </select>
-            <input type="date" name="journeyDate" value="@DateTime.Today.ToString("yyyy-MM-dd")" />
-            <button type="submit">Search</button>
-        </form>
-    </div>
-</div>
-
-
-<!-- jQuery CDN --> <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script> // ✅ Debounce helper to avoid too many requests function debounce(fn, delay) { let timer; return function () { clearTimeout(timer); timer = setTimeout(fn, delay); }; } // ✅ Autocomplete wiring logic function wireAutocomplete($input, $list) { function fetchStations(term, callback) { $.get('/Train/GetStations', { term: term }, function (data) { callback(data); }); } function renderList($listEl, items) { $listEl.empty(); if (!items.length) { $listEl.hide(); return; } items.forEach(function (s) { $('<div class="autocomplete-item">') .text(s.name + ' (' + s.code + ')') .data('id', s.id) .appendTo($listEl); }); $listEl.show(); } // 🔹 Typing triggers search $input.on('input', debounce(function () { const term = $input.val().trim(); if (term.length === 0) { $list.hide(); // hide if cleared return; } fetchStations(term, function (items) { renderList($list, items); }); }, 200)); // 🔹 Click on item $list.on('click', '.autocomplete-item', function () { const stationName = $(this).text(); const stationId = $(this).data('id'); $input.val(stationName); // show name in textbox // ✅ set hidden field value if ($input.attr('id') === 'fromStation') { $('#fromStationId').val(stationId); } else if ($input.attr('id') === 'toStation') { $('#toStationId').val(stationId); } $input.val($(this).text()); $list.hide(); }); // 🔹 Hide when clicking outside $(document).on('click', function (e) { if (!$(e.target).closest($input).length && !$(e.target).closest($list).length) { $list.hide(); } }); } // ✅ Initialize for both inputs $(function () { wireAutocomplete($('#fromStation'), $('#fromStationList')); wireAutocomplete($('#toStation'), $('#toStationList')); }); var swapBtn = document.getElementById("swapStations"); var fromSelect = document.getElementById("fromStation"); var toSelect = document.getElementById("toStation"); if (swapBtn && fromSelect && toSelect) { swapBtn.onclick = function () { var tempValue = fromSelect.value; fromSelect.value = toSelect.value; toSelect.value = tempValue; }; } </script>
-
-
- *@
+</script>

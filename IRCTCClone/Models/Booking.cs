@@ -24,7 +24,10 @@ namespace IRCTCClone.Models
         public string ClassCode { get; set; }
         public string Frmst { get; set; }
         public string Tost { get; set; }
-/*        public string FromStationName { get; set; } = string.Empty;
-        public string ToStationName { get; set; } = string.Empty;*/
+        public int ClassId { get; set; }
+        public decimal TotalFare { get; set; }
+        public string PaymentMethod { get; set; }
+        /*        public string FromStationName { get; set; } = string.Empty;
+                public string ToStationName { get; set; } = string.Empty;*/
     }
 }

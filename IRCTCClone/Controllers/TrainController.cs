@@ -68,7 +68,8 @@ namespace IRCTCClone.Controllers
         [HttpPost]
         public IActionResult TrainResults(int fromStationId, int toStationId, DateTime journeyDate)
         {
-            var trains = Train.GetTrains(_connectionString, fromStationId, toStationId);
+            var trains = Train.GetTrains(_connectionString, fromStationId);
+
 
             ViewBag.JourneyDate = journeyDate.ToString("yyyy-MM-dd");
             return View(trains);
@@ -88,8 +89,17 @@ namespace IRCTCClone.Controllers
 
             return View(train);
         }
-    }
 
+        /*[HttpGet]
+        public IActionResult GetTrainRoute(int trainId)
+        {
+            var routes = Train.GetRouteByTrainId(_connectionString, trainId);
+
+            // Return your route partial view
+            return View("TrainRouteToUser", routes);
+        }*/
+
+    }
 
     public static class HttpRequestExtensions
     {

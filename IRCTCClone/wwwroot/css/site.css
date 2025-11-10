@@ -1168,3 +1168,224 @@ hr {
     top: 0px;
     z-index: 10;
 }
+
+/*.route-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.4);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+.route-box {
+    background: #fff;
+    width: 60%;
+    max-height: 80%;
+    overflow-y: auto;
+    padding: 20px;
+    border-radius: 10px;
+    position: relative;
+    animation: slideIn 0.3s ease-out;
+    box-shadow: 0 5px 25px rgba(0,0,0,0.3);
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.close-btn {
+    position: absolute;
+    right: 15px;
+    top: 10px;
+    font-size: 28px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #333;
+}*/
+
+
+/* ✅ Overlay background */
+.sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.45);
+    display: none;
+    z-index: 1999;
+}
+
+/* ✅ Right Side Drawer */
+.route-sidebar {
+    position: fixed;
+    top: 0;
+    right: -450px; /* Hidden initially */
+    width: 450px;
+    height: 100%;
+    background: #ffffff;
+    box-shadow: -3px 0 10px rgba(0,0,0,0.2);
+    z-index: 2000;
+    padding: 20px;
+    overflow-y: auto;
+    transition: right 0.3s ease-out;
+}
+
+/* ✅ Header */
+.sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+}
+
+.sidebar-close {
+    font-size: 26px;
+    border: none;
+    background: none;
+    cursor: pointer;
+}
+
+.class-scroll {
+    max-width: 480px; /* adjust width */
+    overflow-x: auto;
+    white-space: nowrap; /* keep buttons in one row */
+}
+
+.class-buttons {
+    display: inline-block;
+    white-space: nowrap;
+}
+
+.class-btn {
+    margin-right: 8px;
+}
+
+/* ✅ IRCTC Timeline */
+.route-timeline {
+    position: relative;
+    margin-left: 20px;
+    padding-left: 20px;
+    border-left: 3px solid #3f51b5;
+}
+
+.timeline-item {
+    margin-bottom: 25px;
+    position: relative;
+}
+
+    .timeline-item::before {
+        content: "●";
+        position: absolute;
+        left: -28px;
+        color: #3f51b5;
+        font-size: 18px;
+    }
+
+.station-name {
+    font-weight: bold;
+    font-size: 17px;
+}
+
+.time-row {
+    color: #444;
+    margin-top: 5px;
+}
+
+.distance {
+    font-size: 13px;
+    color: #777;
+}
+
+.halt {
+    font-size: 13px;
+    color: #c62828;
+}
+
+
+/* Background overlay */
+.irctc-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.55);
+    z-index: 9999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Modal box */
+.irctc-modal {
+    width: 100%;
+    max-width: 550px;
+    background: #fff;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.3);
+    animation: fadeIn 0.3s ease-out;
+}
+
+    /* Title */
+    .irctc-modal .title {
+        font-size: 25px;
+        margin-top: 0px;
+        font-weight: bold;
+        color: #1E90FF;
+        text-align: center;
+    }
+
+    /* Message text */
+    .irctc-modal .msg {
+        margin-bottom: 15px;
+        font-size: 17px;
+        line-height: 1.5;
+    }
+
+/* Close button */
+.warning-close-btn {
+    display: block;
+    margin: 0 auto;
+    background: #1E90FF;
+    color: #fff;
+    border: none;
+    padding: 7px 25px;
+    font-size: 15px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+    .warning-close-btn:hover {
+        background: #00BFFF;
+    }
+
+/* Animation */
+@keyframes fadeIn {
+    from {
+        transform: scale(0.92);
+        opacity: 0;
+    }
+
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
