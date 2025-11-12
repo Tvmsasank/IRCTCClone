@@ -27,6 +27,8 @@ namespace IRCTCClone.Models
         public int ClassId { get; set; }
         public decimal TotalFare { get; set; }
         public string PaymentMethod { get; set; }
+/*        public string username { get; set; }
+        public string password { get; set; }*/
         /*        public string FromStationName { get; set; } = string.Empty;
                 public string ToStationName { get; set; } = string.Empty;*/
     }

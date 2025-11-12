@@ -50,10 +50,19 @@
                     <!-- ✅ Normal User Logged In -->
                     var username = User.Identity.Name?.Split('@')[0];
                     <span class="welcome-text">👋 Welcome, @username </span>
+@*                     @if (User.Identity.IsAuthenticated)
+                    {
+                        <a href="/Account/Profile" class="nav-link">Profile</a>
+                        <form method="post" action="/Account/Logout">
+                        </form>
+                    }
+                    else
+                    {
+                        <a href="/Account/Login" class="nav-link">Login</a>
+                    } *@
                     <a href="/Booking/History" class="history-btn">📄 My Bookings</a>
                     <form method="post" action="/Account/Logout" style="display:inline;">
                         <button type="submit" class="logout-btn">🚪 Logout</button>
-
                     </form>
                 }
                 else
@@ -93,6 +102,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.4/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/emoji-mart@latest/dist/browser.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script id="signalrjs" src="~/js/signalr/dist/browser/signalr.js"></script>
 
     <!-- ✅ Then render page-specific scripts -->

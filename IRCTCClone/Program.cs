@@ -1,12 +1,14 @@
 ﻿using IRCTCClone.Data;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Builder;
+using IRCTCClone.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1️⃣ Add services
+// ✅ MVC, Razor, Session
 builder.Services.AddControllersWithViews();
+builder.Services.AddTransient<EmailService>();
 builder.Services.AddRazorPages();
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddHttpContextAccessor();
@@ -17,24 +19,79 @@ builder.Services.AddSession(options =>
     options.Cookie.IsEssential = true;
 });
 
-// 2️⃣ Add Authentication BEFORE building the app
-builder.Services.AddAuthentication(options =>
+// ✅ Cookie Authentication
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/Account/Login";
+    });
+
+// ✅ ✅ ✅ RATE LIMITER (ONLY ONE BLOCK)
+builder.Services.AddRateLimiter(options =>
 {
-    options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-})
-.AddCookie(options =>
-{
-    options.LoginPath = "/Account/Login"; //redirect after logged in
+    // ✅ GLOBAL LIMITER (Aadhaar-aware)
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+    {
+        string key;
+
+        // Aadhaar verified users -> limit by user
+        if (context.Session.GetString("AadhaarVerified") == "true" &&
+            context.User.Identity?.IsAuthenticated == true)
+        {
+            key = context.User.Identity.Name;
+        }
+        else
+        {
+            // Non-verified users -> limit by IP
+            key = context.Connection.RemoteIpAddress?.ToString() ?? "anonymous";
+        }
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            key,
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 30,
+                Window = TimeSpan.FromSeconds(10)
+            });
+    });
+
+    // ✅ Used in controllers where needed
+    options.AddFixedWindowLimiter("DefaultPolicy", o =>
+    {
+        o.PermitLimit = 20;
+        o.Window = TimeSpan.FromSeconds(10);
+    });
+
+    options.AddFixedWindowLimiter("LoginLimiter", o =>
+    {
+        o.PermitLimit = 5;
+        o.Window = TimeSpan.FromMinutes(1);
+    });
+
+    options.AddFixedWindowLimiter("SearchLimiter", o =>
+    {
+        o.PermitLimit = 10;
+        o.Window = TimeSpan.FromSeconds(20);
+    });
+
+    options.AddFixedWindowLimiter("BookingLimiter", o =>
+    {
+        o.PermitLimit = 5;
+        o.Window = TimeSpan.FromMinutes(1);
+    });
+
+    options.AddFixedWindowLimiter("StationLimiter", o =>
+    {
+        o.PermitLimit = 5;
+        o.Window = TimeSpan.FromSeconds(5);
+    });
+
+    options.RejectionStatusCode = 429;
 });
 
-// 3️⃣ Build the app
 var app = builder.Build();
 
-// 4️⃣ Seed database
-string connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-DbSeeder.Seed(connectionString);
-
-// 5️⃣ Middlewares
+// ✅ Error Handling
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
@@ -43,16 +100,52 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+
 app.UseRouting();
 
-app.UseSession();        // ✅ Session must come before Authentication
-app.UseAuthentication(); // ✅ Authentication middleware
-app.UseAuthorization();  // ✅ Authorization middleware
+// ✅ Session BEFORE auth
+app.UseSession();
 
-// 6️⃣ Routes
+// ✅ Authentication + Authorization
+app.UseAuthentication();
+app.UseAuthorization();
+
+// ✅ IRCTC Aadhaar 8AM–10AM booking restriction
+/*app.Use(async (context, next) =>
+{
+    var path = context.Request.Path.Value?.ToLower();
+
+    if (path != null && path.Contains("/booking/confirm"))
+    {
+        var aadhaar = context.Session.GetString("AadhaarVerified") ?? "false";
+
+        var now = DateTime.Now.TimeOfDay;
+        var start = new TimeSpan(8, 0, 0);
+        var end = new TimeSpan(10, 0, 0);
+
+        if (now >= start && now <= end && aadhaar != "true")
+        {
+            context.Response.StatusCode = 403;
+            await context.Response.WriteAsync(
+                "⛔ Booking between 8 AM and 10 AM requires Aadhaar verification."
+            );
+            return;
+        }
+    }
+
+    await next();
+});*/
+
+// ✅ Rate Limiter AFTER Authentication
+app.UseRateLimiter();
+
+// ✅ Mapping Routes
+app.MapControllers();  // ❗ Do NOT attach global rate limit here
+app.MapRazorPages();
+
+// ✅ Default Route
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
-app.MapRazorPages();
 
 app.Run();

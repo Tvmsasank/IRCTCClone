@@ -4,6 +4,27 @@
     ViewData["Title"] = "Booking Confirmation";
 }
 
+@{
+    var successMessage = TempData["BookingSuccess"] as string;
+}
+
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            Swal.fire({
+                icon: "success",
+                title: "Booking Successful!",
+                text: "@successMessage",
+                confirmButtonText: "OK",
+                confirmButtonColor: "#3085d6",
+                timer: 7000,
+                timerProgressBar: true
+            });
+        });
+    </script>
+}
+
 <div class="booking-confirmation">
     <h2 class="confirmation-title">🎟️ Booking Confirmation</h2>
 

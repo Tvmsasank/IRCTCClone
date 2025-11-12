@@ -198,6 +198,9 @@ body {
     margin-top: 20px;
 }
 
+
+/*---------HOME PAGE SEARCH BUTTON ------------*/
+
 .btn-primary {
     background: linear-gradient(90deg, #0078d7, #00b7ff);
     color: white;
@@ -720,6 +723,9 @@ main {
         background: #b52a36;
     }
 
+
+/*-------HOME PAGE SWAP ------------*/
+
 /* Small circular swap button */
 .swapStations {
     color: white;
@@ -749,6 +755,8 @@ main {
     border-radius: 50px;
 }
 
+
+/*--------ADMIN PAGE ----------*/
 
 /* ===== Layout ===== */
 .admin-container {
@@ -790,6 +798,9 @@ hr {
     border-top: 2px solid #333;
     margin: 15px 0;
 }
+
+
+/*-----------ADMIN MANAGE DROPDOWN -----------*/
 
 /* Dropdown container */
 .custom-dropdown {
@@ -879,6 +890,9 @@ hr {
     overflow: hidden;
 }*/
 
+
+/*-----------HOME PAGE SEARCH TRAINS BOX ---------------*/
+
 .new-search-box {
     background-color: rgba(255, 255, 255, 0.95);
     padding: 20px 40px;
@@ -924,6 +938,10 @@ hr {
             background-color: #005fa3;
             transform: scale(1.03);
         }
+
+
+/*-----------FORGOT PASSWORD ------------*/
+
 
 .forgot-card {
     background-color: #fff;
@@ -978,6 +996,10 @@ hr {
         text-decoration: underline;
     }
 
+
+/*-------------ADMIN PAGE -----------------*/
+
+
 .page-centered-password{
     display: flex;
     align-items: center;
@@ -1007,6 +1029,9 @@ hr {
         background-color: #007bff;
         color: white;
     }
+
+
+/*-----------ADMIN PAGE TRAIN TIME LINE IN ADD TRAIN ---------------*/
 
 
 .timeline-card {
@@ -1089,6 +1114,10 @@ hr {
     font-size: 0.95rem;
     font-weight: 500;
 }
+
+
+/*------------------AMDIN PAGE STATION ADD EDIT --------------*/
+
 
 .station-badge {
     display: inline-block;
@@ -1319,6 +1348,8 @@ hr {
 }
 
 
+/*--------------- HOME PAGE OVER LAY ALERT POP UP --------------*/
+
 /* Background overlay */
 .irctc-overlay {
     position: fixed;
@@ -1388,4 +1419,186 @@ hr {
         transform: scale(1);
         opacity: 1;
     }
+}
+
+/*------------------- PNR status --------------*/
+
+.text-center a {
+    background: linear-gradient(90deg, #0078d7, #00b7ff);
+    color: white !important;
+    text-decoration: none;
+    padding: 7px 45px;
+    border-radius: 6px;
+    font-size: 13px;
+    display: inline-block;
+    margin-top: 0.7rem;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+    .text-center a:hover {
+        transform: scale(1.02);
+        background: linear-gradient(90deg, #005fa3, #00a6e0);
+    }
+
+
+/*----------------CHECK PNR STATUS CARD -----------------*/
+
+
+    .pnr-body {
+        background: linear-gradient(120deg, #0078d7, #00b7ff);
+    }
+
+    .pnr-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 80vh;
+        padding: 20px;
+    }
+
+    .pnr-card {
+        background: #fff;
+        border-radius: 15px;
+        padding: 20px 35px;
+        max-width: 470px;
+        width: 100%;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    }
+
+    .pnr-title {
+        font-weight: 700;
+        color: #0078d7;
+        margin-bottom: 10px;
+    }
+
+    .pnr-input {
+        border: 2px solid #0078d7;
+        border-radius: 8px;
+        margin-top: 0.7rem;
+        padding: 9px;
+        font-size: 16px;
+        text-align: center;
+        letter-spacing: 2px;
+        transition: all 0.3s ease;
+    }
+
+        .pnr-input:focus {
+            border-color: #00b7ff;
+            box-shadow: 0 0 10px rgba(0, 183, 255, 0.4);
+            outline: none;
+        }
+
+    .btn-checkpnr {
+        background: linear-gradient(90deg, #0078d7, #00b7ff);
+        color: white;
+        border: none;
+        padding: 7px 7px;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.2s ease, background 0.3s ease;
+    }
+
+        .btn-checkpnr:hover {
+            transform: scale(1.05);
+            background: linear-gradient(90deg, #005fa3, #0096d1);
+        }
+
+.pnr-alert-danger {
+    border-radius: 10px;
+    font-size: 15px;
+    background: #fff0f0;
+    border: 1px solid #ffb3b3;
+    color: #b30000;
+    margin-top:0.5rem;
+}
+
+
+/*------------------ PNRDetails -----------------*/
+
+
+.PNRD-body {
+    background: linear-gradient(120deg, #0078d7, #00b7ff);
+}
+
+.pnrd-card {
+    background: #ffffff;
+    margin-top: 1rem;
+    border-radius: 15px;
+    padding: 15px;
+    max-width: 900px;
+    width: 100%;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    animation: fadeIn 0.6s ease-in-out;
+}
+
+.pnrd-title {
+    font-weight: 700;
+    color: #0078d7;
+    margin-bottom: 10px;
+}
+
+.pnrd-details p {
+    font-size: 16px;
+    margin-bottom: 1px;
+    color: #333;
+}
+
+.passenger-title {
+    color: #0078d7;
+    font-weight: 900;
+    margin-top: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.status-confirmed {
+    color: #28a745;
+    font-weight: bold;
+}
+
+.status-cancelled {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.btn-home {
+    background: linear-gradient(90deg, #0078d7, #00b7ff);
+    color: #fff;
+    font-weight: 600;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: transform 0.2s ease, background 0.3s ease;
+}
+
+    .btn-home:hover {
+        transform: scale(1.02);
+        background: linear-gradient(90deg, #005fa3, #008ed1);
+        color: white;
+    }
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.table th, .table td {
+    padding: 10px 12px;
+}
+
+.table th {
+    background-color: #0078d7 !important;
+    color: white;
+}
+
+.table-primary th {
+    background-color: #0078d7 !important;
+    color: white;
 }

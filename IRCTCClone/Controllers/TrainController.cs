@@ -1,5 +1,6 @@
 ﻿using IRCTCClone.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Data.SqlClient;
 using System;
 using System.Collections.Generic;
@@ -7,6 +8,7 @@ using System.Data;
 
 namespace IRCTCClone.Controllers
 {
+    [EnableRateLimiting("DefaultPolicy")]
     public class TrainController : Controller
     {
         private readonly string _connectionString;
@@ -19,7 +21,7 @@ namespace IRCTCClone.Controllers
 
         //------------------------------------------search stations--------------------------------------------//
 
-
+        [EnableRateLimiting("SearchLimiter")]
         [HttpGet]
         public IActionResult Search(string from = "", string to = "", DateTime? date = null)
         {
@@ -53,6 +55,7 @@ namespace IRCTCClone.Controllers
 
         //-----------------------------------------get stations-----------------------------------------------//
 
+        [EnableRateLimiting("StationLimiter")]
 
         [HttpGet]
         public JsonResult GetStations(string term)
@@ -64,6 +67,7 @@ namespace IRCTCClone.Controllers
 
         //----------------------------------------train results----------------------------------------------//
 
+        [EnableRateLimiting("SearchLimiter")]
 
         [HttpPost]
         public IActionResult TrainResults(int fromStationId, int toStationId, DateTime journeyDate)

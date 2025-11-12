@@ -1,0 +1,35 @@
+﻿@{
+    ViewData["Title"] = "Check PNR Status";
+}
+
+
+<body class="pnr-body">
+<div class="pnr-container">
+    <div class="pnr-card shadow-lg">
+        <h2 class="pnr-title text-center">🔍 Check PNR Status</h2>
+        <p class="text-center text-muted">Enter your 10-digit PNR number to view booking status</p>
+
+        <form asp-action="CheckPNR" method="post" class="pnr-form mt-4">
+            <div class="form-group mb-4">
+                <input type="text" name="pnr" maxlength="10"
+                       placeholder="Enter 10-digit PNR"
+                       class="form-control pnr-input" required />
+            </div>
+            <div class="text-center">
+                <button type="submit" class="btn-checkpnr">
+                    🚆 Check PNR
+                </button>
+            </div>
+        </form>
+
+            @if (ViewBag.Error != null)
+            {
+                <div class="alert pnr-alert-danger mt-4 fade-in" role="alert">
+                    <strong>@ViewBag.Error</strong><br />
+                </div>
+            }
+    </div>
+</div>
+</body>
+
+

@@ -1,0 +1,68 @@
+﻿@model IRCTCClone.Models.Booking
+
+@{
+    ViewData["Title"] = "PNR Status";
+}
+
+<body class="PNRD-body">
+<div class="pnrd-status-container">
+    <div class="pnrd-card shadow-lg">
+        <h2 class="pnrd-title text-center">🎟️ PNR Status</h2>
+
+        <div class="pnrd-details mt-3">
+            <div class="row">
+                <div class="col-md-6"><strong>PNR:</strong> @Model.PNR</div>
+                <div class="col-md-6 text-end">
+                    <strong>Status:</strong>
+                    <span class="@(Model.Status == "CONFIRMED" ? "status-confirmed" : "status-cancelled")">
+                        @Model.Status
+                    </span>
+                </div>
+            </div>
+
+            <hr />
+
+            <p><strong>Train:</strong> 🚆 @Model.TrainNumber - @Model.TrainName</p>
+            <p><strong>From:</strong> 🏁 @Model.Frmst</p>
+            <p><strong>To:</strong> 🎯 @Model.Tost</p>
+            <p><strong>Journey Date:</strong> 📅 @Model.JourneyDate.ToString("dd-MMM-yyyy")</p>
+            <p><strong>Class:</strong> 💺 @Model.ClassCode</p>
+            <p><strong>Amount Paid:</strong> 💰 ₹@Model.Amount</p>
+        </div>
+
+        <h4 class="mt-4 passenger-title">👥 Passenger Details</h4>
+        <table class="table table-striped table-hover mt-2 shadow-sm rounded-3">
+            <thead class="table-primary text-center">
+                <tr>
+                    <th>Name</th>
+                    <th>Age</th>
+                    <th>Gender</th>
+                    <th>Coach</th>
+                    <th>Seat No</th>
+                    <th>Berth</th>
+                </tr>
+            </thead>
+            <tbody class="text-center">
+                @foreach (var p in Model.Passengers)
+                {
+                    string coach = new string(p.SeatNumber.TakeWhile(c => !char.IsDigit(c)).ToArray());
+                    string seat = new string(p.SeatNumber.SkipWhile(c => !char.IsDigit(c)).ToArray());
+
+                    <tr>
+                        <td>@p.Name</td>
+                        <td>@p.Age</td>
+                        <td>@p.Gender</td>
+                        <td>@coach</td>
+                        <td>@seat</td>
+                        <td>@p.Berth</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <div class="text-center mt-4">
+            <a href="/" class="btn btn-home">🏠 Back to Home</a>
+        </div>
+    </div>
+</div>
+</body>

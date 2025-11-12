@@ -1,8 +1,9 @@
 ﻿using IRCTCClone.Models;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.SqlClient;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Data.SqlClient;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -12,6 +13,7 @@ using System.Data;
 
 namespace IrctcClone.Controllers
 {
+    [EnableRateLimiting("DefaultPolicy")]
     public class AdminController : Controller
     {
         private readonly string _connectionString;

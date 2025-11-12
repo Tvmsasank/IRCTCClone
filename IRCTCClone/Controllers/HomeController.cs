@@ -1,10 +1,12 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.SqlClient;   // ✅ Add this
+﻿using IRCTCClone.Data;
 using IRCTCClone.Models;  // For Station, Train, etc.
-using IRCTCClone.Data;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Data.SqlClient;   // ✅ Add this
 
 namespace IRCTCClone.Controllers
 {
+    [EnableRateLimiting("DefaultPolicy")]
     public class HomeController : Controller
     {
         private readonly string _connectionString;
