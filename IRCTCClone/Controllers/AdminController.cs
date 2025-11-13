@@ -124,7 +124,7 @@ namespace IrctcClone.Controllers
                     TrainId = train.Id,
                     Code = classCodes[i],
                     SeatPrefix = !string.IsNullOrWhiteSpace(BookingCode[i]) ? BookingCode[i].Trim() : null, // ✅ add booking code,
-                    Fare = fares[i],
+                    BaseFare = fares[i],
                     SeatsAvailable = seats[i]
                 };
                 trainClass.Insert(_connectionString);
@@ -630,7 +630,7 @@ namespace IrctcClone.Controllers
                             {
                                 Id = Convert.ToInt32(reader["Id"]),
                                 Code = reader["Code"].ToString(),
-                                Fare = Convert.ToDecimal(reader["Fare"]),
+                                BaseFare = Convert.ToDecimal(reader["Fare"]),
                                 SeatsAvailable = Convert.ToInt32(reader["SeatsAvailable"]),
                                 SeatPrefix = reader["SeatPrefix"].ToString()
                             });

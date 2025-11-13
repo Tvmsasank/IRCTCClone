@@ -18,7 +18,7 @@
 {
     <div class="train-info">
         <p><strong>Train:</strong> @train.Number - @train.Name</p>
-        <p><strong>Class:</strong> @cls.Code, Fare: ₹@cls.Fare</p>
+        <p><strong>Class:</strong> @cls.Code, Fare: ₹@cls.BaseFare</p>
         <p><strong>Route:</strong> @train.FromStation?.Name (@train.FromStation?.Code) → @train.ToStation?.Name (@train.ToStation?.Code)</p>
         <p>
             <strong>Departure:</strong> @train.Departure.ToString(@"hh\:mm") |
@@ -36,6 +36,15 @@
                 <input type="hidden" name="FromStationId" value="@train.FromStationId" />
                 <input type="hidden" name="ToStationId" value="@train.ToStationId" />
 
+                <div class="form-group mb-3">
+                    <label for="Quota">Select Quota:</label>
+                    <select name="Quota" class="form-control" required>
+                        <option value="GENERAL">General</option>
+                        <option value="TATKAL">Tatkal</option>
+                        <option value="LADIES">Ladies</option>
+                        <option value="SENIOR">Senior Citizen</option>
+                    </select>
+                </div>
 
                 <h3>Passengers</h3>
 
@@ -65,7 +74,7 @@
                 <button type="button" id="addPassenger" class="btn btn-primary mb-2">+ Add Passenger</button>
 
                 <p class="total-fare">
-                    Total Fare: ₹<span id="totalFare" data-fare="@cls.Fare">@cls.Fare</span>
+                    Total Fare: ₹<span id="totalFare" data-fare="@cls.BaseFare">@cls.BaseFare</span>
                 </p>
                 <button type="submit" class="btn-primary">Pay & Book (Mock)</button>
             </form>

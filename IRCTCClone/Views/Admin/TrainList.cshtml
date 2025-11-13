@@ -49,8 +49,8 @@ else
                     <td>@train.Departure</td>
                     <td>@train.Arrival</td>
                     <td>@train.Duration</td>
-                    <td class="text-center">
-                        <a asp-controller="Admin" asp-action="EditTrain" asp-route-id="@train.Id" class="btn btn-sm btn-warning me-1">Edit</a>
+                    <td class="">
+                        <a asp-controller="Admin" asp-action="EditTrain" asp-route-id="@train.Id" class="btn btn-sm btn-warning me-1">Edit Train</a>
                         <!-- Delete = only opens modal (no immediate navigation) -->
                         <button type="button" class="btn btn-sm btn-danger"
                                 data-bs-toggle="modal"

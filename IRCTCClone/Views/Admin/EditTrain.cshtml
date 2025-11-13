@@ -73,11 +73,11 @@
     <table id="classTable" class="table table-bordered">
         <thead>
             <tr>
-                 <th></th>
+                <th></th>
                 <th>Class Code</th>
                 <th>Fare</th>
                 <th>Seats</th>
-                <th></th>
+                <th>Delete</th>
             </tr>
         </thead>
         <tbody>
@@ -88,7 +88,7 @@
                         <input type="hidden" name="classIds" value="@cls.Id" />
                     </td>
                     <td><input name="classCodes" value="@cls.Code" class="form-control" /></td>
-                    <td><input name="fares" value="@cls.Fare" class="form-control" /></td>
+                    <td><input name="fares" value="@cls.BaseFare" class="form-control" /></td>
                     <td><input name="seats" value="@cls.SeatsAvailable" class="form-control" /></td>
                     <td><button type="button" class="btn btn-danger btn-sm remove-row">X</button></td>
                 </tr>
@@ -98,7 +98,7 @@
     <button type="button" id="addClassRow" class="btn btn-primary btn-sm">+ Add Class</button>
 
     <br /><br />
-    <button type="submit" class="btn btn-success">Save Changes</button>
+    <button type="submit" class="btn btn-success ">Save Changes</button>
 </form>
 
 @section Scripts {

@@ -40,7 +40,23 @@
         }
 
         <p><strong>Class:</strong> @Model.ClassCode</p>
-        <p><strong>Amount Paid:</strong> ₹@Model.Amount</p>
+
+        <h4>💰 Fare Breakdown</h4>
+        <ul class="fare-breakdown">
+            <li>
+                <p><strong>Base Fare:</strong> ₹@Model.BaseFare</p>
+                <p><strong>Quota:</strong> @Model.Quota</p>
+                <p><strong>GST (5%):</strong> ₹@Model.GST</p>
+                @if (Model.QuotaCharge != 0)
+                {
+                    <p><strong>Quota Charge:</strong> ₹@Model.QuotaCharge</p>
+                }
+                <p><strong>Surge Charge:</strong> ₹@Model.SurgeAmount</p>
+                <p><strong>Total Fare:</strong> ₹@Model.TotalFare</p>
+            </li>
+        </ul>
+
+
         <p>
             <strong>Status:</strong>
             <span class="@(Model.Status == "CONFIRMED" ? "status-confirmed" : "status-cancelled")">
@@ -57,3 +73,24 @@
         }
     </ul>
 </div>
+
+
+<style>
+    .fare-breakdown {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 10px 20px;
+        list-style-type: none;
+    }
+
+        .fare-breakdown li {
+            padding: 4px 0;
+            border-bottom: 1px dashed #ccc;
+        }
+
+            .fare-breakdown li:last-child {
+                border-bottom: none;
+                font-weight: bold;
+                color: #0078d7;
+            }
+</style>

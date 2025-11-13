@@ -16,7 +16,7 @@
         <p><strong>Journey Date:</strong> @Model.JourneyDate.ToString("dd-MM-yyyy")</p>
         <p><strong>From:</strong> @Model.Frmst</p>
         <p><strong>To:</strong> @Model.Tost</p>
-        <p><strong>Amount:</strong> ₹@Model.Amount</p>
+        <p><strong>Amount:</strong> ₹@Model.BaseFare</p>
         <p><strong>Status:</strong> <span class="@(Model.Status == "CONFIRMED" ? "status-confirmed" : "status-cancelled")">@Model.Status</span></p>
     </div>
 </div>

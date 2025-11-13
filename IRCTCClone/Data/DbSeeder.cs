@@ -89,11 +89,11 @@ namespace IRCTCClone.Data
                 // Insert TrainClasses
                 var trainClasses = new[]
                 {
-                    new TrainClass { TrainId = t1.Id, Code = "1A", Fare = 2500, SeatsAvailable = 8 },
-                    new TrainClass { TrainId = t1.Id, Code = "2A", Fare = 1800, SeatsAvailable = 20 },
-                    new TrainClass { TrainId = t1.Id, Code = "SL", Fare = 500, SeatsAvailable = 120 },
-                    new TrainClass { TrainId = t2.Id, Code = "CC", Fare = 900, SeatsAvailable = 100 },
-                    new TrainClass { TrainId = t2.Id, Code = "SL", Fare = 450, SeatsAvailable = 140 }
+                    new TrainClass { TrainId = t1.Id, Code = "1A", BaseFare = 2500, SeatsAvailable = 8 },
+                    new TrainClass { TrainId = t1.Id, Code = "2A", BaseFare = 1800, SeatsAvailable = 20 },
+                    new TrainClass { TrainId = t1.Id, Code = "SL", BaseFare = 500, SeatsAvailable = 120 },
+                    new TrainClass { TrainId = t2.Id, Code = "CC", BaseFare = 900, SeatsAvailable = 100 },
+                    new TrainClass { TrainId = t2.Id, Code = "SL", BaseFare = 450, SeatsAvailable = 140 }
                 };
 
                 foreach (var c in trainClasses)
@@ -104,7 +104,7 @@ namespace IRCTCClone.Data
                     {
                         cmd.Parameters.AddWithValue("@TrainId", c.TrainId);
                         cmd.Parameters.AddWithValue("@Code", c.Code);
-                        cmd.Parameters.AddWithValue("@Fare", c.Fare);
+                        cmd.Parameters.AddWithValue("@Fare", c.BaseFare);
                         cmd.Parameters.AddWithValue("@SeatsAvailable", c.SeatsAvailable);
                         cmd.ExecuteNonQuery();
                     }

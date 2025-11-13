@@ -43,7 +43,7 @@ else
                         <td>@b.TrainNumber - @b.TrainName</td>
                         <td>@b.ClassCode</td>
                         <td>@b.JourneyDate.ToString("dd-MM-yyyy")</td>
-                        <td>₹@b.Amount</td>
+                        <td>₹@b.BaseFare</td>
                         <td class="@(b.Status == "CONFIRMED" ? "status-confirmed" : "status-cancelled")">
                             @b.Status
                         </td>

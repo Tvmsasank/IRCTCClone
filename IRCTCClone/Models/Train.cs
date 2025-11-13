@@ -172,7 +172,7 @@ namespace IRCTCClone.Models
                                     Id = reader.GetInt32(reader.GetOrdinal("ClassId")),
                                     TrainId = train.Id,
                                     Code = reader.GetString(reader.GetOrdinal("ClassCode")),
-                                    Fare = reader.GetDecimal(reader.GetOrdinal("Fare")),
+                                    BaseFare = reader.GetDecimal(reader.GetOrdinal("Fare")),
                                     SeatsAvailable = reader.GetInt32(reader.GetOrdinal("SeatsAvailable"))
                                 });
                             }

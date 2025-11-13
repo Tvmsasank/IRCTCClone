@@ -6,12 +6,27 @@ namespace IRCTCClone.Models
     public class TrainClass
     {
         public int Id { get; set; }
+
         public int TrainId { get; set; }
         public Train? Train { get; set; }
-        public string Code { get; set; } = null!; // e.g., 1A, 2A, CC, SL
-        public string SeatPrefix { get; set; } = null!; // e.g., 1A, 2A, CC, SL
-        public decimal Fare { get; set; }
+
+        public string Code { get; set; } = null!;         // e.g., 1A, 2A, SL, CC
+        public string SeatPrefix { get; set; } = null!;   // e.g., A, B, S, C — for seat numbering
+
+        // 🧾 Base Fare Details
+        public decimal BaseFare { get; set; }             // Core fare (per seat, before extras)
         public int SeatsAvailable { get; set; }
+
+        // 🎟️ Quota & Pricing Options
+        public string Quota { get; set; } = "GENERAL";    // Default quota
+        public bool DynamicPricing { get; set; } = false; // Enable/disable surge pricing
+        public decimal TatkalExtra { get; set; } = 0;     // Extra cost for Tatkal quota
+
+        // 💰 Computed Fields (Not Stored in DB)
+        public decimal GST { get; set; } = 0;             // 5% GST calculated dynamically
+        public decimal SurgeAmount { get; set; } = 0;     // Surge addition if demand high
+        public decimal FinalFare { get; set; } = 0;       // Total fare per passenger
+
 
 
         // ✅ Get all classes for a specific train
@@ -38,7 +53,7 @@ namespace IRCTCClone.Models
                                 TrainId = reader.GetInt32(1),
                                 Code = reader.GetString(2),
                                 SeatPrefix = reader.GetString(3),
-                                Fare = reader.GetDecimal(4),
+                                BaseFare = reader.GetDecimal(4),
                                 SeatsAvailable = reader.GetInt32(5)
                             });
                         }
@@ -62,7 +77,7 @@ namespace IRCTCClone.Models
                     cmd.Parameters.AddWithValue("@TrainId", TrainId);
                     cmd.Parameters.AddWithValue("@Code", Code);
                     cmd.Parameters.AddWithValue("@SeatPrefix", (object?)SeatPrefix ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@Fare", Fare);
+                    cmd.Parameters.AddWithValue("@Fare", BaseFare);
                     cmd.Parameters.AddWithValue("@SeatsAvailable", SeatsAvailable);
                     cmd.ExecuteNonQuery();
                 }

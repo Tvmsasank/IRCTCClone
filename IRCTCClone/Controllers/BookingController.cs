@@ -16,6 +16,7 @@ using System.Linq;
 using System.Reflection.Metadata;
 using System.Security.Claims;
 using static System.Net.Mime.MediaTypeNames;
+using Font = iTextSharp.text.Font;
 
 
 namespace IRCTCClone.Controllers
@@ -28,6 +29,61 @@ namespace IRCTCClone.Controllers
         private readonly string _connectionString;
 /*        private readonly string _baseUrl;*/
         private readonly EmailService _emailService;
+
+        private int GetBookedSeatsCount(int trainId, int classId)
+        {
+            int count = 0;
+            using (var conn = new SqlConnection(_connectionString))
+            {
+                conn.Open();
+                using (var cmd = new SqlCommand("GetBookedSeatsCount", conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure; // ✅ Important!
+                    cmd.Parameters.AddWithValue("@TrainId", trainId);
+                    cmd.Parameters.AddWithValue("@ClassId", classId);
+
+                    object result = cmd.ExecuteScalar();
+                    count = result != DBNull.Value ? Convert.ToInt32(result) : 0;
+                }
+            }
+            return count;
+        }
+
+        private decimal CalculateFare(TrainClass cls, int totalSeats, int bookedSeats, string quota, out decimal gst, out decimal surge, out decimal quotaCharge)
+        {
+            decimal baseFare = cls.BaseFare;
+            gst = Math.Round(baseFare * 0.05m, 2); // 5% GST
+            surge = 0;
+            quotaCharge = 0;
+
+            // Dynamic pricing (surge)
+            if (cls.DynamicPricing && totalSeats > 0)
+            {
+                decimal occupancyRate = (decimal)bookedSeats / totalSeats;
+                if (occupancyRate > 0.7m) surge = Math.Round(baseFare * 0.10m, 2);
+                else if (occupancyRate > 0.5m) surge = Math.Round(baseFare * 0.05m, 2);
+            }
+
+            // Quota adjustments
+            switch (quota.ToUpper())
+            {
+                case "TATKAL":
+                    quotaCharge = Math.Round(baseFare * 0.20m, 2);
+                    break;
+                case "LADIES":
+                    quotaCharge = Math.Round(baseFare * 0.05m, 2);
+                    break;
+                case "SC": // Senior Citizen
+                    quotaCharge = Math.Round(-baseFare * 0.10m, 2);
+                    break;
+                default:
+                    quotaCharge = 0;
+                    break;
+            }
+
+            decimal finalFare = baseFare + gst + surge + quotaCharge;
+            return finalFare;
+        }
 
         public BookingController(IConfiguration configuration, EmailService emailService)
         {
@@ -93,7 +149,7 @@ namespace IRCTCClone.Controllers
                                 Id = reader.GetInt32(reader.GetOrdinal("ClassId")),
                                 TrainId = reader.GetInt32(reader.GetOrdinal("TrainId")),
                                 Code = reader.GetString(reader.GetOrdinal("Code")),
-                                Fare = reader.GetDecimal(reader.GetOrdinal("Fare")),
+                                BaseFare = reader.GetDecimal(reader.GetOrdinal("BaseFare")),
                                 SeatsAvailable = reader.GetInt32(reader.GetOrdinal("SeatsAvailable"))
                             };
                         }
@@ -223,31 +279,42 @@ namespace IRCTCClone.Controllers
                     return RedirectToAction("Login", "Account");
                 }
 
-                // Get TrainClass
+                // Get TrainClass info
                 TrainClass cls = null;
                 int seatsAvailable = 0;
-                decimal fare = 0;
+                int totalSeats = 0;
                 using (var cmd = new SqlCommand("GetTrainClassById", conn))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@ClassId", classId);
+
                     using (var reader = cmd.ExecuteReader())
                     {
                         if (reader.Read())
                         {
                             cls = new TrainClass
                             {
-                                Id = reader["Id"] != DBNull.Value ? Convert.ToInt32(reader["Id"]) : 0,
-                                Code = reader["Code"]?.ToString(),
-                                Fare = reader["Fare"] != DBNull.Value ? Convert.ToDecimal(reader["Fare"]) : 0,
-                                SeatsAvailable = reader["SeatsAvailable"] != DBNull.Value ? Convert.ToInt32(reader["SeatsAvailable"]) : 0,
+                                Id = Convert.ToInt32(reader["Id"]),
+                                Code = reader["Code"].ToString(),
+                                BaseFare = Convert.ToDecimal(reader["BaseFare"]),
+                                DynamicPricing = Convert.ToBoolean(reader["DynamicPricing"]),
+                                TatkalExtra = reader["TatkalExtra"] != DBNull.Value ? Convert.ToDecimal(reader["TatkalExtra"]) : 0,
+                                SeatsAvailable = Convert.ToInt32(reader["SeatsAvailable"]),
                                 SeatPrefix = reader["SeatPrefix"]?.ToString()
                             };
+
                             seatsAvailable = cls.SeatsAvailable;
-                            fare = cls.Fare;
+                            totalSeats = cls.SeatsAvailable;
                         }
                     }
                 }
+
+
+                /*                // 🚆 Calculate fare dynamically
+                                int bookedSeats = GetBookedSeatsCount(trainId, classId); // write stored proc
+                                string quota = Request.Form["Quota"]; // from dropdown in form
+                                fare = CalculateFare(cls, totalSeats, bookedSeats, quota);*/
+
 
                 if (cls == null || string.IsNullOrEmpty(cls.Code))
                 {
@@ -262,6 +329,36 @@ namespace IRCTCClone.Controllers
                     return RedirectToAction("Checkout", new { trainId, classId, journeyDate });
                 }
 
+                /*// Get how many seats are already booked for this train+class (stored proc should return INT)
+                int bookedSeats = GetBookedSeatsCount(trainId, classId);
+
+                // Get quota selection from form (if not provided default to GENERAL)
+                string quota = Request.Form["Quota"];
+                if (string.IsNullOrWhiteSpace(quota)) quota = "GENERAL";
+               *//* quota = quota.ToUpper();*//*
+
+                // Calculate fare per seat (includes GST and tatkal/surge)
+                decimal gstPerSeat;
+                decimal surgePerSeat;
+                decimal farePerSeat = CalculateFare(cls, cls.SeatsAvailable, bookedSeats, quota, out gstPerSeat, out surgePerSeat);*/
+
+
+                int bookedSeats = GetBookedSeatsCount(trainId, classId);
+                string quota = (Request.Form["Quota"].FirstOrDefault() ?? "GENERAL").ToUpper();
+
+                // Dynamic fare calculation
+                decimal gst, surge, quotaCharge;
+                decimal farePerPassenger = CalculateFare(cls, cls.SeatsAvailable, bookedSeats, quota, out gst, out surge, out quotaCharge);
+
+                // Totals per passenger
+                decimal totalBaseFare = cls.BaseFare * passengerCount;       // base fare only
+                decimal totalQuotaCharge = quotaCharge * passengerCount;    // includes Tatkal, Ladies, Senior, or other quota adjustments
+                decimal totalGst = gst * passengerCount;                    // GST total
+                decimal totalSurge = surge * passengerCount;                // Surge total
+
+                // Final total fare for all passengers
+                decimal totalFare = totalBaseFare + totalQuotaCharge + totalGst + totalSurge;
+
                 // Update TrainClass seats
                 using (var cmd = new SqlCommand("UpdateTrainClassSeats", conn))
                 {
@@ -274,6 +371,8 @@ namespace IRCTCClone.Controllers
                 // Insert Booking
                 int bookingId;
                 string pnr = GeneratePnr();
+/*                decimal totalBaseFare = farePerSeat * passengerCount;*/
+
                 using (var cmd = new SqlCommand("InsertBooking", conn))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
@@ -283,36 +382,28 @@ namespace IRCTCClone.Controllers
                     cmd.Parameters.AddWithValue("@TrainClassId", cls.Id);
                     cmd.Parameters.AddWithValue("@JourneyDate", DateTime.Parse(journeyDate));
                     cmd.Parameters.AddWithValue("@BookingDate", DateTime.UtcNow);
-                    cmd.Parameters.AddWithValue("@Amount", fare * passengerCount);
+                    cmd.Parameters.AddWithValue("@BaseFare", totalBaseFare * passengerCount);
                     cmd.Parameters.AddWithValue("@Status", "CONFIRMED");
                     cmd.Parameters.AddWithValue("@TrainNumber", trainNumber);
                     cmd.Parameters.AddWithValue("@TrainName", trainName);
                     cmd.Parameters.AddWithValue("@Class", Class);
                     cmd.Parameters.AddWithValue("@Frmst", fromStation.Name);
                     cmd.Parameters.AddWithValue("@Tost", toStation.Name);
+                    cmd.Parameters.AddWithValue("@Quota", quota);
+                    cmd.Parameters.AddWithValue("@GST", totalGst);
+                    cmd.Parameters.AddWithValue("@QuotaCharge", totalQuotaCharge);
+                    cmd.Parameters.AddWithValue("@SurgeAmount", totalSurge);
+                    cmd.Parameters.AddWithValue("@TotalFare", totalFare);
 
+                    // ExecuteScalar must return inserted booking id — ensure your stored proc does that
                     bookingId = Convert.ToInt32(cmd.ExecuteScalar());
                 }
 
-                // Determine seat prefix
-                /*   string seatPrefix = cls.Code switch
-                   {
-                       "SL" => "S",
-                       "2A" => "H",
-                       "3A" => "A",
-                       "1A" => "B",
-                       "3E" => "M",
-                       "AC CC" => "C",
-                       "2S" => "D",
-                       "EC CC" => "EC",
-                       _ => "X"
-                   };
-   */
-
-                // Determine seat prefix dynamically from database
+                // Determine seat prefix dynamically
                 string seatPrefix = !string.IsNullOrWhiteSpace(cls.SeatPrefix)
                     ? cls.SeatPrefix.Trim()
                     : (cls.Code ?? "X").Replace(" ", "").Substring(0, Math.Min(2, (cls.Code ?? "X").Length));
+
                 Random random = new Random();
                 HashSet<int> usedSeats = new HashSet<int>();
                 // Insert passengers
@@ -343,6 +434,7 @@ namespace IRCTCClone.Controllers
                     }
                 }
 
+                // Build booking object with fare breakdown
                 Booking booking = new Booking
                 {
                     BookingId = bookingId,
@@ -352,46 +444,51 @@ namespace IRCTCClone.Controllers
                     TrainClassId = cls.Id,
                     JourneyDate = DateTime.Parse(journeyDate),
                     BookingDate = DateTime.UtcNow,
-                    Amount = fare * passengerCount,
+                    BaseFare = cls.BaseFare,
                     Status = "CONFIRMED",
-                    TrainNumber = int.Parse(trainNumber),
+                    TrainNumber = int.TryParse(trainNumber, out var tn) ? tn : 0,
                     TrainName = trainName,
                     ClassCode = Class,
                     Frmst = fromStation.Name,
                     Tost = toStation.Name,
-/*                    username = "IRCTCClone@gmail.com",
-                    password = "Irctc@123"*/
+                    QuotaCharge = totalQuotaCharge,
+                    GST = gst,
+                    SurgeAmount = surge,
+                    FinalFare = farePerPassenger,       // ✅ per passenger
+                    TotalFare = totalFare,        // ✅ for all passengers
                 };
-                // --- Build email content ---
-                string userEmail = User.FindFirstValue(ClaimTypes.Email) ?? User.Identity.Name; // adjust if you store email elsewhere
+
+                // Build email content
+                string userEmail = User.FindFirstValue(ClaimTypes.Email) ?? User.Identity.Name;
                 string userName = User.Identity.Name ?? "Passenger";
-                string pnrLocal = pnr; // your generated PNR
+                string pnrLocal = pnr;
                 string subject = $"Booking Confirmed - PNR {pnrLocal}";
                 string bookingUrl = Url.Action("DownloadTicket", "Booking", new { id = bookingId }, Request.Scheme);
                 string body = $@"
-                        <h3>Booking Confirmed ✅</h3>
-                        <p>Hi {userName},</p>
-                        <p>Your booking is confirmed. Details below:</p>
-                        <ul>
-                            <li><strong>PNR:</strong> {pnrLocal}</li>
-                            <li><strong>Train:</strong> {trainName} ({trainNumber})</li>
-                            <li><strong>From:</strong> {fromStation?.Name}</li>
-                            <li><strong>To:</strong> {toStation?.Name}</li>
-                            <li><strong>Date:</strong> {DateTime.Parse(journeyDate):dd-MMM-yyyy}</li>
-                            <li><strong>Amount:</strong> ₹{fare * passengerCount}</li>
-                        </ul>
-                            <p>Your detailed ticket is attached below.</p>
-                            <p><a href='{bookingUrl}' download='E-Ticket_{pnr}.pdf'
-                               style='display:inline-block;padding:10px 15px;background:#007bff;color:white;text-decoration:none;border-radius:5px;'>
-                               📄 Download E-Ticket
-                            </a></p>
-                            <p>Thank you — IRCTC Clone</p>
-                        ";
+                <h3>Booking Confirmed ✅</h3>
+                <p>Hi {userName},</p>
+                <p>Your booking is confirmed. Details below:</p>
+                <ul>
+                    <li><strong>PNR:</strong> {pnrLocal}</li>
+                    <li><strong>Train:</strong> {trainName} ({trainNumber})</li>
+                    <li><strong>Quota:</strong> {quota}</li>
+                    <li><strong>From:</strong> {fromStation?.Name}</li>
+                    <li><strong>To:</strong> {toStation?.Name}</li>
+                    <li><strong>Date:</strong> {DateTime.Parse(journeyDate):dd-MMM-yyyy}</li>
+                    <li><strong>Base Fare per passenger:</strong> ₹{cls.BaseFare}</li>
+                    <li><strong>GST:</strong> ₹{gst}</li>
+                    <li><strong>Quota Charge:</strong> ₹{totalQuotaCharge}</li>
+                    <li><strong>Surge:</strong> ₹{surge}</li>
+                    <li><strong>Passengers:</strong> {passengerCount}</li>
+                    <li><strong>Total Fare:</strong> ₹{totalFare}</li>
+                </ul>
+                <p>Your detailed ticket is attached below.</p>
+                <p><a href='{bookingUrl}' download='E-Ticket_{pnr}.pdf' style='display:inline-block;padding:10px 15px;background:#007bff;color:white;text-decoration:none;border-radius:5px;'>📄 Download E-Ticket</a></p>
+                <p>Thank you — IRCTC Clone</p>
+            ";
 
-                // fire-and-forget (not awaiting) — safe to await too if you prefer
+                // fire-and-forget email send (method from your EmailService)
                 _ = _emailService.SendEmail(userEmail, subject, body);
-                /*  _ = _emailService.SendEmail(booking);*/
-
 
                 TempData["BookingSuccess"] = "Ticket booked successfully and sent to your email!";
 
@@ -421,22 +518,30 @@ namespace IRCTCClone.Controllers
                         // 1️⃣ Read Booking details
                         if (reader.Read())
                         {
-                            booking = new Booking
+                            booking = new Booking()
                             {
                                 Id = reader.GetInt32(reader.GetOrdinal("Id")),
-                                PNR = reader.GetString(reader.GetOrdinal("PNR")),
-                                UserId = reader.GetString(reader.GetOrdinal("UserId")),
+                                PNR = reader["PNR"].ToString(),
+                                UserId = reader["UserId"].ToString(),
                                 TrainId = reader.GetInt32(reader.GetOrdinal("TrainId")),
-                                TrainNumber = reader.GetInt32(reader.GetOrdinal("TrainNumber")),
-                                TrainName = reader.GetString(reader.GetOrdinal("TrainName")),
+                                TrainNumber = Convert.ToInt32(reader["TrainNumber"]),
+                                TrainName = reader["TrainName"].ToString(),
                                 TrainClassId = reader.GetInt32(reader.GetOrdinal("TrainClassId")),
                                 JourneyDate = reader.GetDateTime(reader.GetOrdinal("JourneyDate")),
                                 BookingDate = reader.GetDateTime(reader.GetOrdinal("BookingDate")),
-                                Amount = reader.GetDecimal(reader.GetOrdinal("Amount")),
-                                Status = reader.GetString(reader.GetOrdinal("Status")),
-                                ClassCode = reader.GetString(reader.GetOrdinal("ClassCode")),
+                                BaseFare = reader["BaseFare"] != DBNull.Value ? Convert.ToDecimal(reader["BaseFare"]) : 0,
+                                TotalFare = reader["TotalFare"] != DBNull.Value ? Convert.ToDecimal(reader["TotalFare"]) : 0,
+                                GST = reader["GST"] != DBNull.Value ? Convert.ToDecimal(reader["GST"]) : 0,
+                                QuotaCharge = reader["QuotaCharge"] != DBNull.Value ? Convert.ToDecimal(reader["QuotaCharge"]) : 0,
+                                SurgeAmount = reader["SurgeAmount"] != DBNull.Value ? Convert.ToDecimal(reader["SurgeAmount"]) : 0,
+                                Quota = reader["Quota"] != DBNull.Value ? reader["Quota"].ToString()?.Trim() : null,
+                                Status = reader["Status"].ToString(),
+                                ClassCode = reader["ClassCode"].ToString(),
+                                Frmst = reader["Frmst"].ToString(),
+                                Tost = reader["Tost"].ToString(),
                                 Passengers = new List<Passenger>()
                             };
+
                         }
                         else
                         {
@@ -493,7 +598,7 @@ namespace IRCTCClone.Controllers
                                 BookingId = reader.GetInt32(reader.GetOrdinal("BookingId")),
                                 PNR = reader.GetString(reader.GetOrdinal("PNR")),
                                 JourneyDate = reader.GetDateTime(reader.GetOrdinal("JourneyDate")),
-                                Amount = reader.GetDecimal(reader.GetOrdinal("Amount")),
+                                BaseFare = reader.GetDecimal(reader.GetOrdinal("BaseFare")),
                                 Status = reader.GetString(reader.GetOrdinal("Status")),
                                 TrainNumber = reader.GetInt32(reader.GetOrdinal("TrainNumber")),
                                 TrainName = reader.GetString(reader.GetOrdinal("TrainName")),
@@ -537,7 +642,7 @@ namespace IRCTCClone.Controllers
                                 BookingId = reader.GetInt32(reader.GetOrdinal("BookingId")),
                                 PNR = reader.GetString(reader.GetOrdinal("PNR")),
                                 JourneyDate = reader.GetDateTime(reader.GetOrdinal("JourneyDate")),
-                                Amount = reader.GetDecimal(reader.GetOrdinal("Amount")),
+                                BaseFare = reader.GetDecimal(reader.GetOrdinal("BaseFare")),
                                 Status = reader.GetString(reader.GetOrdinal("Status")),
                                 TrainNumber = reader.GetInt32(reader.GetOrdinal("TrainNumber")),
                                 TrainName = reader.GetString(reader.GetOrdinal("TrainName")),
@@ -599,7 +704,7 @@ namespace IRCTCClone.Controllers
                                 Id = reader.GetInt32(reader.GetOrdinal("BookingId")),
                                 PNR = reader.GetString(reader.GetOrdinal("PNR")),
                                 JourneyDate = reader.GetDateTime(reader.GetOrdinal("JourneyDate")),
-                                Amount = reader.GetDecimal(reader.GetOrdinal("Amount")),
+                                BaseFare = reader.GetDecimal(reader.GetOrdinal("BaseFare")),
                                 Status = reader.GetString(reader.GetOrdinal("Status")),
                                 Train = new Train
                                 {
@@ -772,8 +877,42 @@ namespace IRCTCClone.Controllers
                 trainTable.AddCell(new PdfPCell(new Phrase("Status:", labelFont)));
                 trainTable.AddCell(new PdfPCell(new Phrase(booking.Status, normalFont)));
 
-                trainTable.AddCell(new PdfPCell(new Phrase("Fare Paid:", labelFont)));
-                trainTable.AddCell(new PdfPCell(new Phrase($"₹{booking.Amount}", normalFont)));
+                // Fare Breakdown Section
+                // Create a new font for white text
+                Font whiteFont = new Font(labelFont.BaseFont, labelFont.Size, labelFont.Style, BaseColor.WHITE);
+
+                // Fare Breakdown header
+                PdfPCell fareHeaderCell = new PdfPCell(new Phrase("Fare Breakdown", whiteFont))
+                {
+                    BackgroundColor = new BaseColor(0, 102, 204), // Blue background
+                    Padding = 5,
+                    Colspan = 2,
+                    HorizontalAlignment = Element.ALIGN_CENTER,
+                    Border = Rectangle.NO_BORDER
+                };
+
+                trainTable.AddCell(fareHeaderCell);
+
+                // Base Fare
+                trainTable.AddCell(new PdfPCell(new Phrase("Base Fare:", labelFont)));
+                trainTable.AddCell(new PdfPCell(new Phrase($"₹{booking.BaseFare}", normalFont)));
+
+                // GST
+                trainTable.AddCell(new PdfPCell(new Phrase("GST:", labelFont)));
+                trainTable.AddCell(new PdfPCell(new Phrase($"₹{booking.GST}", normalFont)));
+
+                // Quota Charge
+                trainTable.AddCell(new PdfPCell(new Phrase("Quota Charge:", labelFont)));
+                trainTable.AddCell(new PdfPCell(new Phrase($"₹{booking.QuotaCharge}", normalFont)));
+
+                // Surge
+                trainTable.AddCell(new PdfPCell(new Phrase("Surge:", labelFont)));
+                trainTable.AddCell(new PdfPCell(new Phrase($"₹{booking.SurgeAmount}", normalFont)));
+
+                // Total Fare
+                trainTable.AddCell(new PdfPCell(new Phrase("Total Fare Paid:", labelFont)));
+                trainTable.AddCell(new PdfPCell(new Phrase($"₹{booking.TotalFare}", normalFont)));
+
 
                 doc.Add(trainTable);
                 doc.Add(new Paragraph("\n"));
@@ -865,7 +1004,7 @@ namespace IRCTCClone.Controllers
                                 JourneyDate = reader["JourneyDate"] != DBNull.Value ? Convert.ToDateTime(reader["JourneyDate"]) : DateTime.MinValue,
                                 Status = reader["Status"]?.ToString(),
                                 ClassCode = reader["ClassCode"]?.ToString(),
-                                Amount = reader["Amount"] != DBNull.Value ? Convert.ToDecimal(reader["Amount"]) : 0,
+                                BaseFare = reader["BaseFare"] != DBNull.Value ? Convert.ToDecimal(reader["BaseFare"]) : 0,
                                 Passengers = new List<Passenger>()
                             };
                         }
@@ -932,7 +1071,7 @@ namespace IRCTCClone.Controllers
                                 JourneyDate = reader.GetDateTime(reader.GetOrdinal("JourneyDate")),
                                 Status = reader.GetString(reader.GetOrdinal("Status")),
                                 ClassCode = reader.GetString(reader.GetOrdinal("ClassCode")),
-                                Amount = reader.GetDecimal(reader.GetOrdinal("Amount")),
+                                BaseFare = reader.GetDecimal(reader.GetOrdinal("BaseFare")),
                                 Frmst = reader.GetString(reader.GetOrdinal("Frmst")),
                                 Tost = reader.GetString(reader.GetOrdinal("Tost")),
                                 Passengers = new List<Passenger>()
