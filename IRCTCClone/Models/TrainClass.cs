@@ -18,7 +18,7 @@ namespace IRCTCClone.Models
         public int SeatsAvailable { get; set; }
 
         // 🎟️ Quota & Pricing Options
-        public string Quota { get; set; } = "GENERAL";    // Default quota
+        public string? Quota { get; set; }
         public bool DynamicPricing { get; set; } = false; // Enable/disable surge pricing
         public decimal TatkalExtra { get; set; } = 0;     // Extra cost for Tatkal quota
 
@@ -77,7 +77,7 @@ namespace IRCTCClone.Models
                     cmd.Parameters.AddWithValue("@TrainId", TrainId);
                     cmd.Parameters.AddWithValue("@Code", Code);
                     cmd.Parameters.AddWithValue("@SeatPrefix", (object?)SeatPrefix ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@Fare", BaseFare);
+                    cmd.Parameters.AddWithValue("@BaseFare", BaseFare);
                     cmd.Parameters.AddWithValue("@SeatsAvailable", SeatsAvailable);
                     cmd.ExecuteNonQuery();
                 }

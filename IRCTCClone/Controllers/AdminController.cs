@@ -630,7 +630,7 @@ namespace IrctcClone.Controllers
                             {
                                 Id = Convert.ToInt32(reader["Id"]),
                                 Code = reader["Code"].ToString(),
-                                BaseFare = Convert.ToDecimal(reader["Fare"]),
+                                BaseFare = Convert.ToDecimal(reader["BaseFare"]),
                                 SeatsAvailable = Convert.ToInt32(reader["SeatsAvailable"]),
                                 SeatPrefix = reader["SeatPrefix"].ToString()
                             });
@@ -688,70 +688,103 @@ namespace IrctcClone.Controllers
             List<int> routeStations,          // ✅ NEW
             List<string> routeArrivals,       // ✅ NEW
             List<string> routeDepartures,     // ✅ NEW
-            List<int> routeOrder              // ✅ NEW
+            List<int> routeOrder,             // ✅ NEW
+            string deletedClassIds // 👈 add this
         )
         {
-            using (var conn = new SqlConnection(_connectionString))
-            {
-                conn.Open();
+            try
+            { 
 
-                // --- Update train ---
-                using (var cmd = new SqlCommand("spUpdateTrain", conn))
+                using (var conn = new SqlConnection(_connectionString))
                 {
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@TrainId", train.Id);
-                    cmd.Parameters.AddWithValue("@Number", train.Number);
-                    cmd.Parameters.AddWithValue("@Name", train.Name);
-                    cmd.Parameters.AddWithValue("@FromStationId", train.FromStationId);
-                    cmd.Parameters.AddWithValue("@ToStationId", train.ToStationId);
-                    cmd.Parameters.AddWithValue("@Departure", train.Departure);
-                    cmd.Parameters.AddWithValue("@Arrival", train.Arrival);
-                    cmd.Parameters.AddWithValue("@Duration", train.Duration);
-                    cmd.ExecuteNonQuery();
-                }
+                    conn.Open();
 
-                // --- Update / Insert Train Classes ---
-                for (int i = 0; i < classCodes.Count; i++)
-                {
-                    using (var cmd = new SqlCommand("spUpsertTrainClass", conn))
-                    {
-                        cmd.CommandType = CommandType.StoredProcedure;
-                        int classId = (classIds != null && i < classIds.Count) ? classIds[i] : 0;
-
-                        cmd.Parameters.AddWithValue("@ClassId", classId);
-                        cmd.Parameters.AddWithValue("@TrainId", train.Id);
-                        cmd.Parameters.AddWithValue("@Code", classCodes[i]);
-                        cmd.Parameters.AddWithValue("@Fare", fares[i]);
-                        cmd.Parameters.AddWithValue("@SeatsAvailable", seats[i]);
-                        cmd.ExecuteNonQuery();
-                    }
-                }
-
-                // --- ✅ Update / Insert Train Routes ---
-                // You can first delete old routes (optional) and then insert new ones
-                using (var delCmd = new SqlCommand("spDeleteTrainRoutesByTrainId", conn))
-                {
-                    delCmd.CommandType = CommandType.StoredProcedure;
-                    delCmd.Parameters.AddWithValue("@TrainId", train.Id);
-                    delCmd.ExecuteNonQuery();
-                }
-
-                for (int i = 0; i < routeStations.Count; i++)
-                {
-                    using (var cmd = new SqlCommand("spInsertTrainRoute", conn))
+                    // --- Update train ---
+                    using (var cmd = new SqlCommand("spUpdateTrain", conn))
                     {
                         cmd.CommandType = CommandType.StoredProcedure;
                         cmd.Parameters.AddWithValue("@TrainId", train.Id);
-                        cmd.Parameters.AddWithValue("@StationId", routeStations[i]);
-                        cmd.Parameters.AddWithValue("@ArrivalTime", TimeSpan.Parse(routeArrivals[i]));
-                        cmd.Parameters.AddWithValue("@DepartureTime", TimeSpan.Parse(routeDepartures[i]));
-                        cmd.Parameters.AddWithValue("@StopNumber", routeOrder[i]);
+                        cmd.Parameters.AddWithValue("@Number", train.Number);
+                        cmd.Parameters.AddWithValue("@Name", train.Name);
+                        cmd.Parameters.AddWithValue("@FromStationId", train.FromStationId);
+                        cmd.Parameters.AddWithValue("@ToStationId", train.ToStationId);
+                        cmd.Parameters.AddWithValue("@Departure", train.Departure);
+                        cmd.Parameters.AddWithValue("@Arrival", train.Arrival);
+                        cmd.Parameters.AddWithValue("@Duration", train.Duration);
                         cmd.ExecuteNonQuery();
                     }
+
+
+                    // --- ✅ Delete removed classes ---
+                    if (!string.IsNullOrEmpty(deletedClassIds))
+                    {
+                        using (var delCmd = new SqlCommand("spDeleteTrainClassesByIds", conn))
+                        {
+                            delCmd.CommandType = CommandType.StoredProcedure;
+                            delCmd.Parameters.AddWithValue("@Ids", deletedClassIds);
+                            delCmd.ExecuteNonQuery();
+                        }
+                    }
+
+                    var seatPrefixes = Request.Form["SeatPrefix"].ToList();
+
+                    // --- Update / Insert Train Classes ---
+                    for (int i = 0; i < classCodes.Count; i++)
+                    {
+                        using (var cmd = new SqlCommand("spUpsertTrainClass", conn))
+                        {
+                            cmd.CommandType = CommandType.StoredProcedure;
+
+                            int classId = (classIds != null && i < classIds.Count) ? classIds[i] : 0;
+                            decimal fare = (i < fares.Count) ? fares[i] : 0;           // ✅ scalar
+                            int seat = (i < seats.Count) ? seats[i] : 0;               // ✅ scalar
+                            string prefix = (i < seatPrefixes.Count) ? seatPrefixes[i] : ""; // ✅ scalar
+
+                            cmd.Parameters.AddWithValue("@ClassId", classId);
+                            cmd.Parameters.AddWithValue("@TrainId", train.Id);
+                            cmd.Parameters.AddWithValue("@Code", classCodes[i]);
+                            cmd.Parameters.AddWithValue("@BaseFare", fare);             // ✅ not fares
+                            cmd.Parameters.AddWithValue("@SeatsAvailable", seat);       // ✅ not seats
+                            cmd.Parameters.AddWithValue("@SeatPrefix", string.IsNullOrWhiteSpace(prefix) ? (object)DBNull.Value : prefix);
+                            // ✅ not seatPrefixes
+
+                            cmd.ExecuteNonQuery();
+                        }
+                    }
+
+                    // --- ✅ Update / Insert Train Routes ---
+                    // You can first delete old routes (optional) and then insert new ones
+                    using (var delCmd = new SqlCommand("spDeleteTrainRoutesByTrainId", conn))
+                    {
+                        delCmd.CommandType = CommandType.StoredProcedure;
+                        delCmd.Parameters.AddWithValue("@TrainId", train.Id);
+                        delCmd.ExecuteNonQuery();
+                    }
+
+                    for (int i = 0; i < routeStations.Count; i++)
+                    {
+                        using (var cmd = new SqlCommand("spInsertTrainRoute", conn))
+                        {
+                            cmd.CommandType = CommandType.StoredProcedure;
+                            cmd.Parameters.AddWithValue("@TrainId", train.Id);
+                            cmd.Parameters.AddWithValue("@StationId", routeStations[i]);
+                            cmd.Parameters.AddWithValue("@ArrivalTime", TimeSpan.Parse(routeArrivals[i]));
+                            cmd.Parameters.AddWithValue("@DepartureTime", TimeSpan.Parse(routeDepartures[i]));
+                            cmd.Parameters.AddWithValue("@StopNumber", routeOrder[i]);
+                            cmd.ExecuteNonQuery();
+                        }
+                    }
                 }
+
+                TempData["SuccessMessage"] = "Train details edited successfully!";
+                return RedirectToAction("EditTrain", new { id = train.Id });
             }
 
-            return RedirectToAction("TrainList");
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = "Error updating train: " + ex.Message;
+                return RedirectToAction("EditTrain", new { id = train.Id });
+            }
         }
 
 

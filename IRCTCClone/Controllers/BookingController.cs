@@ -49,41 +49,70 @@ namespace IRCTCClone.Controllers
             return count;
         }
 
-        private decimal CalculateFare(TrainClass cls, int totalSeats, int bookedSeats, string quota, out decimal gst, out decimal surge, out decimal quotaCharge)
+        private decimal CalculateFare(TrainClass cls, int totalSeats, int bookedSeats, string quota,
+            out decimal gst, out decimal surge, out decimal quotaCharge)
         {
             decimal baseFare = cls.BaseFare;
             gst = Math.Round(baseFare * 0.05m, 2); // 5% GST
             surge = 0;
             quotaCharge = 0;
 
-            // Dynamic pricing (surge)
+            // ✅ Dynamic pricing (surge)
             if (cls.DynamicPricing && totalSeats > 0)
             {
                 decimal occupancyRate = (decimal)bookedSeats / totalSeats;
-                if (occupancyRate > 0.7m) surge = Math.Round(baseFare * 0.10m, 2);
-                else if (occupancyRate > 0.5m) surge = Math.Round(baseFare * 0.05m, 2);
+                if (occupancyRate > 0.7m)
+                    surge = Math.Round(baseFare * 0.10m, 2); // 10% surge if >70% seats booked
+                else if (occupancyRate > 0.5m)
+                    surge = Math.Round(baseFare * 0.05m, 2); // 5% surge if >50%
             }
 
-            // Quota adjustments
+            // ✅ Official IRCTC Tatkal rates with min & max limits
+            var tatkalConfig = new Dictionary<string, (decimal percent, decimal min, decimal max)>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "2S", (0.10m, 10m, 15m) },    // Second Sitting: 10% or ₹10–₹15
+                { "SL", (0.30m, 100m, 200m) },  // Sleeper: 30% or ₹100–₹200
+                { "3A", (0.30m, 300m, 400m) },  // 3rd AC: 30% or ₹300–₹400
+                { "2A", (0.30m, 400m, 500m) },  // 2nd AC: 30% or ₹400–₹500
+                { "1A", (0.30m, 400m, 500m) },  // 1st AC: 30% or ₹400–₹500
+                { "CC", (0.30m, 125m, 225m) },  // AC Chair Car: 30% or ₹125–₹225
+                { "EC", (0.30m, 400m, 500m) }   // Executive Chair Car: 30% or ₹400–₹500
+            };
+
+            // ✅ Quota-based adjustments
             switch (quota.ToUpper())
             {
                 case "TATKAL":
-                    quotaCharge = Math.Round(baseFare * 0.20m, 2);
+                    if (tatkalConfig.TryGetValue(cls.Code.ToUpper(), out var config))
+                    {
+                        decimal tatkalAmount = baseFare * config.percent;
+                        // Apply IRCTC min/max range
+                        quotaCharge = Math.Round(Math.Min(Math.Max(tatkalAmount, config.min), config.max), 2);
+                    }
+                    else
+                    {
+                        quotaCharge = Math.Round(baseFare * 0.30m, 2); // fallback if unknown class
+                    }
                     break;
+
                 case "LADIES":
-                    quotaCharge = Math.Round(baseFare * 0.05m, 2);
+                    quotaCharge = Math.Round(baseFare * 0.05m, 2); // 5% extra
                     break;
+
                 case "SC": // Senior Citizen
-                    quotaCharge = Math.Round(-baseFare * 0.10m, 2);
+                    quotaCharge = Math.Round(-baseFare * 0.10m, 2); // 10% discount
                     break;
+
                 default:
                     quotaCharge = 0;
                     break;
             }
 
+            // ✅ Final Fare calculation
             decimal finalFare = baseFare + gst + surge + quotaCharge;
             return finalFare;
         }
+
 
         public BookingController(IConfiguration configuration, EmailService emailService)
         {
@@ -297,8 +326,6 @@ namespace IRCTCClone.Controllers
                                 Id = Convert.ToInt32(reader["Id"]),
                                 Code = reader["Code"].ToString(),
                                 BaseFare = Convert.ToDecimal(reader["BaseFare"]),
-                                DynamicPricing = Convert.ToBoolean(reader["DynamicPricing"]),
-                                TatkalExtra = reader["TatkalExtra"] != DBNull.Value ? Convert.ToDecimal(reader["TatkalExtra"]) : 0,
                                 SeatsAvailable = Convert.ToInt32(reader["SeatsAvailable"]),
                                 SeatPrefix = reader["SeatPrefix"]?.ToString()
                             };
@@ -344,7 +371,17 @@ namespace IRCTCClone.Controllers
 
 
                 int bookedSeats = GetBookedSeatsCount(trainId, classId);
-                string quota = (Request.Form["Quota"].FirstOrDefault() ?? "GENERAL").ToUpper();
+                string quota = Request.Form["Quota"].FirstOrDefault();
+                quota = string.IsNullOrWhiteSpace(quota) ? null : quota.ToUpper();
+
+                if (string.IsNullOrWhiteSpace(quota))
+                {
+                    quota = null; // or handle error if quota is mandatory
+                }
+                else
+                {
+                    quota = quota.ToUpper();
+                }
 
                 // Dynamic fare calculation
                 decimal gst, surge, quotaCharge;
@@ -644,6 +681,7 @@ namespace IRCTCClone.Controllers
                                 JourneyDate = reader.GetDateTime(reader.GetOrdinal("JourneyDate")),
                                 BaseFare = reader.GetDecimal(reader.GetOrdinal("BaseFare")),
                                 Status = reader.GetString(reader.GetOrdinal("Status")),
+                                Quota = reader.GetString(reader.GetOrdinal("Quota")),
                                 TrainNumber = reader.GetInt32(reader.GetOrdinal("TrainNumber")),
                                 TrainName = reader.GetString(reader.GetOrdinal("TrainName")),
                                 ClassCode = reader.GetString(reader.GetOrdinal("ClassCode")),
@@ -877,44 +915,45 @@ namespace IRCTCClone.Controllers
                 trainTable.AddCell(new PdfPCell(new Phrase("Status:", labelFont)));
                 trainTable.AddCell(new PdfPCell(new Phrase(booking.Status, normalFont)));
 
+                trainTable.AddCell(new PdfPCell(new Phrase("Quota:", labelFont)));
+                trainTable.AddCell(new PdfPCell(new Phrase(booking.Quota, normalFont)));
+
                 // Fare Breakdown Section
-                // Create a new font for white text
+                // Fare Breakdown header in the same trainTable
                 Font whiteFont = new Font(labelFont.BaseFont, labelFont.Size, labelFont.Style, BaseColor.WHITE);
 
-                // Fare Breakdown header
-                PdfPCell fareHeaderCell = new PdfPCell(new Phrase("Fare Breakdown", whiteFont))
+                trainTable.AddCell(new PdfPCell(new Phrase("Fare Breakdown", whiteFont))
                 {
-                    BackgroundColor = new BaseColor(0, 102, 204), // Blue background
+                    BackgroundColor = new BaseColor(0, 102, 204),
                     Padding = 5,
                     Colspan = 2,
                     HorizontalAlignment = Element.ALIGN_CENTER,
                     Border = Rectangle.NO_BORDER
-                };
-
-                trainTable.AddCell(fareHeaderCell);
+                });
 
                 // Base Fare
-                trainTable.AddCell(new PdfPCell(new Phrase("Base Fare:", labelFont)));
-                trainTable.AddCell(new PdfPCell(new Phrase($"₹{booking.BaseFare}", normalFont)));
+                trainTable.AddCell(new PdfPCell(new Phrase("Base Fare:", labelFont)) { Padding = 3 });
+                trainTable.AddCell(new PdfPCell(new Phrase($"₹{booking.BaseFare}", normalFont)) { Padding = 3 });
 
                 // GST
-                trainTable.AddCell(new PdfPCell(new Phrase("GST:", labelFont)));
-                trainTable.AddCell(new PdfPCell(new Phrase($"₹{booking.GST}", normalFont)));
+                trainTable.AddCell(new PdfPCell(new Phrase("GST (5%):", labelFont)) { Padding = 3 });
+                trainTable.AddCell(new PdfPCell(new Phrase($"₹{booking.GST}", normalFont)) { Padding = 3 });
 
                 // Quota Charge
-                trainTable.AddCell(new PdfPCell(new Phrase("Quota Charge:", labelFont)));
-                trainTable.AddCell(new PdfPCell(new Phrase($"₹{booking.QuotaCharge}", normalFont)));
+                trainTable.AddCell(new PdfPCell(new Phrase("Quota Charge:", labelFont)) { Padding = 3 });
+                trainTable.AddCell(new PdfPCell(new Phrase($"₹{booking.QuotaCharge}", normalFont)) { Padding = 3 });
 
                 // Surge
-                trainTable.AddCell(new PdfPCell(new Phrase("Surge:", labelFont)));
-                trainTable.AddCell(new PdfPCell(new Phrase($"₹{booking.SurgeAmount}", normalFont)));
+                trainTable.AddCell(new PdfPCell(new Phrase("Surge:", labelFont)) { Padding = 3 });
+                trainTable.AddCell(new PdfPCell(new Phrase($"₹{booking.SurgeAmount}", normalFont)) { Padding = 3 });
 
                 // Total Fare
-                trainTable.AddCell(new PdfPCell(new Phrase("Total Fare Paid:", labelFont)));
-                trainTable.AddCell(new PdfPCell(new Phrase($"₹{booking.TotalFare}", normalFont)));
+                trainTable.AddCell(new PdfPCell(new Phrase("Total Fare Paid:", labelFont)) { Padding = 3 });
+                trainTable.AddCell(new PdfPCell(new Phrase($"₹{booking.TotalFare}", normalFont)) { Padding = 3 });
 
-
+                // Add trainTable to doc once all cells are added
                 doc.Add(trainTable);
+
                 doc.Add(new Paragraph("\n"));
 
                 // 👥 Passenger Details Section
@@ -1004,7 +1043,12 @@ namespace IRCTCClone.Controllers
                                 JourneyDate = reader["JourneyDate"] != DBNull.Value ? Convert.ToDateTime(reader["JourneyDate"]) : DateTime.MinValue,
                                 Status = reader["Status"]?.ToString(),
                                 ClassCode = reader["ClassCode"]?.ToString(),
+                                Quota = reader["Quota"]?.ToString(),
                                 BaseFare = reader["BaseFare"] != DBNull.Value ? Convert.ToDecimal(reader["BaseFare"]) : 0,
+                                GST = reader["GST"] != DBNull.Value ? Convert.ToDecimal(reader["GST"]) : 0,
+                                SurgeAmount = reader["SurgeAmount"] != DBNull.Value ? Convert.ToDecimal(reader["SurgeAmount"]) : 0,
+                                TotalFare = reader["TotalFare"] != DBNull.Value ? Convert.ToDecimal(reader["TotalFare"]) : 0,
+                                QuotaCharge = reader["QuotaCharge"] != DBNull.Value ? Convert.ToDecimal(reader["QuotaCharge"]) : 0,
                                 Passengers = new List<Passenger>()
                             };
                         }

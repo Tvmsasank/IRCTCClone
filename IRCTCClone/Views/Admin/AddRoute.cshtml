@@ -86,9 +86,10 @@
     <!-- ✅ Success Message -->
     @if (TempData["SuccessMessage"] != null)
     {
-        <div class="alert alert-success alert-dismissible fade show">
-            @TempData["SuccessMessage"]
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <div class="success-popup ">
+            <div class="popup-content">
+                @TempData["SuccessMessage"]
+            </div>
         </div>
     }
 
@@ -240,6 +241,22 @@
                 alert("At least one stop is required.");
             }
         }
+        
+            document.addEventListener("DOMContentLoaded", () => {
+                const popup = document.querySelector(".success-popup");
+                    if (popup) {
+                    const popupContent = popup.querySelector(".popup-content");
+                
+                        // Start fade out after 2 seconds
+                        setTimeout(() => {
+                        popupContent.classList.add("fade-out");
+                        // Then hide it after fade animation completes
+                            setTimeout(() => {
+                                popup.style.display = "none";
+                            }, 1000);
+                    }, 1000);
+                }
+            });
 
         // ✅ Fix row indices after deletion
         function updateRowIndices() {
