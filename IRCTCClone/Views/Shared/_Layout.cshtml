@@ -108,6 +108,35 @@
     <!-- ✅ Then render page-specific scripts -->
     @RenderSection("Scripts", required: false)
 
+    <div id="loadingScreen">
+        <div class="railway-track"></div>
+
+        <div class="train-wrapper">
+            <div class="train">
+                <div class="engine">
+                    <div class="headlight"></div>
+                    <div class="chimney"></div>
+                    <div class="smoke"></div>
+                </div>
+
+                <div class="coach"></div>
+                <div class="coach"></div>
+                <div class="coach"></div>
+            </div>
+        </div>
+    </div>
+
+
+
 </body>
 </html>
 
+@section Scripts{
+    <script>
+        window.addEventListener("load", () => {
+        setTimeout(() => {
+            document.getElementById("loadingScreen").style.display = "none";
+        }, 1000);
+    });
+    </script>
+}

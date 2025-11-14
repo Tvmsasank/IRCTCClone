@@ -66,9 +66,12 @@ body {
     display: flex;
     justify-content: flex-end;
     align-items: center;
-    background: url('https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEg5wIVGScLbfJP-U8NokGAi4UroYmTJFgv9IpImlCoUelTlfmHuu6MlfOT8SxEVK_-EtIM27eg7cYIb6xadkrydWSUaG4amwhc-siq8EFwVo7cyO5Vj5p89tPF7bVnMcIH4n6mTipWogU5ns_RfnwWTAtWRe1OvIM2UWWx9EV4HRDtlTm2LML1vyZ-dIA/s1920/kishore-v-kgH64ekcq4I-unsplash.jpg') no-repeat center center fixed;
+    background-image: url("../images/vande-bharat-train.jpg");
+/*    background: url('https://images.travelandleisureasia.com/wp-content/uploads/sites/2/2023/05/26163940/vande-bharat-train.jpg?tr=w-1366,f-jpg,pr-true') no-repeat center center fixed;*/
     background-size: cover;
-    padding: 100px 50px;  
+    background-repeat: no-repeat;
+    background-position: center;
+    padding: 100px 50px;
     overflow: hidden;
 }
 
@@ -1693,6 +1696,177 @@ hr {
         transform: scale(1.05);
     }
 
+/*----------------- LOADING TRAIN -------------------------*/
 
+/* --------------------
+     LOADER BACKGROUND
+---------------------*/
+#loadingScreen {
+    position: fixed;
+    inset: 0;
+    background: linear-gradient(to bottom, #87CEEB 40%, #ffffff);
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    z-index: 999999;
+    animation: fadeOut 1s ease 1s forwards;
+}
+
+/* --------------------
+      RAILWAY TRACK
+---------------------*/
+.railway-track {
+    position: absolute;
+    bottom: 40px;
+    width: 100%;
+    height: 8px;
+    background: #333;
+}
+
+    .railway-track::before {
+        content: "";
+        position: absolute;
+        width: 100%;
+        height: 3px;
+        background: repeating-linear-gradient( to right, #888 0px, #888 20px, #333 20px, #333 40px );
+        bottom: -10px;
+        animation: moveTrack 0.5s linear infinite;
+    }
+
+@keyframes moveTrack {
+    from {
+        transform: translateX(0);
+    }
+
+    to {
+        transform: translateX(0px);
+    }
+}
+
+/* --------------------
+         TRAIN
+---------------------*/
+.train-wrapper {
+    margin-bottom: 50px;
+}
+
+.train {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    animation: moveTrain 1s ease-in-out forwards;
+}
+
+@keyframes moveTrain {
+    0% {
+        transform: translateX(300%);
+    }
+
+    100% {
+        transform: translateX(-150%);
+    }
+}
+
+/* --------------------
+      ENGINE DESIGN
+---------------------*/
+.engine, .coach {
+    width: 120px;
+    height: 60px;
+    background: #b30000;
+    border-radius: 8px;
+    position: relative;
+    border: 4px solid #000;
+}
+
+.engine {
+    width: 140px;
+    background: #cc0000;
+}
+
+/* Blinking engine headlight */
+.headlight {
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    background: yellow;
+    border-radius: 50%;
+    right: -10px;
+    top: 20px;
+    animation: blink 0.7s infinite alternate;
+}
+
+@keyframes blink {
+    0% {
+        opacity: 0.2;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
+/* Chimney and Smoke */
+.chimney {
+    width: 20px;
+    height: 35px;
+    background: #222;
+    position: absolute;
+    top: -35px;
+    left: 25px;
+    border-radius: 5px;
+}
+
+.smoke {
+    width: 22px;
+    height: 22px;
+    background: rgba(200,200,200,0.8);
+    border-radius: 50%;
+    position: absolute;
+    top: -60px;
+    left: 32px;
+    animation: smokeUp 1s infinite ease-out;
+}
+
+@keyframes smokeUp {
+    0% {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translateY(-60px) scale(2);
+        opacity: 0;
+    }
+}
+
+/* --------------------
+         COACH
+---------------------*/
+.coach {
+    background: #004d99;
+    border-color: #000;
+}
+
+    .coach::after {
+        content: "";
+        position: absolute;
+        width: 90%;
+        height: 8px;
+        background: #fff;
+        top: 20px;
+        left: 5%;
+        border-radius: 4px;
+    }
+
+/* --------------------
+     Fadeout Loader
+---------------------*/
+@keyframes fadeOut {
+    to {
+        opacity: 0;
+        visibility: hidden;
+    }
+}
 
 
