@@ -33,9 +33,8 @@
                 <input type="hidden" name="trainName" value="@train.Name" />
                 <input type="hidden" name="trainNumber" value="@train.Number" />
                 <input type="hidden" name="Class" value="@cls.Code" />
-                <input type="hidden" name="FromStationId" value="@train.FromStationId" />
-                <input type="hidden" name="ToStationId" value="@train.ToStationId" />
-
+                <input type="hidden" name="FromStationId" value="@ViewBag.FromStationId" />
+                <input type="hidden" name="ToStationId" value="@ViewBag.ToStationId" />
                 <div class="form-group mb-3">
                     <label for="Quota">Select Quota:</label>
                     <select name="Quota" class="form-control" required>

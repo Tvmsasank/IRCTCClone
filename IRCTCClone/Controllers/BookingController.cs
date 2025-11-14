@@ -115,6 +115,37 @@ namespace IRCTCClone.Controllers
         }
 
 
+        private Station GetStationById(int stationId)
+        {
+            using (var conn = new SqlConnection(_connectionString))
+            {
+                conn.Open();
+
+                using (var cmd = new SqlCommand("GetStationById", conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@StationId", stationId);
+
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            return new Station
+                            {
+                                Id = reader["Id"] != DBNull.Value ? Convert.ToInt32(reader["Id"]) : 0,
+                                Code = reader["Code"]?.ToString(),
+                                Name = reader["Name"]?.ToString()
+                            };
+                        }
+                    }
+                }
+            }
+
+            return null;
+        }
+
+
+
         public BookingController(IConfiguration configuration, EmailService emailService)
         {
             _connectionString = configuration.GetConnectionString("DefaultConnection");
@@ -125,7 +156,7 @@ namespace IRCTCClone.Controllers
         // GET: /Booking/Checkout
         [Authorize]
         [HttpGet]
-        public IActionResult Checkout(int trainId, int classId, string journeyDate)
+        public IActionResult Checkout(int trainId, int classId, string journeyDate, int FromStationId, int ToStationId)
         {
             Train train = null;
             TrainClass cls = null;
@@ -153,6 +184,7 @@ namespace IRCTCClone.Controllers
                                 Arrival = reader.GetTimeSpan(reader.GetOrdinal("Arrival")),
                                 Duration = reader.GetString(reader.GetOrdinal("Duration")),
 
+                                // override later
                                 FromStationId = reader.GetInt32(reader.GetOrdinal("FromStationId")),
                                 ToStationId = reader.GetInt32(reader.GetOrdinal("ToStationId")),
 
@@ -171,7 +203,7 @@ namespace IRCTCClone.Controllers
                             };
                         }
 
-                        // Move to next result set for class
+                        // Read class details
                         if (reader.NextResult() && reader.Read())
                         {
                             cls = new TrainClass
@@ -190,12 +222,23 @@ namespace IRCTCClone.Controllers
             if (train == null || cls == null)
                 return NotFound();
 
+            // 🔥 Override route based on user search
+            train.FromStationId = FromStationId;
+            train.ToStationId = ToStationId;
+
+            train.FromStation = GetStationById(FromStationId);
+            train.ToStation = GetStationById(ToStationId);
+
+            // Pass to view
             ViewBag.Train = train;
             ViewBag.Class = cls;
             ViewBag.JourneyDate = journeyDate;
+            ViewBag.FromStationId = FromStationId;
+            ViewBag.ToStationId = ToStationId;
 
             return View("Checkout");
         }
+
 
 
         /*        [HttpPost]

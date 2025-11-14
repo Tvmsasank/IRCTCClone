@@ -72,7 +72,7 @@ namespace IRCTCClone.Controllers
         [HttpPost]
         public IActionResult TrainResults(int fromStationId, int toStationId, DateTime journeyDate)
         {
-            var trains = Train.GetTrains(_connectionString, fromStationId);
+            var trains = Train.GetTrains(_connectionString, fromStationId, toStationId);
 
 
             ViewBag.JourneyDate = journeyDate.ToString("yyyy-MM-dd");

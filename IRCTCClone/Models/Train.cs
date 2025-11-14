@@ -68,7 +68,7 @@ namespace IRCTCClone.Models
 
 
         // ✅ Fetch trains between 2 stations (calls spSearchTrains)
-        public static List<Train> GetTrains(string connectionString, int fromStationId)
+        public static List<Train> GetTrains(string connectionString, int fromStationId, int toStationId)
         {
             var trains = new List<Train>();
 
@@ -80,36 +80,36 @@ namespace IRCTCClone.Models
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@FromStationId", fromStationId);
-       
-
+/*                    cmd.Parameters.AddWithValue("@ToStationId", toStationId);
+*/
                     using (var reader = cmd.ExecuteReader())
                     {
                         while (reader.Read())
                         {
                             trains.Add(new Train
                             {
-                                Id = reader.GetInt32(0),                     // Id
-                                Number = reader.GetInt32(1),                 // Number
-                                Name = reader.GetString(2),                  // Name
-                                       
-                                ToStationId = reader.GetInt32(4),            // ToStationId
+                                Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                                Number = reader.GetInt32(reader.GetOrdinal("Number")),
+                                Name = reader.GetString(reader.GetOrdinal("Name")),
 
-                                Departure = reader.GetTimeSpan(5),           // Departure
-                                Arrival = reader.GetTimeSpan(6),             // Arrival
-                                Duration = reader.GetString(7),            // Duration
-                                FromStationName1= reader.GetString(8),
-                                ToStationName1 = reader.GetString(9),
+                                // 👉 Read the correct IDs coming from SQL 
+                                FromStationId = fromStationId,
+                                ToStationId = toStationId,
 
+                                Departure = reader.GetTimeSpan(reader.GetOrdinal("Departure")),
+                                Arrival = reader.GetTimeSpan(reader.GetOrdinal("Arrival")),
+                                Duration = reader.GetString(reader.GetOrdinal("Duration")),
 
+                                FromStationName1 = reader.GetString(reader.GetOrdinal("FromStationName")),
+                                ToStationName1 = reader.GetString(reader.GetOrdinal("ToStationName")),
 
                                 Classes = new List<TrainClass>()
                             });
-
                         }
                     }
                 }
 
-                // ✅ For each train, get class info
+                // Load classes for each train
                 foreach (var train in trains)
                 {
                     train.Classes = TrainClass.GetClasses(connectionString, train.Id);
@@ -118,6 +118,7 @@ namespace IRCTCClone.Models
 
             return trains;
         }
+
 
 
         // ✅ Static method to get train details

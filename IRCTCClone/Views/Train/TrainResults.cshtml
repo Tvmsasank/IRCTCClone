@@ -67,6 +67,10 @@
                                                     <input type="hidden" name="trainId" value="@t.Id" />
                                                     <input type="hidden" name="classId" value="@c.Id" />
                                                     <input type="hidden" name="journeyDate" value="@journey" />
+
+                                                    <input type="hidden" name="FromStationId" value="@t.FromStationId" />
+                                                    <input type="hidden" name="ToStationId" value="@t.ToStationId" />
+
                                                     <button type="submit" class="class-btn">
                                                         @c.Code - ₹@c.BaseFare (@c.SeatsAvailable)
                                                     </button>
