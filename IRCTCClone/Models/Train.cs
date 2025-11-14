@@ -16,7 +16,7 @@ namespace IRCTCClone.Models
         public Station? ToStation { get; set; }
         public TimeSpan Departure { get; set; }
         public TimeSpan Arrival { get; set; }
-        public TimeSpan Duration { get; set; }
+        public string Duration { get; set; }
         public String FromStationName { get; set; } // ✅ use this
         public String ToStationName { get; set; }  
         public String? fscode { get; set; }  
@@ -56,7 +56,7 @@ namespace IRCTCClone.Models
                                 ToStationId = reader.GetInt32(4),
                                 Departure = reader.GetTimeSpan(5),
                                 Arrival = reader.GetTimeSpan(6),
-                                Duration = reader.GetTimeSpan(7)
+                                Duration = reader.GetString(7)
                             });
                         }
                     }
@@ -96,7 +96,7 @@ namespace IRCTCClone.Models
 
                                 Departure = reader.GetTimeSpan(5),           // Departure
                                 Arrival = reader.GetTimeSpan(6),             // Arrival
-                                Duration = reader.GetTimeSpan(7),            // Duration
+                                Duration = reader.GetString(7),            // Duration
                                 FromStationName1= reader.GetString(8),
                                 ToStationName1 = reader.GetString(9),
 
@@ -159,7 +159,7 @@ namespace IRCTCClone.Models
                                     },
                                     Departure = reader.GetTimeSpan(reader.GetOrdinal("Departure")),
                                     Arrival = reader.GetTimeSpan(reader.GetOrdinal("Arrival")),
-                                    Duration = reader.GetTimeSpan(reader.GetOrdinal("Duration")),
+                                    Duration = reader.GetString(reader.GetOrdinal("Duration")),
                                     Classes = new List<TrainClass>()
                                 };
                             }
@@ -211,7 +211,7 @@ namespace IRCTCClone.Models
                                 ToStationId = reader.GetInt32(4),
                                 Departure = reader.GetTimeSpan(5),
                                 Arrival = reader.GetTimeSpan(6),
-                                Duration = reader.GetTimeSpan(7),
+                                Duration = reader.GetString(7),
                                 FromStation = new Station
                                 {
                                     Id = reader.GetInt32(3),
@@ -299,7 +299,7 @@ namespace IRCTCClone.Models
                                 ToStationId = Convert.ToInt32(reader["ToStationId"]),
                                 Departure = TimeSpan.Parse(reader["Departure"].ToString()!),
                                 Arrival = TimeSpan.Parse(reader["Arrival"].ToString()!),
-                                Duration = TimeSpan.Parse(reader["Duration"].ToString()!),
+                                Duration = reader["Duration"].ToString(),
                                 FromStation = new Station
                                 {
                                     Id = Convert.ToInt32(reader["FromStationId"]),

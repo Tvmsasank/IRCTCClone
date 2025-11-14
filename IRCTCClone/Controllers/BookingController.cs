@@ -17,6 +17,7 @@ using System.Reflection.Metadata;
 using System.Security.Claims;
 using static System.Net.Mime.MediaTypeNames;
 using Font = iTextSharp.text.Font;
+using Image = iTextSharp.text.Image;
 
 
 namespace IRCTCClone.Controllers
@@ -150,7 +151,7 @@ namespace IRCTCClone.Controllers
                                 Name = reader.GetString(reader.GetOrdinal("TrainName")),
                                 Departure = reader.GetTimeSpan(reader.GetOrdinal("Departure")),
                                 Arrival = reader.GetTimeSpan(reader.GetOrdinal("Arrival")),
-                                Duration = reader.GetTimeSpan(reader.GetOrdinal("Duration")),
+                                Duration = reader.GetString(reader.GetOrdinal("Duration")),
 
                                 FromStationId = reader.GetInt32(reader.GetOrdinal("FromStationId")),
                                 ToStationId = reader.GetInt32(reader.GetOrdinal("ToStationId")),
@@ -830,189 +831,344 @@ namespace IRCTCClone.Controllers
         [Authorize]
         public IActionResult DownloadTicket(int id)
         {
-            var booking = GetBookingDetails(id);
-            if (booking == null)
-                return NotFound();
+            var booking = GetBookingDetails(id); // your method to fetch booking (must include Passengers, fares etc.)
+            if (booking == null) return NotFound();
 
-            using (MemoryStream stream = new MemoryStream())
+            using (var ms = new MemoryStream())
             {
-                var doc = new iTextSharp.text.Document(iTextSharp.text.PageSize.A4, 36, 36, 36, 36);
-                PdfWriter.GetInstance(doc, stream).CloseStream = false;
+                // Document setup
+                var doc = new iTextSharp.text.Document(PageSize.A4, 36, 36, 36, 36);
+                var writer = PdfWriter.GetInstance(doc, ms);
+                writer.CloseStream = false;
                 doc.Open();
 
-                // 🎨 Fonts
-                var titleFont = FontFactory.GetFont(FontFactory.HELVETICA_BOLD, 20, BaseColor.BLUE);
-                var sectionFont = FontFactory.GetFont(FontFactory.HELVETICA_BOLD, 13, BaseColor.WHITE);
-                var labelFont = FontFactory.GetFont(FontFactory.HELVETICA_BOLD, 11);
-                var normalFont = FontFactory.GetFont(FontFactory.HELVETICA, 11);
+                // Fonts
+                var titleFont = FontFactory.GetFont(FontFactory.HELVETICA_BOLD, 18);
+                var sectionWhite = FontFactory.GetFont(FontFactory.HELVETICA_BOLD, 11, BaseColor.WHITE);
+                var sectionBlue = FontFactory.GetFont(FontFactory.HELVETICA_BOLD, 12, new BaseColor(0, 102, 204));
+                var labelFont = FontFactory.GetFont(FontFactory.HELVETICA_BOLD, 10);
+                var normal = FontFactory.GetFont(FontFactory.HELVETICA, 9);
+                var small = FontFactory.GetFont(FontFactory.HELVETICA, 8);
 
-                // 🟦 Header
-                var headerTable = new PdfPTable(2);
-                headerTable.WidthPercentage = 100;
-                headerTable.SetWidths(new float[] { 1f, 3f });
+                // Colors
+                var premiumBlue = new BaseColor(0, 102, 204);
+                var lightPanel = new BaseColor(245, 246, 250);
+                var frameColor = BaseColor.BLACK;
 
-                // IRCTC Logo (optional: replace with your app logo)
-                var logoPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "irctc_logo.png");
+                var cb = writer.DirectContent;
+
+                // --- Page border/frame ---
+                Rectangle page = doc.PageSize;
+                page = new Rectangle(doc.PageSize.Left + 15, doc.PageSize.Bottom + 15, doc.PageSize.Right - 15, doc.PageSize.Top - 15);
+                page.Border = Rectangle.BOX;
+                page.BorderWidth = 1.0f;
+                page.BorderColor = frameColor;
+                page.GetLeft(page.Left);
+                doc.Add(new Chunk()); // ensure content started
+                cb.Rectangle(page.Left, page.Bottom, page.Width, page.Height);
+                cb.SetLineWidth(1.2f);
+                cb.SetColorStroke(frameColor);
+                cb.Stroke();
+
+                // --- Light background panel behind ticket content ---
+                cb.SetColorFill(lightPanel);
+                float panelX = doc.Left + 8;
+                float panelY = doc.Top - 300; // adjust height start
+                float panelW = doc.PageSize.Width - doc.Left - doc.Right - 0;
+                float panelH = 360f;
+                cb.RoundRectangle(panelX, panelY, panelW, panelH, 6f);
+                cb.Fill();
+
+                // --- Watermark (faint, centered, rotated) ---
+                cb.SaveState();
+                cb.SetGState(new PdfGState { FillOpacity = 0.06f, StrokeOpacity = 0.06f });
+                var wmFont = FontFactory.GetFont(FontFactory.HELVETICA_BOLD, 60);
+                ColumnText.ShowTextAligned(cb, Element.ALIGN_CENTER, new Phrase("IRCTC CLONE", wmFont),
+                    doc.PageSize.Width / 2, doc.PageSize.Height / 2, 45);
+                cb.RestoreState();
+
+                // --- Header: logo + title + PNR/Date
+                var headerTbl = new PdfPTable(3) { WidthPercentage = 100f };
+                headerTbl.SetWidths(new float[] { 1f, 3f, 1.7f });
+
+                // Logo
+                string logoPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "irctc_logo.png");
                 if (System.IO.File.Exists(logoPath))
                 {
                     var logo = iTextSharp.text.Image.GetInstance(logoPath);
-                    logo.ScaleAbsolute(60, 60);
-                    headerTable.AddCell(new PdfPCell(logo) { Border = Rectangle.NO_BORDER, HorizontalAlignment = Element.ALIGN_LEFT });
+                    logo.ScaleToFit(55f, 55f);
+                    headerTbl.AddCell(new PdfPCell(logo)
+                    {
+                        Border = Rectangle.NO_BORDER,
+                        HorizontalAlignment = Element.ALIGN_LEFT,
+                        VerticalAlignment = Element.ALIGN_MIDDLE,
+                        PaddingLeft = 2f
+                    });
                 }
                 else
                 {
-                    headerTable.AddCell(new PdfPCell(new Phrase("IRCTC", titleFont)) { Border = Rectangle.NO_BORDER, HorizontalAlignment = Element.ALIGN_LEFT });
+                    headerTbl.AddCell(new PdfPCell(new Phrase("IRCTC", titleFont))
+                    {
+                        Border = Rectangle.NO_BORDER,
+                        HorizontalAlignment = Element.ALIGN_LEFT,
+                        VerticalAlignment = Element.ALIGN_MIDDLE
+                    });
                 }
 
-                headerTable.AddCell(new PdfPCell(new Phrase("Indian Railway Catering and Tourism Corporation\nE-Ticket", titleFont))
+                // Title (center)
+                headerTbl.AddCell(new PdfPCell(new Phrase("E - TICKET", titleFont))
                 {
                     Border = Rectangle.NO_BORDER,
-                    HorizontalAlignment = Element.ALIGN_RIGHT,
-                    VerticalAlignment = Element.ALIGN_MIDDLE
-                });
-
-                doc.Add(headerTable);
-                doc.Add(new Paragraph("\n"));
-
-                // 🔹 PNR Section
-                var pnrCell = new PdfPCell(new Phrase($"PNR: {booking.PNR}", sectionFont))
-                {
-                    BackgroundColor = new BaseColor(0, 102, 204),
-                    Padding = 8,
-                    Border = Rectangle.NO_BORDER,
-                    Colspan = 2,
-                    HorizontalAlignment = Element.ALIGN_CENTER
-                };
-                var pnrTable = new PdfPTable(1) { WidthPercentage = 100 };
-                pnrTable.AddCell(pnrCell);
-                doc.Add(pnrTable);
-
-                doc.Add(new Paragraph("\n"));
-
-                // 🚆 Train Details Section
-                var trainTable = new PdfPTable(2);
-                trainTable.WidthPercentage = 100;
-                trainTable.SetWidths(new float[] { 1f, 2f });
-
-                trainTable.AddCell(new PdfPCell(new Phrase("Train Number:", labelFont)));
-                trainTable.AddCell(new PdfPCell(new Phrase(booking.TrainNumber.ToString(), normalFont)));
-
-                trainTable.AddCell(new PdfPCell(new Phrase("Train Name:", labelFont)));
-                trainTable.AddCell(new PdfPCell(new Phrase(booking.TrainName, normalFont)));
-
-                trainTable.AddCell(new PdfPCell(new Phrase("From:", labelFont)));
-                trainTable.AddCell(new PdfPCell(new Phrase(booking.Frmst, normalFont)));
-
-                trainTable.AddCell(new PdfPCell(new Phrase("To:", labelFont)));
-                trainTable.AddCell(new PdfPCell(new Phrase(booking.Tost, normalFont)));
-
-                trainTable.AddCell(new PdfPCell(new Phrase("Journey Date:", labelFont)));
-                trainTable.AddCell(new PdfPCell(new Phrase(booking.JourneyDate.ToString("dd-MMM-yyyy"), normalFont)));
-
-                trainTable.AddCell(new PdfPCell(new Phrase("Class:", labelFont)));
-                trainTable.AddCell(new PdfPCell(new Phrase(booking.ClassCode, normalFont)));
-
-                trainTable.AddCell(new PdfPCell(new Phrase("Status:", labelFont)));
-                trainTable.AddCell(new PdfPCell(new Phrase(booking.Status, normalFont)));
-
-                trainTable.AddCell(new PdfPCell(new Phrase("Quota:", labelFont)));
-                trainTable.AddCell(new PdfPCell(new Phrase(booking.Quota, normalFont)));
-
-                // Fare Breakdown Section
-                // Fare Breakdown header in the same trainTable
-                Font whiteFont = new Font(labelFont.BaseFont, labelFont.Size, labelFont.Style, BaseColor.WHITE);
-
-                trainTable.AddCell(new PdfPCell(new Phrase("Fare Breakdown", whiteFont))
-                {
-                    BackgroundColor = new BaseColor(0, 102, 204),
-                    Padding = 5,
-                    Colspan = 2,
                     HorizontalAlignment = Element.ALIGN_CENTER,
-                    Border = Rectangle.NO_BORDER
+                    VerticalAlignment = Element.ALIGN_MIDDLE,
+                    PaddingTop = 12f
                 });
 
-                // Base Fare
-                trainTable.AddCell(new PdfPCell(new Phrase("Base Fare:", labelFont)) { Padding = 3 });
-                trainTable.AddCell(new PdfPCell(new Phrase($"₹{booking.BaseFare}", normalFont)) { Padding = 3 });
+                // Right PNR + Date (proper blue color)
+                var right = new PdfPTable(1) { WidthPercentage = 100f };
 
-                // GST
-                trainTable.AddCell(new PdfPCell(new Phrase("GST (5%):", labelFont)) { Padding = 3 });
-                trainTable.AddCell(new PdfPCell(new Phrase($"₹{booking.GST}", normalFont)) { Padding = 3 });
+                right.AddCell(new PdfPCell(new Phrase($"PNR: {booking.PNR}",
+                    FontFactory.GetFont(FontFactory.HELVETICA_BOLD, 12, BaseColor.BLUE)))
+                {
+                    Border = Rectangle.NO_BORDER,
+                    HorizontalAlignment = Element.ALIGN_RIGHT
+                });
 
-                // Quota Charge
-                trainTable.AddCell(new PdfPCell(new Phrase("Quota Charge:", labelFont)) { Padding = 3 });
-                trainTable.AddCell(new PdfPCell(new Phrase($"₹{booking.QuotaCharge}", normalFont)) { Padding = 3 });
+                right.AddCell(new PdfPCell(new Phrase($"Booked On: {booking.BookingDate:dd-MMM-yyyy}",
+                    FontFactory.GetFont(FontFactory.HELVETICA, 10)))
+                {
+                    Border = Rectangle.NO_BORDER,
+                    HorizontalAlignment = Element.ALIGN_RIGHT
+                });
 
-                // Surge
-                trainTable.AddCell(new PdfPCell(new Phrase("Surge:", labelFont)) { Padding = 3 });
-                trainTable.AddCell(new PdfPCell(new Phrase($"₹{booking.SurgeAmount}", normalFont)) { Padding = 3 });
+                headerTbl.AddCell(new PdfPCell(right)
+                {
+                    Border = Rectangle.NO_BORDER,
+                    PaddingTop = 5f
+                });
 
-                // Total Fare
-                trainTable.AddCell(new PdfPCell(new Phrase("Total Fare Paid:", labelFont)) { Padding = 3 });
-                trainTable.AddCell(new PdfPCell(new Phrase($"₹{booking.TotalFare}", normalFont)) { Padding = 3 });
-
-                // Add trainTable to doc once all cells are added
-                doc.Add(trainTable);
-
+                doc.Add(headerTbl);
                 doc.Add(new Paragraph("\n"));
 
-                // 👥 Passenger Details Section
-                var passengerHeader = new PdfPCell(new Phrase("Passenger Details", sectionFont))
+
+                // --- Top info table: Train/Route/Status and QR/barcode
+                var topTbl = new PdfPTable(2) { WidthPercentage = 100f, SpacingBefore = 6f };
+                topTbl.SetWidths(new float[] { 2.7f, 1f });
+
+                // Left: Train details
+                var leftTbl = new PdfPTable(2) { WidthPercentage = 100f };
+                leftTbl.DefaultCell.Border = Rectangle.NO_BORDER;
+                leftTbl.AddCell(new PdfPCell(new Phrase("Train", labelFont)) { Border = Rectangle.NO_BORDER });
+                leftTbl.AddCell(new PdfPCell(new Phrase($"{booking.TrainNumber} - {booking.TrainName}", normal)) { Border = Rectangle.NO_BORDER });
+
+                leftTbl.AddCell(new PdfPCell(new Phrase("From", labelFont)) { Border = Rectangle.NO_BORDER });
+                leftTbl.AddCell(new PdfPCell(new Phrase($"{booking.Frmst} ({booking.Frmst?.Split(' ').FirstOrDefault()})", normal)) { Border = Rectangle.NO_BORDER });
+
+                leftTbl.AddCell(new PdfPCell(new Phrase("To", labelFont)) { Border = Rectangle.NO_BORDER });
+                leftTbl.AddCell(new PdfPCell(new Phrase($"{booking.Tost} ({booking.Tost?.Split(' ').FirstOrDefault()})", normal)) { Border = Rectangle.NO_BORDER });
+
+                leftTbl.AddCell(new PdfPCell(new Phrase("Journey Date", labelFont)) { Border = Rectangle.NO_BORDER });
+                leftTbl.AddCell(new PdfPCell(new Phrase(booking.JourneyDate.ToString("dd-MMM-yyyy"), normal)) { Border = Rectangle.NO_BORDER });
+
+                leftTbl.AddCell(new PdfPCell(new Phrase("Class / Quota", labelFont)) { Border = Rectangle.NO_BORDER });
+                leftTbl.AddCell(new PdfPCell(new Phrase($"{booking.ClassCode} / {booking.Quota}", normal)) { Border = Rectangle.NO_BORDER });
+
+                leftTbl.AddCell(new PdfPCell(new Phrase("Status", labelFont)) { Border = Rectangle.NO_BORDER });
+                var statusCell = new PdfPCell(new Phrase(booking.Status, FontFactory.GetFont(FontFactory.HELVETICA_BOLD, 10, booking.Status == "CONFIRMED" ? BaseColor.GREEN : BaseColor.RED))) { Border = Rectangle.NO_BORDER };
+                leftTbl.AddCell(statusCell);
+
+                topTbl.AddCell(leftTbl);
+
+                // Right: QR + Barcode
+                var rightTbl = new PdfPTable(1) { WidthPercentage = 100f };
+
+
+
+                // QR code (PNR + Train + Date)
+                // Build passenger details
+                string passengerInfo = string.Join(";", booking.Passengers.Select(p =>
+                    $"{p.Name} | {p.Age} | {p.Gender} | {p.SeatNumber}"
+                ));
+                // Build QR text
+                string qrText =
+                $"PNR: {booking.PNR} \nTrain: {booking.TrainNumber} - {booking.TrainName} \nFrom: {booking.Frmst} \nTo: {booking.Tost} \nDOJ: {booking.JourneyDate:yyyy-MM-dd} \nQuota: {booking.Quota} \nPassenger Details: \n\n{passengerInfo}"; 
+                var qr = new BarcodeQRCode(qrText, 150, 150, null);
+                var qrImage = qr.GetImage();
+                qrImage.ScaleToFit(110f, 110f);
+                var qrCell = new PdfPCell(qrImage) { Border = Rectangle.NO_BORDER, HorizontalAlignment = Element.ALIGN_RIGHT, Padding = 2f };
+                rightTbl.AddCell(qrCell);
+
+                topTbl.AddCell(rightTbl);
+
+                doc.Add(topTbl);
+                doc.Add(new Paragraph("\n"));
+
+                // --- Passenger table (premium style) ---
+                var passTbl = new PdfPTable(6) { WidthPercentage = 100f, SpacingBefore = 6f };
+                passTbl.SetWidths(new float[] { 3f, 1f, 1f, 1.4f, 1.4f, 1.8f });
+
+                // Header row with blue background
+                var hdrCell = new PdfPCell(new Phrase("Passenger Details", sectionWhite))
                 {
-                    BackgroundColor = new BaseColor(0, 102, 204),
-                    Padding = 8,
-                    Border = Rectangle.NO_BORDER,
+                    BackgroundColor = premiumBlue,
                     Colspan = 6,
-                    HorizontalAlignment = Element.ALIGN_CENTER
+                    HorizontalAlignment = Element.ALIGN_CENTER,
+                    Padding = 6f,
+                    Border = Rectangle.NO_BORDER
                 };
+                passTbl.AddCell(hdrCell);
 
-                var passengerTable = new PdfPTable(6);
-                passengerTable.WidthPercentage = 100;
-                passengerTable.SetWidths(new float[] { 2f, 1f, 1f, 2f, 2f, 2f});
+                // Column headers
+                var cols = new[] { "Name", "Age", "Gender", "Coach", "Seat", "Berth" };
+                foreach (var c in cols)
+                {
+                    passTbl.AddCell(new PdfPCell(new Phrase(c, labelFont)) { BackgroundColor = BaseColor.LIGHT_GRAY, HorizontalAlignment = Element.ALIGN_CENTER, Padding = 4f });
+                }
 
-                passengerTable.AddCell(passengerHeader);
-
-                passengerTable.AddCell(new PdfPCell(new Phrase("Passenger Name", labelFont)) { BackgroundColor = BaseColor.LIGHT_GRAY });
-                passengerTable.AddCell(new PdfPCell(new Phrase("Age", labelFont)) { BackgroundColor = BaseColor.LIGHT_GRAY });
-                passengerTable.AddCell(new PdfPCell(new Phrase("Gender", labelFont)) { BackgroundColor = BaseColor.LIGHT_GRAY });
-                passengerTable.AddCell(new PdfPCell(new Phrase("Coach", labelFont)) { BackgroundColor = BaseColor.LIGHT_GRAY });
-                passengerTable.AddCell(new PdfPCell(new Phrase("Seat", labelFont)) { BackgroundColor = BaseColor.LIGHT_GRAY });
-                passengerTable.AddCell(new PdfPCell(new Phrase("Berth", labelFont)) { BackgroundColor = BaseColor.LIGHT_GRAY });
-
+                // Rows
                 foreach (var p in booking.Passengers)
                 {
                     string coach = "-";
-                    string seatNumber = "-";
-
+                    string seatNo = "-";
                     if (!string.IsNullOrEmpty(p.SeatNumber))
                     {
-                        // Example: "H23" → Coach = "H", Seat = "23"
-                        coach = p.SeatNumber.Substring(0, 1); // first letter
-                        seatNumber = p.SeatNumber.Substring(1);  // rest of the string
+                        coach = p.SeatNumber.Length > 0 ? p.SeatNumber.Substring(0, 1) : "-";
+                        seatNo = p.SeatNumber.Length > 1 ? p.SeatNumber.Substring(1) : "-";
                     }
 
-                    passengerTable.AddCell(new Phrase(p.Name, normalFont));
-                    passengerTable.AddCell(new Phrase(p.Age.ToString(), normalFont));
-                    passengerTable.AddCell(new Phrase(p.Gender, normalFont));
-                    passengerTable.AddCell(new Phrase(coach, normalFont));
-                    passengerTable.AddCell(new Phrase(seatNumber, normalFont));
-                    passengerTable.AddCell(new Phrase(p.Berth ?? "-", normalFont));
+                    passTbl.AddCell(new PdfPCell(new Phrase(p.Name, normal)) { Padding = 4f });
+                    passTbl.AddCell(new PdfPCell(new Phrase(p.Age.ToString(), normal)) { HorizontalAlignment = Element.ALIGN_CENTER });
+                    passTbl.AddCell(new PdfPCell(new Phrase(p.Gender, normal)) { HorizontalAlignment = Element.ALIGN_CENTER });
+                    passTbl.AddCell(new PdfPCell(new Phrase(coach, normal)) { HorizontalAlignment = Element.ALIGN_CENTER });
+                    passTbl.AddCell(new PdfPCell(new Phrase(seatNo, normal)) { HorizontalAlignment = Element.ALIGN_CENTER });
+                    passTbl.AddCell(new PdfPCell(new Phrase(p.Berth ?? "-", normal)) { HorizontalAlignment = Element.ALIGN_CENTER });
                 }
 
-                doc.Add(passengerTable);
-                doc.Add(new Paragraph("\n\n"));
+                doc.Add(passTbl);
+                doc.Add(new Paragraph("\n"));
 
-                // 🧾 Footer
-                var footer = new Paragraph("Thank you for booking with IRCTC Clone!\nHave a safe and happy journey.", normalFont);
-                footer.Alignment = Element.ALIGN_CENTER;
-                doc.Add(footer);
+                // --- Payment Summary (Appears immediately after Passenger table) ---
+                var payTbl = new PdfPTable(2) { WidthPercentage = 50f, HorizontalAlignment = Element.ALIGN_LEFT };
+                payTbl.SetWidths(new float[] { 2f, 1f });
 
+                // Header
+                payTbl.AddCell(new PdfPCell(new Phrase("Payment Summary", sectionWhite))
+                {
+                    BackgroundColor = premiumBlue,
+                    Colspan = 2,
+                    HorizontalAlignment = Element.ALIGN_CENTER,
+                    Padding = 6f,
+                    Border = Rectangle.NO_BORDER
+                });
+
+                // Function to add rows
+                void AddPay(string label, string val)
+                {
+                    payTbl.AddCell(new PdfPCell(new Phrase(label, labelFont)) { Border = Rectangle.NO_BORDER, Padding = 5f });
+                    payTbl.AddCell(new PdfPCell(new Phrase(val, normal)) { Border = Rectangle.NO_BORDER, Padding = 5f, HorizontalAlignment = Element.ALIGN_RIGHT });
+                }
+
+                AddPay("Base Fare:", $"₹ {booking.BaseFare:F2}");
+                AddPay("GST (5%):", $"₹ {booking.GST:F2}");
+                AddPay("Quota Charge:", $"₹ {booking.QuotaCharge:F2}");
+                AddPay("Surge:", $"₹ {booking.SurgeAmount:F2}");
+
+                // Line + Total Fare
+                payTbl.AddCell(new PdfPCell(new Phrase("")) { Border = Rectangle.TOP_BORDER, BorderWidthTop = 0.7f, Colspan = 2, Padding = 6f });
+                AddPay("Total Paid:", $"₹ {booking.TotalFare:F2}");
+
+                doc.Add(payTbl);
+
+                // Push Signature near bottom of page
+                var sigTable = new PdfPTable(1);
+                sigTable.TotalWidth = 200f;
+
+                string sigPathF = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "signature_placeholder.png");
+                if (System.IO.File.Exists(sigPathF))
+                {
+                    var sImg = Image.GetInstance(sigPathF);
+                    sImg.ScaleToFit(120f, 40f);
+                    sigTable.AddCell(new PdfPCell(sImg)
+                    {
+                        Border = Rectangle.NO_BORDER,
+                        HorizontalAlignment = Element.ALIGN_CENTER
+                    });
+                }
+                else
+                {
+                    sigTable.AddCell(new PdfPCell(new Phrase("Authorized Signatory", labelFont))
+                    {
+                        Border = Rectangle.NO_BORDER,
+                        HorizontalAlignment = Element.ALIGN_CENTER
+                    });
+                }
+
+                sigTable.AddCell(new PdfPCell(new Phrase("IRCTC Clone", small)) { Border = Rectangle.NO_BORDER, HorizontalAlignment = Element.ALIGN_CENTER });
+                sigTable.AddCell(new PdfPCell(new Phrase($"PNR: {booking.PNR}", small)) { Border = Rectangle.NO_BORDER, HorizontalAlignment = Element.ALIGN_CENTER });
+
+                // FIXED POSITION (BOTTOM RIGHT)
+                sigTable.WriteSelectedRows(0, -1, doc.PageSize.Width - 220, 140, writer.DirectContent);
+
+
+                // --- Terms & Conditions box ---
+                // ---- TERMS & CONDITIONS (Fixed Position Above Footer) ----
+                var termsText = new Paragraph();
+                termsText.Add(new Chunk("Terms & Conditions\n",
+                    FontFactory.GetFont(FontFactory.HELVETICA_BOLD, 10)));
+                termsText.Add(new Chunk("• Carry valid ID.\n", small));
+                termsText.Add(new Chunk("• Boarding time subject to announcement.\n", small));
+                termsText.Add(new Chunk("• Ticket is non-transferable.\n", small));
+                termsText.Add(new Chunk("• Berth/coach may change by railway authority.\n", small));
+                termsText.Add(new Chunk("• Refund rules as per IRCTC guidelines.\n", small));
+
+                ColumnText ctTerms = new ColumnText(cb);
+
+                // LEFT, BOTTOM-Y, RIGHT, TOP-Y
+                ctTerms.SetSimpleColumn(
+                    40,                                // X-left
+                    doc.PageSize.GetBottom(60),        // bottom (80 px above bottom)
+                    doc.PageSize.Width - 40,           // right
+                    doc.PageSize.GetBottom(160)        // top of T&C block
+                );
+                ctTerms.AddElement(termsText);
+                ctTerms.Go();
+                cb.SetLineWidth(0.5f);
+                cb.SetColorStroke(BaseColor.GRAY);
+
+                // Draw line just above footer
+                cb.MoveTo(40, doc.PageSize.GetBottom(60));
+                cb.LineTo(doc.PageSize.Width - 40, doc.PageSize.GetBottom(60));
+                cb.Stroke();
+
+                // --- Footer small print centered
+                cb.BeginText();
+
+                var footerFont = FontFactory.GetFont(FontFactory.HELVETICA, 8);
+                cb.SetFontAndSize(footerFont.BaseFont, 8);
+
+                float centerX = (doc.PageSize.Left + doc.PageSize.Right) / 2;
+                float footerY = doc.PageSize.GetBottom(40);
+
+                cb.ShowTextAligned(
+                    Element.ALIGN_CENTER,
+                    $"Generated on {DateTime.UtcNow:dd-MMM-yyyy HH:mm} UTC | IRCTC Clone",
+                    centerX,
+                    footerY,
+                    0
+                );
+
+                cb.EndText();
+
+                // finalize
                 doc.Close();
-                stream.Position = 0;
+                writer.Flush();
 
-                return File(stream.ToArray(), "application/pdf", $"{booking.PNR}_{booking.TrainName}_{booking.TrainNumber}.pdf");
+                ms.Position = 0;
+                var fileName = $"{booking.PNR}_{booking.TrainName}_{booking.TrainNumber}.pdf";
+                return File(ms.ToArray(), "application/pdf", fileName);
             }
         }
+
 
 
         private Booking GetBookingDetails(int bookingId)
@@ -1035,12 +1191,14 @@ namespace IRCTCClone.Controllers
                             booking = new Booking
                             {
                                 Id = reader["Id"] != DBNull.Value ? Convert.ToInt32(reader["Id"]) : 0,
+                                UserId = reader["UserId"]?.ToString(),
                                 PNR = reader["PNR"]?.ToString(),
                                 TrainName = reader["TrainName"]?.ToString(),
                                 TrainNumber = reader["TrainNumber"] != DBNull.Value ? Convert.ToInt32(reader["TrainNumber"]) : 0,
                                 Frmst = reader["Frmst"]?.ToString(),
                                 Tost = reader["Tost"]?.ToString(),
                                 JourneyDate = reader["JourneyDate"] != DBNull.Value ? Convert.ToDateTime(reader["JourneyDate"]) : DateTime.MinValue,
+                                BookingDate = reader["BookingDate"] != DBNull.Value ? Convert.ToDateTime(reader["BookingDate"]) : DateTime.MinValue,
                                 Status = reader["Status"]?.ToString(),
                                 ClassCode = reader["ClassCode"]?.ToString(),
                                 Quota = reader["Quota"]?.ToString(),

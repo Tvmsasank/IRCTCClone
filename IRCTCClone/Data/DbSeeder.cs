@@ -1,4 +1,4 @@
-﻿using IRCTCClone.Models;
+﻿/*using IRCTCClone.Models;
 using Microsoft.Data.SqlClient;
 
 namespace IRCTCClone.Data
@@ -52,7 +52,7 @@ namespace IRCTCClone.Data
                     ToStationId = stations[3].Id,
                     Departure = new TimeSpan(16, 0, 0),
                     Arrival = new TimeSpan(6, 30, 0),
-                    Duration = new TimeSpan(14, 0, 0)
+                    Duration = 
                 };
 
                 var t2 = new Train
@@ -113,3 +113,4 @@ namespace IRCTCClone.Data
         }
     }
 }
+*/

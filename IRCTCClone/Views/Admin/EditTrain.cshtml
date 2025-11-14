@@ -54,6 +54,8 @@
 
             <select asp-for="FromStationId" asp-items="@(new SelectList((List<Station>)ViewBag.Stations, nameof(Station.Id), nameof(Station.Name)))" class="form-control"></select>
 
+            
+
         </div>
         <div class="col-md-3">
             <label>To Station</label>

@@ -233,7 +233,7 @@ namespace IrctcClone.Controllers
                                 ToStation = new Station { Name = reader.GetString(4) },
                                 Departure = reader.GetTimeSpan(5),
                                 Arrival = reader.GetTimeSpan(6),
-                                Duration = reader.GetTimeSpan(7)
+                                Duration = reader.GetString(7)
                             };
                         }
                     }
@@ -590,7 +590,7 @@ namespace IrctcClone.Controllers
                                 ToStationId = Convert.ToInt32(reader["ToStationId"]),
                                 Departure = TimeSpan.Parse(reader["Departure"].ToString()),
                                 Arrival = TimeSpan.Parse(reader["Arrival"].ToString()),
-                                Duration = TimeSpan.Parse(reader["Duration"].ToString())
+                                Duration = reader["Duration"].ToString()
                             };
                         }
                     }

@@ -54,7 +54,7 @@
 
                                 <td>@t.FromStationName1</td>
                                 <td>@t.Departure.ToString(@"hh\:mm")</td>
-                                <td>@t.Duration.ToString(@"hh\:mm")</td>
+                                <td>@t.Duration.Substring(0,5)</td>
                                 <td>@t.ToStationName1</td>
                                 <td>@t.Arrival.ToString(@"hh\:mm")</td>
 
