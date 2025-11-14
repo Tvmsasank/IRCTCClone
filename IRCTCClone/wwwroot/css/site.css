@@ -144,8 +144,11 @@ body {
     display: flex;
     justify-content: flex-end;
     align-items: center;
-    background: url('https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEg5wIVGScLbfJP-U8NokGAi4UroYmTJFgv9IpImlCoUelTlfmHuu6MlfOT8SxEVK_-EtIM27eg7cYIb6xadkrydWSUaG4amwhc-siq8EFwVo7cyO5Vj5p89tPF7bVnMcIH4n6mTipWogU5ns_RfnwWTAtWRe1OvIM2UWWx9EV4HRDtlTm2LML1vyZ-dIA/s1920/kishore-v-kgH64ekcq4I-unsplash.jpg') no-repeat center center fixed;
-    background-size: cover;
+    background-image: url("../images/vande-bharat-train.jpg");
+    /*    background: url('https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEg5wIVGScLbfJP-U8NokGAi4UroYmTJFgv9IpImlCoUelTlfmHuu6MlfOT8SxEVK_-EtIM27eg7cYIb6xadkrydWSUaG4amwhc-siq8EFwVo7cyO5Vj5p89tPF7bVnMcIH4n6mTipWogU5ns_RfnwWTAtWRe1OvIM2UWWx9EV4HRDtlTm2LML1vyZ-dIA/s1920/kishore-v-kgH64ekcq4I-unsplash.jpg') no-repeat center center fixed;
+*/ background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
     padding: 40px 20px;
 }
 
@@ -445,8 +448,11 @@ main {
     display: flex;
     justify-content: flex-end;
     align-items: center;
+    background-image: url("../images/vande-bharat-train.jpg");
     background: url('https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEg5wIVGScLbfJP-U8NokGAi4UroYmTJFgv9IpImlCoUelTlfmHuu6MlfOT8SxEVK_-EtIM27eg7cYIb6xadkrydWSUaG4amwhc-siq8EFwVo7cyO5Vj5p89tPF7bVnMcIH4n6mTipWogU5ns_RfnwWTAtWRe1OvIM2UWWx9EV4HRDtlTm2LML1vyZ-dIA/s1920/kishore-v-kgH64ekcq4I-unsplash.jpg') no-repeat center center fixed;
     background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
     padding: 40px 20px;
     overflow: hidden;
 }
