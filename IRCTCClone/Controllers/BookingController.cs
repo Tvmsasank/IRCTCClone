@@ -31,6 +31,9 @@ namespace IRCTCClone.Controllers
 /*        private readonly string _baseUrl;*/
         private readonly EmailService _emailService;
 
+        private readonly IAvailabilityService _availabilityService;
+
+
         private int GetBookedSeatsCount(int trainId, int classId)
         {
             int count = 0;
@@ -49,6 +52,7 @@ namespace IRCTCClone.Controllers
             }
             return count;
         }
+
 
         private decimal CalculateFare(TrainClass cls, int totalSeats, int bookedSeats, string quota,
             out decimal gst, out decimal surge, out decimal quotaCharge)
@@ -169,6 +173,7 @@ namespace IRCTCClone.Controllers
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@TrainId", trainId);
                     cmd.Parameters.AddWithValue("@ClassId", classId);
+                    cmd.Parameters.AddWithValue("@JourneyDate", journeyDate);
 
                     using (var reader = cmd.ExecuteReader())
                     {
@@ -183,6 +188,7 @@ namespace IRCTCClone.Controllers
                                 Departure = reader.GetTimeSpan(reader.GetOrdinal("Departure")),
                                 Arrival = reader.GetTimeSpan(reader.GetOrdinal("Arrival")),
                                 Duration = reader.GetString(reader.GetOrdinal("Duration")),
+                                JourneyDate = reader.GetDateTime(reader.GetOrdinal("JourneyDate")).Date,
 
                                 // override later
                                 FromStationId = reader.GetInt32(reader.GetOrdinal("FromStationId")),
@@ -1358,6 +1364,12 @@ namespace IRCTCClone.Controllers
             return View("PNRDetails", booking);
         }
 
+        [HttpGet]
+        public async Task<IActionResult> GetNext7Days(int trainId, string travelClass)
+        {
+            var data = await _availabilityService.GetNext7DaysAsync(trainId, travelClass);
+            return Json(data);
+        }
 
         private string GeneratePnr()
         {

@@ -1,7 +1,9 @@
 ﻿using IRCTCClone.Models;
+using IRCTCClone.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -12,10 +14,14 @@ namespace IRCTCClone.Controllers
     public class TrainController : Controller
     {
         private readonly string _connectionString;
+        private readonly IAvailabilityService _availabilityService;
+        private readonly IConfiguration _configuration;
 
-        public TrainController(IConfiguration configuration)
+        public TrainController(IConfiguration configuration, IAvailabilityService availabilityService)
         {
+            _configuration = configuration;
             _connectionString = configuration.GetConnectionString("DefaultConnection");
+            _availabilityService = availabilityService;
         }
 
 
@@ -93,6 +99,43 @@ namespace IRCTCClone.Controllers
 
             return View(train);
         }
+
+        public IActionResult Get7DayAvailability(int trainId, int trainClassId)
+        {
+            List<SevenDayAvailability> result = new List<SevenDayAvailability>();
+
+            using (SqlConnection con = new SqlConnection(_configuration.GetConnectionString("DefaultConnection")))
+            {
+                using (SqlCommand cmd = new SqlCommand("SP_Get7DayAvailability", con))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+
+                    cmd.Parameters.AddWithValue("@TrainId", trainId);
+                    cmd.Parameters.AddWithValue("@TrainClassId", trainClassId);
+                    cmd.Parameters.AddWithValue("@StartDate", DateTime.Now.Date);
+
+                    con.Open();
+
+                    using (SqlDataReader dr = cmd.ExecuteReader())
+                    {
+                        while (dr.Read())
+                        {
+                            result.Add(new SevenDayAvailability
+                            {
+                                TravelDate = Convert.ToDateTime(dr["TravelDate"]),
+                                TotalSeats = Convert.ToInt32(dr["TotalSeats"]),
+                                BookedSeats = Convert.ToInt32(dr["BookedSeats"]),
+                                AvailableSeats = Convert.ToInt32(dr["AvailableSeats"]),
+                                FarePerDay = Convert.ToDecimal(dr["FarePerDay"])
+                            });
+                        }
+                    }
+                }
+            }
+
+            return Json(result);
+        }
+
 
         /*[HttpGet]
         public IActionResult GetTrainRoute(int trainId)

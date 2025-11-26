@@ -2,6 +2,8 @@
 
 @{
     ViewData["Title"] = "Search Trains";
+    var minDate = DateTime.Today.ToString("yyyy-MM-dd");
+    var maxDate = DateTime.Today.AddMonths(2).ToString("yyyy-MM-dd");
 }
 
 <div class="home-page">
@@ -29,7 +31,12 @@
             </div>
 
 
-            <input type="date" name="journeyDate" value="@DateTime.Today.ToString("yyyy-MM-dd")" required />
+            <input type="date"
+                   name="journeyDate"
+                   value="@minDate"
+                   min="@minDate"
+                   max="@maxDate"
+                   required />            
             <button type="submit" class="btn btn-primary">Search Trains</button>
             <div class="text-center">
                 <a asp-controller="Booking" asp-action="CheckPNR">

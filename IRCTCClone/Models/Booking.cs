@@ -44,6 +44,17 @@ namespace IRCTCClone.Models
         public decimal TotalFare { get; set; }        // Final fare (Base + extras + GST)
         public decimal FinalFare { get; set; }
         public decimal QuotaCharge { get; set; }  // for Ladies/Senior etc
-        public List<TrainClass> bf { get; set; } 
+        public List<TrainClass> bf { get; set; }
+        public DateTime TravelDate { get; set; }
+        public string Class { get; set; }
+        public int TotalSeats { get; set; }
+        public int BookedSeats { get; set; }
+        public decimal WeekendExtra { get; set; }
+        public int DynamicPercent { get; set; }
+        public DateTime Date { get; set; }
+        public int AvailableSeats { get; set; }
+        public decimal Fare { get; set; }
+        public bool IsWeekend { get; set; }
+        public bool IsTatkalWindow { get; set; }
     }
 }

@@ -20,6 +20,7 @@
         <p><strong>Train:</strong> @train.Number - @train.Name</p>
         <p><strong>Class:</strong> @cls.Code, Fare: ₹@cls.BaseFare</p>
         <p><strong>Route:</strong> @train.FromStation?.Name (@train.FromStation?.Code) → @train.ToStation?.Name (@train.ToStation?.Code)</p>
+        <p><strong>Boarding Date:</strong> @train.JourneyDate</p>
         <p>
             <strong>Departure:</strong> @train.Departure.ToString(@"hh\:mm") |
             <strong>Arrival:</strong> @train.Arrival.ToString(@"hh\:mm") |
@@ -36,7 +37,7 @@
                 <input type="hidden" name="FromStationId" value="@ViewBag.FromStationId" />
                 <input type="hidden" name="ToStationId" value="@ViewBag.ToStationId" />
                 <div class="form-group mb-3">
-                    <label for="Quota">Select Quota:</label>
+                    <label for="Quota"><strong>Select Quota:</strong></label>
                     <select name="Quota" class="form-control" required>
                         <option value="GENERAL">General</option>
                         <option value="TATKAL">Tatkal</option>

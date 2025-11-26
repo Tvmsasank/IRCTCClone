@@ -9,12 +9,13 @@
 	<ItemGroup>
 		<!-- SQL Server ADO.NET provider -->
 		<PackageReference Include="iTextSharp" Version="5.5.13.3" />
-		<PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.1" />
+		<PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.3" />
 
 		<!-- Optional: Identity for authentication if needed -->
 		<PackageReference Include="Microsoft.AspNetCore.Identity.UI" Version="8.0.0" />
 		<PackageReference Include="Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation" Version="8.0.0" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+		<PackageReference Include="System.Data.SqlClient" Version="4.9.0" />
 	</ItemGroup>
 
 </Project>
