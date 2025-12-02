@@ -40,14 +40,18 @@
                     <th>Coach</th>
                     <th>Seat No</th>
                     <th>Berth</th>
+                    <th>Current Status</th>
+               
                 </tr>
             </thead>
             <tbody class="text-center">
                 @foreach (var p in Model.Passengers)
                 {
-                    string coach = new string(p.SeatNumber.TakeWhile(c => !char.IsDigit(c)).ToArray());
+                    //string coach = new string(p.SeatNumber.TakeWhile(c => !char.IsDigit(c)).ToArray());
                     string seat = new string(p.SeatNumber.SkipWhile(c => !char.IsDigit(c)).ToArray());
-
+                        string coach = (p.BookingStatus == "CNF" && !string.IsNullOrEmpty(p.SeatPrefix))
+                        ? p.SeatPrefix
+                        : "--";
                     <tr>
                         <td>@p.Name</td>
                         <td>@p.Age</td>
@@ -55,6 +59,7 @@
                         <td>@coach</td>
                         <td>@seat</td>
                         <td>@p.Berth</td>
+                        <td>@p.BookingStatus</td>
                     </tr>
                 }
             </tbody>

@@ -16,10 +16,12 @@ namespace IRCTCClone.Models
         public int TrainClassId { get; set; }
         public TrainClass? TrainClass { get; set; }
 
+        public string SeatPrefix { get; set; }
+
         public DateTime JourneyDate { get; set; }
         public DateTime BookingDate { get; set; }
 
-        public string Status { get; set; } = "CONFIRMED"; // CONFIRMED / CANCELLED
+        public string Status { get; set; }
 
         public List<Passenger> Passengers { get; set; } = new();
 
@@ -56,5 +58,10 @@ namespace IRCTCClone.Models
         public decimal Fare { get; set; }
         public bool IsWeekend { get; set; }
         public bool IsTatkalWindow { get; set; }
+        public int SeatsAvailable { get; set; }
+        public int RACSeats { get; set; }
+        public int ConfirmedCount { get; set; }
+        public int RACCount { get; set; }
+        public int WLCount { get; set; } = 0; // Add WLCount if needed
     }
 }

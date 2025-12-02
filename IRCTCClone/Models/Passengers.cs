@@ -9,7 +9,12 @@
         public int Age { get; set; }
         public string Gender { get; set; } = null!;
         public string Coach { get; set; } = null!;
-        public string? SeatNumber { get; set; } // assigned after booking
-        public string? Berth { get; set; }
+        public string? SeatNumber { get; set; } // assigned after CNF
+        public string? Berth { get; set; } // assigned after CNF
+        public string? BookingStatus { get; set; }
+        public int? Position { get; set; }
+
+        public string? SeatPrefix { get; set; }
+
     }
 }

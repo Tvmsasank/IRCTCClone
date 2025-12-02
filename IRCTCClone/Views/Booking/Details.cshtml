@@ -27,6 +27,7 @@
 <table class="passengers-table">
     <thead>
         <tr>
+            <th>ID</th>
             <th>Name</th>
             <th>Age</th>
             <th>Gender</th>
@@ -35,17 +36,24 @@
             <th>Berth</th>
             <th>From</th>
             <th>To</th>
+            <th>Current Status</th>
+            <th>Action</th>
         </tr>
     </thead>
     <tbody>
+
         @foreach (var p in Model.Passengers)
         {
-           
-    // Extract the alphabetic part (coach) and numeric part (seat)
-                string coach = new string(p.SeatNumber.TakeWhile(c => !char.IsDigit(c)).ToArray());
-                string seat = new string(p.SeatNumber.SkipWhile(c => !char.IsDigit(c)).ToArray());
+            string coach = (p.BookingStatus == "CNF" && !string.IsNullOrEmpty(p.SeatPrefix))
+            ? p.SeatPrefix
+            : "--";
 
-            <tr>
+            string seat = (p.BookingStatus == "CNF" && !string.IsNullOrEmpty(p.SeatNumber))
+            ? new string(p.SeatNumber.SkipWhile(c => !char.IsDigit(c)).ToArray())
+            : "--";
+
+            <tr >
+                <td>@p.Id</td>
                 <td>@p.Name</td>
                 <td>@p.Age</td>
                 <td>@p.Gender</td>
@@ -54,7 +62,65 @@
                 <td>@p.Berth</td>
                 <td>@Model.Frmst</td>
                 <td>@Model.Tost</td>
+                <td>
+                    @p.BookingStatus
+                    @if (p.Position.HasValue)
+                    {
+                        <text>(@p.Position)</text>
+                    }
+                </td>
+                <td>
+                    <button class="deleteBtn btn btn-outline-danger" data-id="@p.Id">Delete</button>
+
+                </td>
+               
+
+@*                 <td><button onclick="deletepassenger(@p.Id)"></button>Delete </td> *@
             </tr>
         }
+
+
     </tbody>
 </table>
+
+
+
+
+
+
+@section Scripts {
+
+    <script>
+       $(document).on("click", ".deleteBtn", function () {
+        let id = $(this).data("id");
+
+        if (!confirm("Are you sure you want to delete this passenger?"))
+            return;
+
+               $.ajax({
+            url: '/Booking/DeletePassenger',
+            type: 'POST',
+            data: { id: id },
+            success: function (res) {
+                if (res.success) {
+                    // Remove row visually
+                    $("#passenger-row-" + id).fadeOut(300, function () { $(this).remove(); });
+
+                    // Reload page after 1 second
+                    setTimeout(() => {
+                        location.reload();
+                    }, 800);
+                }
+                else {
+                    alert(res.message);
+                }
+            },
+            error: function () {
+                alert("Something went wrong!");
+            }
+        });
+
+        
+    });
+    </script>
+}

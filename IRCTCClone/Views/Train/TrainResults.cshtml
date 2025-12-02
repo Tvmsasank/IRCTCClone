@@ -72,7 +72,24 @@
                                                     <input type="hidden" name="ToStationId" value="@t.ToStationId" />
 
                                                     <button type="submit" class="class-btn">
-                                                        @c.Code - ₹@c.BaseFare (@c.SeatsAvailable)
+                                                        @{
+                                                            string seatStatus;
+
+                                                            if (c.SeatsAvailable > 0)
+                                                            {
+                                                                seatStatus = "AVAILABLE - " + c.SeatsAvailable;
+                                                            }
+                                                            else if (c.SeatsAvailable == 0)
+                                                            {
+                                                                seatStatus = "RAC";
+                                                            }
+                                                            else
+                                                            {
+                                                                seatStatus = "WL " + Math.Abs(c.SeatsAvailable);
+                                                            }
+                                                        }
+
+                                                        @c.Code - ₹@c.BaseFare (@seatStatus)
                                                     </button>
                                                 </form>
                                             }

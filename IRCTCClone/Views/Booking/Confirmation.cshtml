@@ -69,13 +69,27 @@
 
     <h3 class="passenger-heading">👥 Passengers</h3>
     <ul class="passenger-list">
-        @foreach (var p in Model.Passengers)
+        @foreach (var item in Model.Passengers)
         {
-            string coach = new string(p.SeatNumber.TakeWhile(c => !char.IsDigit(c)).ToArray());
-            string seat = new string(p.SeatNumber.SkipWhile(c => !char.IsDigit(c)).ToArray());
+            // Coach is SeatPrefix ONLY if CNF
+            string coach = (item.BookingStatus == "CNF" && !string.IsNullOrEmpty(item.SeatPrefix))
+            ? item.SeatPrefix
+            : "--";
 
-            <li>@p.Name, @p.Age, @p.Gender — Coach: @coach, Seat: @seat</li>
+            string seat = !string.IsNullOrEmpty(item.SeatNumber)
+            ? item.SeatNumber
+            : "--";
+
+            <li>
+                @item.Name, @item.Age, @item.Gender —
+                Coach: @coach,
+                Seat: @seat
+                • Status: @(string.IsNullOrEmpty(item.BookingStatus) ? "--" : item.BookingStatus)
+                • Position: @(item.Position.HasValue? item.Position.ToString() : "--")
+                • Full Seat No: @(coach != "--" && seat != "--" ? coach + seat : "--")
+            </li>
         }
+
     </ul>
 </div>
 

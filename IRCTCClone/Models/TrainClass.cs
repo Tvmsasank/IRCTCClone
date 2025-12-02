@@ -26,6 +26,9 @@ namespace IRCTCClone.Models
         public decimal GST { get; set; } = 0;             // 5% GST calculated dynamically
         public decimal SurgeAmount { get; set; } = 0;     // Surge addition if demand high
         public decimal FinalFare { get; set; } = 0;       // Total fare per passenger
+                                                          // ✅ Add these
+        public int RACSeats { get; set; }      // Number of RAC seats allowed
+        public int WLSeats { get; set; }       // Number of waiting list seats allowed
 
 
 

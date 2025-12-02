@@ -1,4 +1,4 @@
-﻿@model IRCTCClone.Models.Train
+﻿@model IRCTCClone.Models.Booking
 
 @{
     ViewData["Title"] = "Booking Details";
@@ -20,7 +20,8 @@
         <p><strong>Train:</strong> @train.Number - @train.Name</p>
         <p><strong>Class:</strong> @cls.Code, Fare: ₹@cls.BaseFare</p>
         <p><strong>Route:</strong> @train.FromStation?.Name (@train.FromStation?.Code) → @train.ToStation?.Name (@train.ToStation?.Code)</p>
-        <p><strong>Boarding Date:</strong> @train.JourneyDate</p>
+                <p><strong>Boarding Date:</strong> @train.JourneyDate?.ToString("dd-MM-yyyy")</p>
+
         <p>
             <strong>Departure:</strong> @train.Departure.ToString(@"hh\:mm") |
             <strong>Arrival:</strong> @train.Arrival.ToString(@"hh\:mm") |

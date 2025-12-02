@@ -28,10 +28,55 @@ namespace IRCTCClone.Controllers
     public class BookingController : Controller
     {
         private readonly string _connectionString;
-/*        private readonly string _baseUrl;*/
         private readonly EmailService _emailService;
-
+        private const int RAC_LIMIT = 8; //recently added
         private readonly IAvailabilityService _availabilityService;
+
+        private string GetBerthBySeatNumber(string seatNumber)
+        {
+            int seat = int.Parse(seatNumber);
+            int mod = seat % 8;
+            return mod switch
+            {
+                1 or 4 => "LB",
+                2 or 5 => "MB",
+                3 or 6 => "UB",
+                7 => "SL",
+                8 => "SU",
+                _ => "--"
+            };
+        }
+
+
+        private Booking GetSeatStatus(int trainId, int classId)
+        {
+            Booking result = new Booking();
+
+            using (var conn = new SqlConnection(_connectionString))
+            {
+                using (var cmd = new SqlCommand("spGetSeatStatusCounts", conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@TrainId", trainId);
+                    cmd.Parameters.AddWithValue("@ClassId", classId);
+
+                    conn.Open();
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            result.SeatsAvailable = Convert.ToInt32(reader["SeatsAvailable"]);
+                            result.RACSeats = Convert.ToInt32(reader["RACSeats"]);
+                            result.ConfirmedCount = Convert.ToInt32(reader["ConfirmedCount"]);
+                            result.RACCount = Convert.ToInt32(reader["RACCount"]);
+                            result.WLCount = Convert.ToInt32(reader["WLCount"]); // read from SQL
+                        }
+                    }
+                }
+            }
+
+            return result;
+        }
 
 
         private int GetBookedSeatsCount(int trainId, int classId)
@@ -148,20 +193,273 @@ namespace IRCTCClone.Controllers
             return null;
         }
 
+        //---------------------------------------recently added down---------------------------------------//
+
+        private void AllocateAndInsertPassengers(SqlConnection conn,
+    int bookingId,
+    int trainId,
+    int classId,
+    DateTime journeyDate,
+    List<string> names,
+    List<int> ages,
+    List<string> genders,
+    List<string> berths, // requested berth preference (optional)
+    int seatsAvailable) // total seats in class)
+        {
+            // 1) Get existing counts
+            int cnfCount = 0, racCount = 0, wlCount = 0;
+            using (var cmd = new SqlCommand("spGetPassengerCounts", conn))
+            {
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@TrainId", trainId);
+                cmd.Parameters.AddWithValue("@TrainClassId", classId);
+                cmd.Parameters.AddWithValue("@JourneyDate", journeyDate.Date);
+                using (var r = cmd.ExecuteReader())
+                {
+                    if (r.Read())
+                    {
+                        cnfCount = r["CNFCount"] != DBNull.Value ? Convert.ToInt32(r["CNFCount"]) : 0;
+                        racCount = r["RACCount"] != DBNull.Value ? Convert.ToInt32(r["RACCount"]) : 0;
+                        wlCount = r["WLCount"] != DBNull.Value ? Convert.ToInt32(r["WLCount"]) : 0;
+                    }
+                }
+            }
+
+            // 2) Get used seat numbers to pick next free numbers for CNF
+            var usedSeatNums = new HashSet<int>();
+            using (var cmd = new SqlCommand("spGetUsedSeatNumbers", conn))
+            {
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@TrainId", trainId);
+                cmd.Parameters.AddWithValue("@TrainClassId", classId);
+                cmd.Parameters.AddWithValue("@JourneyDate", journeyDate.Date);
+                using (var r = cmd.ExecuteReader())
+                {
+                    while (r.Read())
+                    {
+                        var sn = r["SeatNumber"]?.ToString();
+                        if (!string.IsNullOrEmpty(sn))
+                        {
+                            // extract numeric part
+                            var digits = new string(sn.SkipWhile(ch => !char.IsDigit(ch)).ToArray());
+                            if (int.TryParse(digits, out var val)) usedSeatNums.Add(val);
+                        }
+                    }
+                }
+            }
+
+            // helper to get next free seat number (numeric)
+            int nextFreeSeat()
+            {
+                for (int i = 1; i <= seatsAvailable * 2; i++) // iterate up to a safe limit
+                {
+                    if (!usedSeatNums.Contains(i))
+                    {
+                        usedSeatNums.Add(i);
+                        return i;
+                    }
+                }
+                return -1; // fallback
+            }
+
+            // Insert passenger loop
+            for (int i = 0; i < names.Count; i++)
+            {
+                string pName = names[i];
+                int pAge = ages[i];
+                string pGender = genders[i];
+                string pBerth = (berths != null && berths.Count > i) ? berths[i] : null;
+
+                string bookingStatus = null;
+                int? position = null;
+                string seatNumber = null;
+                string berthAssigned = null;
+
+                // If seats still available -> CNF
+                if (cnfCount < seatsAvailable)
+                {
+                    // assign CNF seat
+                    bookingStatus = "CNF";
+                    cnfCount++;
+
+                    int num = nextFreeSeat(); // numeric seat
+                    if (num > 0)
+                    {
+                        // create seat string using class seat prefix logic (existing seatPrefix)
+                        // you may have seatPrefix in TrainClass object; for demo assume 'S' or from DB
+                        string prefix = ""; // fetch or pass seatPrefix
+                                            // if you have cls.SeatPrefix available pass it to this method
+                        seatNumber = $"{prefix}{num}";
+                        berthAssigned = pBerth ?? ""; // you can compute LB/UB logic here if you want
+                    }
+                }
+                else if (racCount < RAC_LIMIT)
+                {
+                    // assign RAC
+                    racCount++;
+                    bookingStatus = "RAC";
+                    position = racCount; // RAC1, RAC2...
+                    seatNumber = null;
+                    berthAssigned = null;
+                }
+                else
+                {
+                    // WL
+                    wlCount++;
+                    bookingStatus = "WL";
+                    position = wlCount; // WL1, WL2...
+                    seatNumber = null;
+                    berthAssigned = null;
+                }
+
+                // Insert passenger (update your InsertPassenger proc to include @BookingStatus,@Position,@SeatNumber,@Berth)
+                using (var cmd = new SqlCommand("InsertPassenger", conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@BookingId", bookingId);
+                    cmd.Parameters.AddWithValue("@Name", pName);
+                    cmd.Parameters.AddWithValue("@Age", pAge);
+                    cmd.Parameters.AddWithValue("@Gender", pGender);
+                    cmd.Parameters.AddWithValue("@SeatNumber", (object)seatNumber ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@Berth", (object)berthAssigned ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@BookingStatus", bookingStatus);
+                    cmd.Parameters.AddWithValue("@Position", (object)position ?? DBNull.Value);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        private void PromoteQueuesOnSeatFreed(
+            SqlConnection conn, 
+            int trainId, 
+            int classId, 
+            DateTime journeyDate, 
+            string freedSeatPrefix, 
+            int freedSeatNumeric, 
+            int seatsFreed)
+        {
+            // seatsFreed: number of seats released (usually 1)
+            for (int s = 0; s < seatsFreed; s++)
+            {
+                // 1) get next RAC passenger (smallest position)
+                int racPassengerId = 0;
+                int racPosition = 0;
+                using (var cmd = new SqlCommand(@"
+            SELECT TOP 1 p.Id, p.Position
+            FROM Passengers p
+            INNER JOIN Bookings b ON p.BookingId = b.Id
+            WHERE b.TrainId = @TrainId AND b.TrainClassId = @ClassId AND CAST(b.JourneyDate AS DATE) = @JourneyDate
+              AND p.BookingStatus = 'RAC'
+            ORDER BY p.Position ASC", conn))
+                {
+                    cmd.Parameters.AddWithValue("@TrainId", trainId);
+                    cmd.Parameters.AddWithValue("@ClassId", classId);
+                    cmd.Parameters.AddWithValue("@JourneyDate", journeyDate.Date);
+                    using (var r = cmd.ExecuteReader())
+                    {
+                        if (r.Read())
+                        {
+                            racPassengerId = r.GetInt32(0);
+                            racPosition = r.GetInt32(1);
+                        }
+                    }
+                }
+
+                if (racPassengerId == 0)
+                {
+                    // no RAC passengers — nothing to promote
+                    break;
+                }
+
+                // 2) assign freed seat to that RAC passenger
+                string seatNumber = $"{freedSeatPrefix}{freedSeatNumeric}"; // or compute nextFreeSeat()
+                string berth = "LB"; // compute berth if you want
+
+                using (var cmd = new SqlCommand(@"
+            UPDATE Passengers
+            SET BookingStatus = 'CNF', SeatNumber = @SeatNumber, Berth = @Berth, Position = NULL
+            WHERE Id = @Id", conn))
+                {
+                    cmd.Parameters.AddWithValue("@SeatNumber", seatNumber);
+                    cmd.Parameters.AddWithValue("@Berth", berth);
+                    cmd.Parameters.AddWithValue("@Id", racPassengerId);
+                    cmd.ExecuteNonQuery();
+                }
+
+                // 3) Move the earliest WL to RAC (if any)
+                int wlPassengerId = 0;
+                int nextRACPos = 0;
+                // get current highest rac pos
+                using (var cmd = new SqlCommand(@"
+            SELECT ISNULL(MAX(Position),0) FROM Passengers p
+            INNER JOIN Bookings b ON p.BookingId = b.Id
+            WHERE b.TrainId = @TrainId AND b.TrainClassId = @ClassId AND CAST(b.JourneyDate AS DATE) = @JourneyDate
+              AND p.BookingStatus='RAC'", conn))
+                {
+                    cmd.Parameters.AddWithValue("@TrainId", trainId);
+                    cmd.Parameters.AddWithValue("@ClassId", classId);
+                    cmd.Parameters.AddWithValue("@JourneyDate", journeyDate.Date);
+                    nextRACPos = Convert.ToInt32(cmd.ExecuteScalar()) + 1;
+                }
+
+                using (var cmd = new SqlCommand(@"
+            SELECT TOP 1 p.Id
+            FROM Passengers p
+            INNER JOIN Bookings b ON p.BookingId = b.Id
+            WHERE b.TrainId = @TrainId AND b.TrainClassId = @ClassId AND CAST(b.JourneyDate AS DATE) = @JourneyDate
+              AND p.BookingStatus='WL'
+            ORDER BY p.Position ASC", conn))
+                {
+                    cmd.Parameters.AddWithValue("@TrainId", trainId);
+                    cmd.Parameters.AddWithValue("@ClassId", classId);
+                    cmd.Parameters.AddWithValue("@JourneyDate", journeyDate.Date);
+                    using (var r = cmd.ExecuteReader())
+                    {
+                        if (r.Read()) wlPassengerId = r.GetInt32(0);
+                    }
+                }
+
+                if (wlPassengerId != 0)
+                {
+                    using (var cmd = new SqlCommand("UPDATE Passengers SET BookingStatus='RAC', Position=@NewPos WHERE Id=@Id", conn))
+                    {
+                        cmd.Parameters.AddWithValue("@NewPos", nextRACPos);
+                        cmd.Parameters.AddWithValue("@Id", wlPassengerId);
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+
+                // increment freed seat numeric (if multiple seats freed) or recompute next free seat
+                freedSeatNumeric++;
+            }
+        }
+
 
 
         public BookingController(IConfiguration configuration, EmailService emailService)
         {
             _connectionString = configuration.GetConnectionString("DefaultConnection");
             _emailService = emailService;
-/*            _baseUrl = configuration["AppSettings:BaseUrl"];*/
+            /*            _baseUrl = configuration["AppSettings:BaseUrl"];*/
         }
+
+        //--------------------------------------recently added up and original down------------------------------//
 
         // GET: /Booking/Checkout
         [Authorize]
         [HttpGet]
-        public IActionResult Checkout(int trainId, int classId, string journeyDate, int FromStationId, int ToStationId)
+        public IActionResult Checkout(int trainId, int classId, string journeyDate, int FromStationId, int ToStationId, int numPassengers)
         {
+            // 1️⃣ Create a booking object with empty passengers
+            Booking booking = new Booking();
+            booking.Passengers = new List<Passenger>();
+
+            // Populate empty Passenger objects based on number of passengers
+            for (int i = 0; i < numPassengers; i++)
+            {
+                booking.Passengers.Add(new Passenger());
+            }
+
             Train train = null;
             TrainClass cls = null;
 
@@ -190,7 +488,6 @@ namespace IRCTCClone.Controllers
                                 Duration = reader.GetString(reader.GetOrdinal("Duration")),
                                 JourneyDate = reader.GetDateTime(reader.GetOrdinal("JourneyDate")).Date,
 
-                                // override later
                                 FromStationId = reader.GetInt32(reader.GetOrdinal("FromStationId")),
                                 ToStationId = reader.GetInt32(reader.GetOrdinal("ToStationId")),
 
@@ -218,7 +515,8 @@ namespace IRCTCClone.Controllers
                                 TrainId = reader.GetInt32(reader.GetOrdinal("TrainId")),
                                 Code = reader.GetString(reader.GetOrdinal("Code")),
                                 BaseFare = reader.GetDecimal(reader.GetOrdinal("BaseFare")),
-                                SeatsAvailable = reader.GetInt32(reader.GetOrdinal("SeatsAvailable"))
+                                SeatsAvailable = reader.GetInt32(reader.GetOrdinal("SeatsAvailable")),
+                                RACSeats = reader.GetInt32(reader.GetOrdinal("RACSeats"))
                             };
                         }
                     }
@@ -228,60 +526,372 @@ namespace IRCTCClone.Controllers
             if (train == null || cls == null)
                 return NotFound();
 
-            // 🔥 Override route based on user search
+            // Override route based on user search
             train.FromStationId = FromStationId;
             train.ToStationId = ToStationId;
-
             train.FromStation = GetStationById(FromStationId);
             train.ToStation = GetStationById(ToStationId);
 
-            // Pass to view
+            // ----------------------------
+            // ✅ CNF / RAC / WL logic
+            // ----------------------------
+            // After you populate booking.Passengers
+
+            booking.TrainId = trainId;
+            booking.TrainClassId = classId;
+
+            var seatStatus = GetSeatStatus(booking.TrainId, booking.TrainClassId);
+            int remainingSeats = seatStatus.SeatsAvailable - seatStatus.ConfirmedCount;
+            int racCount = seatStatus.RACCount;
+            int wlCount = seatStatus.WLCount;
+
+            foreach (var passenger in booking.Passengers)
+            {
+                string status;
+                int position = 0;
+
+                if (remainingSeats > 0)
+                {
+                    status = "CNF";
+                    passenger.Position = null;
+                    remainingSeats--;
+                }
+                else if (racCount < seatStatus.RACSeats)
+                {
+                    racCount++;
+                    status = "RAC";
+                    position = racCount;
+                    passenger.Position = position;
+                }
+                else
+                {
+                    wlCount++;
+                    status = "WL";
+                    position = wlCount;
+                    passenger.Position = position;
+                }
+
+                passenger.BookingStatus = status;
+            }
+
+
+            // Pass to ViewBag for display
             ViewBag.Train = train;
             ViewBag.Class = cls;
             ViewBag.JourneyDate = journeyDate;
             ViewBag.FromStationId = FromStationId;
             ViewBag.ToStationId = ToStationId;
+            ViewBag.Booking = booking; // Pass the booking with passengers to view
 
-            return View("Checkout");
+            return View("Checkout", booking);
         }
 
 
 
-        /*        [HttpPost]
-                public IActionResult PayViaQR(int trainId, int classId, DateTime journeyDate, decimal fare)
-                {
-                    // Create view model for QR page
-                    var model = new Booking
-                    {
-                        TrainId = trainId,
-                        ClassId = classId,
-                        JourneyDate = journeyDate,
-                        TotalFare = fare
-                    };
-
-                    return View(model);
-                }
-
+        /*        [EnableRateLimiting("BookingLimiter")]
+                // POST: /Booking/Confirm
                 [HttpPost]
-                public IActionResult ConfirmPayment(Booking model)
+                public IActionResult Confirm(
+                    int trainId, int classId, string journeyDate,
+                    List<string> passengerNames, List<int> passengerAges, List<string> passengerGenders, List<string> passengerBerths,
+                    string trainName, string trainNumber, string Class,
+                    int FromStationId, int ToStationId)
                 {
-                    // ✅ Validate data (optional)
-                    if (model == null || model.TotalFare <= 0)
-                        return BadRequest("Invalid payment details");
+                    if (passengerNames == null || passengerNames.Count == 0)
+                    {
+                        TempData["Error"] = "Please add at least one passenger.";
+                        return RedirectToAction("Checkout", new { trainId, classId, journeyDate });
+                    }
 
-                    // ✅ Pass to confirmation page
-                    return View("Confirmation", model);
+                    if (passengerAges == null || passengerGenders == null ||
+                        passengerAges.Count != passengerNames.Count || passengerGenders.Count != passengerNames.Count)
+                    {
+                        TempData["Error"] = "Passenger details are incomplete.";
+                        return RedirectToAction("Checkout", new { trainId, classId, journeyDate });
+                    }
+
+                    Station fromStation = null;
+                    Station toStation = null;
+
+                    using (var conn = new SqlConnection(_connectionString))
+                    {
+                        conn.Open();
+
+                        // Get FROM Station
+                        using (var cmd = new SqlCommand("GetStationById", conn))
+                        {
+                            cmd.CommandType = CommandType.StoredProcedure;
+                            cmd.Parameters.AddWithValue("@StationId", FromStationId);
+                            using (var reader = cmd.ExecuteReader())
+                            {
+                                if (reader.Read())
+                                {
+                                    fromStation = new Station
+                                    {
+                                        Id = reader["Id"] != DBNull.Value ? Convert.ToInt32(reader["Id"]) : 0,
+                                        Code = reader["Code"]?.ToString(),
+                                        Name = reader["Name"]?.ToString()
+                                    };
+                                }
+                            }
+                        }
+
+                        // Get TO Station
+                        using (var cmd = new SqlCommand("GetStationById", conn))
+                        {
+                            cmd.CommandType = CommandType.StoredProcedure;
+                            cmd.Parameters.AddWithValue("@StationId", ToStationId);
+                            using (var reader = cmd.ExecuteReader())
+                            {
+                                if (reader.Read())
+                                {
+                                    toStation = new Station
+                                    {
+                                        Id = reader["Id"] != DBNull.Value ? Convert.ToInt32(reader["Id"]) : 0,
+                                        Code = reader["Code"]?.ToString(),
+                                        Name = reader["Name"]?.ToString()
+                                    };
+                                }
+                            }
+                        }
+
+                        if (fromStation == null || toStation == null || string.IsNullOrEmpty(fromStation.Name) || string.IsNullOrEmpty(toStation.Name))
+                        {
+                            TempData["Error"] = "Invalid station selection.";
+                            return RedirectToAction("Checkout", new { trainId, classId, journeyDate });
+                        }
+
+                        ViewBag.FromStation = fromStation;
+                        ViewBag.ToStation = toStation;
+                        ViewBag.JourneyDate = journeyDate;
+
+                        string userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                        if (string.IsNullOrEmpty(userId))
+                        {
+                            TempData["Error"] = "Please log in to continue.";
+                            return RedirectToAction("Login", "Account");
+                        }
+
+                        // Get TrainClass info
+                        TrainClass cls = null;
+                        int seatsAvailable = 0;
+                        int totalSeats = 0;
+                        using (var cmd = new SqlCommand("GetTrainClassById", conn))
+                        {
+                            cmd.CommandType = CommandType.StoredProcedure;
+                            cmd.Parameters.AddWithValue("@ClassId", classId);
+
+                            using (var reader = cmd.ExecuteReader())
+                            {
+                                if (reader.Read())
+                                {
+                                    cls = new TrainClass
+                                    {
+                                        Id = Convert.ToInt32(reader["Id"]),
+                                        Code = reader["Code"].ToString(),
+                                        BaseFare = Convert.ToDecimal(reader["BaseFare"]),
+                                        SeatsAvailable = Convert.ToInt32(reader["SeatsAvailable"]),
+                                        SeatPrefix = reader["SeatPrefix"]?.ToString()
+                                    };
+
+                                    seatsAvailable = cls.SeatsAvailable;
+                                    totalSeats = cls.SeatsAvailable;
+                                }
+                            }
+                        }
+
+                        if (cls == null || string.IsNullOrEmpty(cls.Code))
+                        {
+                            TempData["Error"] = "Train class not found.";
+                            return RedirectToAction("Checkout", new { trainId, classId, journeyDate });
+                        }
+
+                        int passengerCount = passengerNames.Count;
+                        if (seatsAvailable < passengerCount)
+                        {
+                            TempData["Error"] = "Not enough seats available.";
+                            return RedirectToAction("Checkout", new { trainId, classId, journeyDate });
+                        }
+
+                        int bookedSeats = GetBookedSeatsCount(trainId, classId);
+                        string quota = Request.Form["Quota"].FirstOrDefault();
+                        quota = string.IsNullOrWhiteSpace(quota) ? null : quota.ToUpper();
+
+                        if (string.IsNullOrWhiteSpace(quota))
+                        {
+                            quota = null; // or handle error if quota is mandatory
+                        }
+                        else
+                        {
+                            quota = quota.ToUpper();
+                        }
+
+                        // Dynamic fare calculation
+                        decimal gst, surge, quotaCharge;
+                        decimal farePerPassenger = CalculateFare(cls, cls.SeatsAvailable, bookedSeats, quota, out gst, out surge, out quotaCharge);
+
+                        // Totals per passenger
+                        decimal totalBaseFare = cls.BaseFare * passengerCount;       // base fare only
+                        decimal totalQuotaCharge = quotaCharge * passengerCount;    // includes Tatkal, Ladies, Senior, or other quota adjustments
+                        decimal totalGst = gst * passengerCount;                    // GST total
+                        decimal totalSurge = surge * passengerCount;                // Surge total
+
+                        // Final total fare for all passengers
+                        decimal totalFare = totalBaseFare + totalQuotaCharge + totalGst + totalSurge;
+
+                        // Update TrainClass seats
+                        using (var cmd = new SqlCommand("UpdateTrainClassSeats", conn))
+                        {
+                            cmd.CommandType = CommandType.StoredProcedure;
+                            cmd.Parameters.AddWithValue("@ClassId", cls.Id);
+                            cmd.Parameters.AddWithValue("@SeatsBooked", passengerCount);
+                            cmd.ExecuteNonQuery();
+                        }
+
+                        // Insert Booking
+                        int bookingId;
+                        string pnr = GeneratePnr();
+        *//*                decimal totalBaseFare = farePerSeat * passengerCount;*//*
+
+                        using (var cmd = new SqlCommand("InsertBooking", conn))
+                        {
+                            cmd.CommandType = CommandType.StoredProcedure;
+                            cmd.Parameters.AddWithValue("@PNR", pnr);
+                            cmd.Parameters.AddWithValue("@UserId", userId);
+                            cmd.Parameters.AddWithValue("@TrainId", trainId);
+                            cmd.Parameters.AddWithValue("@TrainClassId", cls.Id);
+                            cmd.Parameters.AddWithValue("@JourneyDate", DateTime.Parse(journeyDate));
+                            cmd.Parameters.AddWithValue("@BookingDate", DateTime.UtcNow);
+                            cmd.Parameters.AddWithValue("@BaseFare", totalBaseFare * passengerCount);
+                            cmd.Parameters.AddWithValue("@Status", "CONFIRMED");
+                            cmd.Parameters.AddWithValue("@TrainNumber", trainNumber);
+                            cmd.Parameters.AddWithValue("@TrainName", trainName);
+                            cmd.Parameters.AddWithValue("@Class", Class);
+                            cmd.Parameters.AddWithValue("@Frmst", fromStation.Name);
+                            cmd.Parameters.AddWithValue("@Tost", toStation.Name);
+                            cmd.Parameters.AddWithValue("@Quota", quota);
+                            cmd.Parameters.AddWithValue("@GST", totalGst);
+                            cmd.Parameters.AddWithValue("@QuotaCharge", totalQuotaCharge);
+                            cmd.Parameters.AddWithValue("@SurgeAmount", totalSurge);
+                            cmd.Parameters.AddWithValue("@TotalFare", totalFare);
+
+                            // ExecuteScalar must return inserted booking id — ensure your stored proc does that
+                            bookingId = Convert.ToInt32(cmd.ExecuteScalar());
+                        }
+
+                        // Determine seat prefix dynamically
+                        string seatPrefix = !string.IsNullOrWhiteSpace(cls.SeatPrefix)
+                            ? cls.SeatPrefix.Trim()
+                            : (cls.Code ?? "X").Replace(" ", "").Substring(0, Math.Min(2, (cls.Code ?? "X").Length));
+
+                        Random random = new Random();
+                        HashSet<int> usedSeats = new HashSet<int>();
+                        // Insert passengers
+                        for (int i = 0; i < passengerCount; i++)
+                        {
+                            *//*string seatNumber = $"{seatPrefix}{seatsAvailable}";*//*
+
+
+                            int seatNumberValue;
+                            do
+                            {
+                                seatNumberValue = random.Next(1, seatsAvailable + 1); // 1 to total seats
+                            }
+                            while (!usedSeats.Add(seatNumberValue)); // ensure unique seat number
+
+                            string seatNumber = $"{seatPrefix}{seatNumberValue}";
+
+                            using (var cmd = new SqlCommand("InsertPassenger", conn))
+                            {
+                                cmd.CommandType = CommandType.StoredProcedure;
+                                cmd.Parameters.AddWithValue("@BookingId", bookingId);
+                                cmd.Parameters.AddWithValue("@Name", passengerNames[i]);
+                                cmd.Parameters.AddWithValue("@Age", passengerAges[i]);
+                                cmd.Parameters.AddWithValue("@Gender", passengerGenders[i]);
+                                cmd.Parameters.AddWithValue("@SeatNumber", seatNumber);
+                                cmd.Parameters.AddWithValue("@Berth", passengerBerths[i]);
+                                cmd.ExecuteNonQuery();
+                            }
+                        }
+
+                        // Build booking object with fare breakdown
+                        Booking booking = new Booking
+                        {
+                            BookingId = bookingId,
+                            PNR = pnr,
+                            UserId = userId,
+                            TrainId = trainId,
+                            TrainClassId = cls.Id,
+                            JourneyDate = DateTime.Parse(journeyDate),
+                            BookingDate = DateTime.UtcNow,
+                            BaseFare = cls.BaseFare,
+                            Status = "CONFIRMED",
+                            TrainNumber = int.TryParse(trainNumber, out var tn) ? tn : 0,
+                            TrainName = trainName,
+                            ClassCode = Class,
+                            Frmst = fromStation.Name,
+                            Tost = toStation.Name,
+                            QuotaCharge = totalQuotaCharge,
+                            GST = gst,
+                            SurgeAmount = surge,
+                            FinalFare = farePerPassenger,       // ✅ per passenger
+                            TotalFare = totalFare,        // ✅ for all passengers
+                        };
+
+                        // Build email content
+                        string userEmail = User.FindFirstValue(ClaimTypes.Email) ?? User.Identity.Name;
+                        string userName = User.Identity.Name ?? "Passenger";
+                        string pnrLocal = pnr;
+                        string subject = $"Booking Confirmed - PNR {pnrLocal}";
+                        string bookingUrl = Url.Action("DownloadTicket", "Booking", new { id = bookingId }, Request.Scheme);
+                        string body = $@"
+                        <h3>Booking Confirmed ✅</h3>
+                        <p>Hi {userName},</p>
+                        <p>Your booking is confirmed. Details below:</p>
+                        <ul>
+                            <li><strong>PNR:</strong> {pnrLocal}</li>
+                            <li><strong>Train:</strong> {trainName} ({trainNumber})</li>
+                            <li><strong>Quota:</strong> {quota}</li>
+                            <li><strong>From:</strong> {fromStation?.Name}</li>
+                            <li><strong>To:</strong> {toStation?.Name}</li>
+                            <li><strong>Date:</strong> {DateTime.Parse(journeyDate):dd-MMM-yyyy}</li>
+                            <li><strong>Base Fare per passenger:</strong> ₹{cls.BaseFare}</li>
+                            <li><strong>GST:</strong> ₹{gst}</li>
+                            <li><strong>Quota Charge:</strong> ₹{totalQuotaCharge}</li>
+                            <li><strong>Surge:</strong> ₹{surge}</li>
+                            <li><strong>Passengers:</strong> {passengerCount}</li>
+                            <li><strong>Total Fare:</strong> ₹{totalFare}</li>
+                        </ul>
+                        <p>Your detailed ticket is attached below.</p>
+                        <p><a href='{bookingUrl}' download='E-Ticket_{pnr}.pdf' style='display:inline-block;padding:10px 15px;background:#007bff;color:white;text-decoration:none;border-radius:5px;'>📄 Download E-Ticket</a></p>
+                        <p>Thank you — IRCTC Clone</p>
+                    ";
+
+                        // fire-and-forget email send (method from your EmailService)
+                        _ = _emailService.SendEmail(userEmail, subject, body);
+
+                        TempData["BookingSuccess"] = "Ticket booked successfully and sent to your email!";
+
+                        return RedirectToAction("Confirmation", new { id = bookingId });
+                    }
                 }*/
 
 
         [EnableRateLimiting("BookingLimiter")]
-        // POST: /Booking/Confirm
         [HttpPost]
         public IActionResult Confirm(
-            int trainId, int classId, string journeyDate,
-            List<string> passengerNames, List<int> passengerAges, List<string> passengerGenders, List<string> passengerBerths,
-            string trainName, string trainNumber, string Class,
-            int FromStationId, int ToStationId)
+            int trainId, 
+            int classId, 
+            string journeyDate,
+            List<string> passengerNames, 
+            List<int> passengerAges, 
+            List<string> passengerGenders, 
+            List<string> passengerBerths,
+            string trainName, 
+            string trainNumber, 
+            string Class,
+            int FromStationId, 
+            int ToStationId)
         {
             if (passengerNames == null || passengerNames.Count == 0)
             {
@@ -362,6 +972,7 @@ namespace IRCTCClone.Controllers
                 TrainClass cls = null;
                 int seatsAvailable = 0;
                 int totalSeats = 0;
+
                 using (var cmd = new SqlCommand("GetTrainClassById", conn))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
@@ -386,13 +997,6 @@ namespace IRCTCClone.Controllers
                     }
                 }
 
-
-                /*                // 🚆 Calculate fare dynamically
-                                int bookedSeats = GetBookedSeatsCount(trainId, classId); // write stored proc
-                                string quota = Request.Form["Quota"]; // from dropdown in form
-                                fare = CalculateFare(cls, totalSeats, bookedSeats, quota);*/
-
-
                 if (cls == null || string.IsNullOrEmpty(cls.Code))
                 {
                     TempData["Error"] = "Train class not found.";
@@ -400,53 +1004,26 @@ namespace IRCTCClone.Controllers
                 }
 
                 int passengerCount = passengerNames.Count;
-                if (seatsAvailable < passengerCount)
+/*                if (seatsAvailable < passengerCount)
                 {
                     TempData["Error"] = "Not enough seats available.";
                     return RedirectToAction("Checkout", new { trainId, classId, journeyDate });
-                }
-
-                /*// Get how many seats are already booked for this train+class (stored proc should return INT)
-                int bookedSeats = GetBookedSeatsCount(trainId, classId);
-
-                // Get quota selection from form (if not provided default to GENERAL)
-                string quota = Request.Form["Quota"];
-                if (string.IsNullOrWhiteSpace(quota)) quota = "GENERAL";
-               *//* quota = quota.ToUpper();*//*
-
-                // Calculate fare per seat (includes GST and tatkal/surge)
-                decimal gstPerSeat;
-                decimal surgePerSeat;
-                decimal farePerSeat = CalculateFare(cls, cls.SeatsAvailable, bookedSeats, quota, out gstPerSeat, out surgePerSeat);*/
-
+                }*/
 
                 int bookedSeats = GetBookedSeatsCount(trainId, classId);
                 string quota = Request.Form["Quota"].FirstOrDefault();
                 quota = string.IsNullOrWhiteSpace(quota) ? null : quota.ToUpper();
 
-                if (string.IsNullOrWhiteSpace(quota))
-                {
-                    quota = null; // or handle error if quota is mandatory
-                }
-                else
-                {
-                    quota = quota.ToUpper();
-                }
-
-                // Dynamic fare calculation
                 decimal gst, surge, quotaCharge;
                 decimal farePerPassenger = CalculateFare(cls, cls.SeatsAvailable, bookedSeats, quota, out gst, out surge, out quotaCharge);
 
-                // Totals per passenger
-                decimal totalBaseFare = cls.BaseFare * passengerCount;       // base fare only
-                decimal totalQuotaCharge = quotaCharge * passengerCount;    // includes Tatkal, Ladies, Senior, or other quota adjustments
-                decimal totalGst = gst * passengerCount;                    // GST total
-                decimal totalSurge = surge * passengerCount;                // Surge total
+                decimal totalBaseFare = cls.BaseFare * passengerCount;
+                decimal totalQuotaCharge = quotaCharge * passengerCount;
+                decimal totalGst = gst * passengerCount;
+                decimal totalSurge = surge * passengerCount;
 
-                // Final total fare for all passengers
                 decimal totalFare = totalBaseFare + totalQuotaCharge + totalGst + totalSurge;
 
-                // Update TrainClass seats
                 using (var cmd = new SqlCommand("UpdateTrainClassSeats", conn))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
@@ -455,10 +1032,8 @@ namespace IRCTCClone.Controllers
                     cmd.ExecuteNonQuery();
                 }
 
-                // Insert Booking
                 int bookingId;
                 string pnr = GeneratePnr();
-/*                decimal totalBaseFare = farePerSeat * passengerCount;*/
 
                 using (var cmd = new SqlCommand("InsertBooking", conn))
                 {
@@ -482,46 +1057,27 @@ namespace IRCTCClone.Controllers
                     cmd.Parameters.AddWithValue("@SurgeAmount", totalSurge);
                     cmd.Parameters.AddWithValue("@TotalFare", totalFare);
 
-                    // ExecuteScalar must return inserted booking id — ensure your stored proc does that
                     bookingId = Convert.ToInt32(cmd.ExecuteScalar());
                 }
 
-                // Determine seat prefix dynamically
-                string seatPrefix = !string.IsNullOrWhiteSpace(cls.SeatPrefix)
-                    ? cls.SeatPrefix.Trim()
-                    : (cls.Code ?? "X").Replace(" ", "").Substring(0, Math.Min(2, (cls.Code ?? "X").Length));
+                // -------------------------------------------------------
+                //   ONLY THIS PART IS UPDATED: REAL CNF/RAC/WL LOGIC
+                // -------------------------------------------------------
+                AllocateAndInsertPassengers(
+                    conn,
+                    bookingId,
+                    trainId,
+                    classId,
+                    DateTime.Parse(journeyDate),
+                    passengerNames,
+                    passengerAges,
+                    passengerGenders,
+                    passengerBerths,
+                    cls.SeatsAvailable
+                );
+                // -------------------------------------------------------
 
-                Random random = new Random();
-                HashSet<int> usedSeats = new HashSet<int>();
-                // Insert passengers
-                for (int i = 0; i < passengerCount; i++)
-                {
-                    /*string seatNumber = $"{seatPrefix}{seatsAvailable}";*/
-
-
-                    int seatNumberValue;
-                    do
-                    {
-                        seatNumberValue = random.Next(1, seatsAvailable + 1); // 1 to total seats
-                    }
-                    while (!usedSeats.Add(seatNumberValue)); // ensure unique seat number
-
-                    string seatNumber = $"{seatPrefix}{seatNumberValue}";
-
-                    using (var cmd = new SqlCommand("InsertPassenger", conn))
-                    {
-                        cmd.CommandType = CommandType.StoredProcedure;
-                        cmd.Parameters.AddWithValue("@BookingId", bookingId);
-                        cmd.Parameters.AddWithValue("@Name", passengerNames[i]);
-                        cmd.Parameters.AddWithValue("@Age", passengerAges[i]);
-                        cmd.Parameters.AddWithValue("@Gender", passengerGenders[i]);
-                        cmd.Parameters.AddWithValue("@SeatNumber", seatNumber);
-                        cmd.Parameters.AddWithValue("@Berth", passengerBerths[i]);
-                        cmd.ExecuteNonQuery();
-                    }
-                }
-
-                // Build booking object with fare breakdown
+                // Build booking object
                 Booking booking = new Booking
                 {
                     BookingId = bookingId,
@@ -541,8 +1097,8 @@ namespace IRCTCClone.Controllers
                     QuotaCharge = totalQuotaCharge,
                     GST = gst,
                     SurgeAmount = surge,
-                    FinalFare = farePerPassenger,       // ✅ per passenger
-                    TotalFare = totalFare,        // ✅ for all passengers
+                    FinalFare = farePerPassenger,
+                    TotalFare = totalFare,
                 };
 
                 // Build email content
@@ -552,27 +1108,27 @@ namespace IRCTCClone.Controllers
                 string subject = $"Booking Confirmed - PNR {pnrLocal}";
                 string bookingUrl = Url.Action("DownloadTicket", "Booking", new { id = bookingId }, Request.Scheme);
                 string body = $@"
-                <h3>Booking Confirmed ✅</h3>
-                <p>Hi {userName},</p>
-                <p>Your booking is confirmed. Details below:</p>
-                <ul>
-                    <li><strong>PNR:</strong> {pnrLocal}</li>
-                    <li><strong>Train:</strong> {trainName} ({trainNumber})</li>
-                    <li><strong>Quota:</strong> {quota}</li>
-                    <li><strong>From:</strong> {fromStation?.Name}</li>
-                    <li><strong>To:</strong> {toStation?.Name}</li>
-                    <li><strong>Date:</strong> {DateTime.Parse(journeyDate):dd-MMM-yyyy}</li>
-                    <li><strong>Base Fare per passenger:</strong> ₹{cls.BaseFare}</li>
-                    <li><strong>GST:</strong> ₹{gst}</li>
-                    <li><strong>Quota Charge:</strong> ₹{totalQuotaCharge}</li>
-                    <li><strong>Surge:</strong> ₹{surge}</li>
-                    <li><strong>Passengers:</strong> {passengerCount}</li>
-                    <li><strong>Total Fare:</strong> ₹{totalFare}</li>
-                </ul>
-                <p>Your detailed ticket is attached below.</p>
-                <p><a href='{bookingUrl}' download='E-Ticket_{pnr}.pdf' style='display:inline-block;padding:10px 15px;background:#007bff;color:white;text-decoration:none;border-radius:5px;'>📄 Download E-Ticket</a></p>
-                <p>Thank you — IRCTC Clone</p>
-            ";
+                        <h3>Booking Confirmed ✅</h3>
+                        <p>Hi {userName},</p>
+                        <p>Your booking is confirmed. Details below:</p>
+                        <ul>
+                            <li><strong>PNR:</strong> {pnrLocal}</li>
+                            <li><strong>Train:</strong> {trainName} ({trainNumber})</li>
+                            <li><strong>Quota:</strong> {quota}</li>
+                            <li><strong>From:</strong> {fromStation?.Name}</li>
+                            <li><strong>To:</strong> {toStation?.Name}</li>
+                            <li><strong>Date:</strong> {DateTime.Parse(journeyDate):dd-MMM-yyyy}</li>
+                            <li><strong>Base Fare per passenger:</strong> ₹{cls.BaseFare}</li>
+                            <li><strong>GST:</strong> ₹{gst}</li>
+                            <li><strong>Quota Charge:</strong> ₹{totalQuotaCharge}</li>
+                            <li><strong>Surge:</strong> ₹{surge}</li>
+                            <li><strong>Passengers:</strong> {passengerCount}</li>
+                            <li><strong>Total Fare:</strong> ₹{totalFare}</li>
+                        </ul>
+                        <p>Your detailed ticket is attached below.</p>
+                        <p><a href='{bookingUrl}' download='E-Ticket_{pnr}.pdf' style='display:inline-block;padding:10px 15px;background:#007bff;color:white;text-decoration:none;border-radius:5px;'>📄 Download E-Ticket</a></p>
+                        <p>Thank you — IRCTC Clone</p>
+                    ";
 
                 // fire-and-forget email send (method from your EmailService)
                 _ = _emailService.SendEmail(userEmail, subject, body);
@@ -582,6 +1138,7 @@ namespace IRCTCClone.Controllers
                 return RedirectToAction("Confirmation", new { id = bookingId });
             }
         }
+
 
 
 
@@ -624,9 +1181,11 @@ namespace IRCTCClone.Controllers
                                 Quota = reader["Quota"] != DBNull.Value ? reader["Quota"].ToString()?.Trim() : null,
                                 Status = reader["Status"].ToString(),
                                 ClassCode = reader["ClassCode"].ToString(),
+                                SeatPrefix = reader["SeatPrefix"].ToString(),
                                 Frmst = reader["Frmst"].ToString(),
                                 Tost = reader["Tost"].ToString(),
-                                Passengers = new List<Passenger>()
+                                Passengers = new List<Passenger>(),
+                           
                             };
 
                         }
@@ -646,8 +1205,19 @@ namespace IRCTCClone.Controllers
                                     Name = reader.GetString(reader.GetOrdinal("Name")),
                                     Age = reader.GetInt32(reader.GetOrdinal("Age")),
                                     Gender = reader.GetString(reader.GetOrdinal("Gender")),
-                                    SeatNumber = reader.GetString(reader.GetOrdinal("SeatNumber"))
+                                    SeatNumber = reader.IsDBNull(reader.GetOrdinal("SeatNumber"))
+                                                    ? null
+                                                    : reader.GetString(reader.GetOrdinal("SeatNumber")),
+                                    Berth = reader.IsDBNull(reader.GetOrdinal("Berth"))
+                                                    ? null
+                                                    : reader.GetString(reader.GetOrdinal("Berth")),
+                                    BookingStatus = reader.GetString(reader.GetOrdinal("BookingStatus")),
+                                    Position = reader.IsDBNull(reader.GetOrdinal("Position"))
+                                                    ? (int?)null
+                                                    : reader.GetInt32(reader.GetOrdinal("Position")),
+                                    SeatPrefix = booking.SeatPrefix // or reader if coming from DB
                                 });
+
                             }
                         }
                     }
@@ -707,7 +1277,7 @@ namespace IRCTCClone.Controllers
                 return RedirectToAction("Login", "Account");
 
             Booking booking = null;
-            List<Passenger> passengers = new List<Passenger>();
+            var passengers = new List<Passenger>();
 
             using (var conn = new SqlConnection(_connectionString))
             {
@@ -715,19 +1285,21 @@ namespace IRCTCClone.Controllers
 
                 using (var cmd = new SqlCommand("spGetBookingDtls", conn))
                 {
-                    cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@BookingId", id);
                     cmd.Parameters.AddWithValue("@UserId", userId);
 
                     using (var reader = cmd.ExecuteReader())
                     {
-                        // First result: booking info
+                        // 1️⃣ Booking data
                         if (reader.Read())
                         {
                             booking = new Booking
                             {
                                 BookingId = reader.GetInt32(reader.GetOrdinal("BookingId")),
                                 PNR = reader.GetString(reader.GetOrdinal("PNR")),
+                                TrainId = reader.GetInt32(reader.GetOrdinal("TrainId")),
+                                TrainClassId = reader.GetInt32(reader.GetOrdinal("TrainClassId")),
                                 JourneyDate = reader.GetDateTime(reader.GetOrdinal("JourneyDate")),
                                 BaseFare = reader.GetDecimal(reader.GetOrdinal("BaseFare")),
                                 Status = reader.GetString(reader.GetOrdinal("Status")),
@@ -736,24 +1308,35 @@ namespace IRCTCClone.Controllers
                                 TrainName = reader.GetString(reader.GetOrdinal("TrainName")),
                                 ClassCode = reader.GetString(reader.GetOrdinal("ClassCode")),
                                 Frmst = reader.GetString(reader.GetOrdinal("Frmst")),
-                                Tost = reader.GetString(reader.GetOrdinal("Tost"))
+                                Tost = reader.GetString(reader.GetOrdinal("Tost")),
+                                SeatPrefix = reader.GetString(reader.GetOrdinal("SeatPrefix"))
                             };
                         }
-                        else
-                            return NotFound();
+                        else return NotFound();
 
-                        // Move to second result set: passengers
+                        // 2️⃣ Passenger data
                         if (reader.NextResult())
                         {
                             while (reader.Read())
                             {
                                 passengers.Add(new Passenger
                                 {
+                                    Id= reader.GetInt32(reader.GetOrdinal("Id")),
                                     Name = reader.GetString(reader.GetOrdinal("Name")),
                                     Age = reader.GetInt32(reader.GetOrdinal("Age")),
                                     Gender = reader.GetString(reader.GetOrdinal("Gender")),
-                                    SeatNumber = reader.GetString(reader.GetOrdinal("SeatNumber")),
-                                    Berth = reader.GetString(reader.GetOrdinal("Berth"))
+                                    SeatNumber = reader.IsDBNull(reader.GetOrdinal("SeatNumber")) ? null : reader.GetString(reader.GetOrdinal("SeatNumber")),
+                                    Berth = reader.IsDBNull(reader.GetOrdinal("Berth")) ? null : reader.GetString(reader.GetOrdinal("Berth")),
+
+                                    BookingStatus = reader.IsDBNull(reader.GetOrdinal("BookingStatus"))
+                                                        ? null
+                                                        : reader.GetString(reader.GetOrdinal("BookingStatus")),
+
+                                    Position = reader.IsDBNull(reader.GetOrdinal("Position"))
+                                                        ? (int?)null
+                                                        : reader.GetInt32(reader.GetOrdinal("Position")),
+
+                                    SeatPrefix = booking.SeatPrefix
                                 });
                             }
                         }
@@ -765,6 +1348,207 @@ namespace IRCTCClone.Controllers
             return View(booking);
         }
 
+
+        [HttpPost]
+        public IActionResult DeletePassenger(int id)
+        {
+            bool isDeleted = false;
+
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            {
+                conn.Open();
+                using (SqlCommand cmd = new SqlCommand("spDeletePassengers", conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@Id", id);
+
+                    int affected = cmd.ExecuteNonQuery();
+                    isDeleted = affected > 0;
+                }
+            }
+
+            if (isDeleted)
+                return Json(new { success = true });
+
+            return Json(new { success = false, message = "Failed to delete passenger" });
+        }
+
+
+
+        /*        [HttpGet]
+                public IActionResult Details(int id)
+                {
+                    string userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                    if (string.IsNullOrEmpty(userId))
+                        return RedirectToAction("Login", "Account");
+
+                    Booking booking = null;
+                    List<Passenger> passengers = new List<Passenger>();
+
+                    using (var conn = new SqlConnection(_connectionString))
+                    {
+                        conn.Open();
+
+                        using (var cmd = new SqlCommand("spGetBookingDtls", conn))
+                        {
+                            cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                            cmd.Parameters.AddWithValue("@BookingId", id);
+                            cmd.Parameters.AddWithValue("@UserId", userId);
+
+                            using (var reader = cmd.ExecuteReader())
+                            {
+                                // First result: booking info
+                                if (reader.Read())
+                                {
+                                    booking = new Booking
+                                    {
+                                        BookingId = reader.GetInt32(reader.GetOrdinal("BookingId")),
+                                        PNR = reader.GetString(reader.GetOrdinal("PNR")),
+                                        TrainId = reader.GetInt32(reader.GetOrdinal("TrainId")),          
+                                        TrainClassId = reader.GetInt32(reader.GetOrdinal("TrainClassId")), 
+                                        JourneyDate = reader.GetDateTime(reader.GetOrdinal("JourneyDate")),
+                                        BaseFare = reader.GetDecimal(reader.GetOrdinal("BaseFare")),
+                                        Status = reader.GetString(reader.GetOrdinal("Status")),
+                                        Quota = reader.GetString(reader.GetOrdinal("Quota")),
+                                        TrainNumber = reader.GetInt32(reader.GetOrdinal("TrainNumber")),
+                                        TrainName = reader.GetString(reader.GetOrdinal("TrainName")),
+                                        ClassCode = reader.GetString(reader.GetOrdinal("ClassCode")),
+                                        Frmst = reader.GetString(reader.GetOrdinal("Frmst")),
+                                        Tost = reader.GetString(reader.GetOrdinal("Tost"))
+                                    };
+                                }
+                                else
+                                    return NotFound();
+
+                                // Second result: passengers
+                                if (reader.NextResult())
+                                {
+                                    while (reader.Read())
+                                    {
+                                        passengers.Add(new Passenger
+                                        {
+                                            Name = reader.GetString(reader.GetOrdinal("Name")),
+                                            Age = reader.GetInt32(reader.GetOrdinal("Age")),
+                                            Gender = reader.GetString(reader.GetOrdinal("Gender")),
+                                            SeatNumber = reader.IsDBNull(reader.GetOrdinal("SeatNumber")) ? null : reader.GetString(reader.GetOrdinal("SeatNumber")),
+                                            Berth = reader.IsDBNull(reader.GetOrdinal("Berth")) ? null : reader.GetString(reader.GetOrdinal("Berth")),
+                                            SeatPrefix = booking.SeatPrefix
+                                        });
+                                    }
+                                }
+
+                                booking.Passengers = passengers;
+                            }
+                        }
+                    }
+
+                    // ✅ Compute BookingStatus & Position based on seat availability
+                    var seatStatus = GetSeatStatus(booking.TrainId, booking.TrainClassId);
+                    int remainingSeats = seatStatus.SeatsAvailable - seatStatus.ConfirmedCount;
+                    int racCount = seatStatus.RACCount;
+                    int wlCount = seatStatus.WLCount;
+
+                    foreach (var passenger in booking.Passengers)
+                    {
+                        string status;
+                        int position = 0;
+
+                        if (remainingSeats > 0)
+                        {
+                            status = "CNF";
+                            passenger.Position = null;
+                            remainingSeats--;
+                        }
+                        else if (racCount < seatStatus.RACSeats)
+                        {
+                            racCount++;
+                            status = "RAC";
+                            position = racCount;
+                            passenger.Position = position;
+                        }
+                        else
+                        {
+                            wlCount++;
+                            status = "WL";
+                            position = wlCount;
+                            passenger.Position = position;
+                        }
+
+                        passenger.BookingStatus = status;
+                    }
+
+                    return View(booking);
+                }*/
+
+
+        /*        [HttpGet]
+                public IActionResult Details(int id)
+                {
+                    string userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                    if (string.IsNullOrEmpty(userId))
+                        return RedirectToAction("Login", "Account");
+
+                    Booking booking = null;
+                    List<Passenger> passengers = new List<Passenger>();
+
+                    using (var conn = new SqlConnection(_connectionString))
+                    {
+                        conn.Open();
+
+                        using (var cmd = new SqlCommand("spGetBookingDtls", conn))
+                        {
+                            cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                            cmd.Parameters.AddWithValue("@BookingId", id);
+                            cmd.Parameters.AddWithValue("@UserId", userId);
+
+                            using (var reader = cmd.ExecuteReader())
+                            {
+                                // First result: booking info
+                                if (reader.Read())
+                                {
+                                    booking = new Booking
+                                    {
+                                        BookingId = reader.GetInt32(reader.GetOrdinal("BookingId")),
+                                        PNR = reader.GetString(reader.GetOrdinal("PNR")),
+                                        JourneyDate = reader.GetDateTime(reader.GetOrdinal("JourneyDate")),
+                                        BaseFare = reader.GetDecimal(reader.GetOrdinal("BaseFare")),
+                                        Status = reader.GetString(reader.GetOrdinal("Status")),
+                                        Quota = reader.GetString(reader.GetOrdinal("Quota")),
+                                        TrainNumber = reader.GetInt32(reader.GetOrdinal("TrainNumber")),
+                                        TrainName = reader.GetString(reader.GetOrdinal("TrainName")),
+                                        ClassCode = reader.GetString(reader.GetOrdinal("ClassCode")),
+                                        Frmst = reader.GetString(reader.GetOrdinal("Frmst")),
+                                        Tost = reader.GetString(reader.GetOrdinal("Tost"))
+                                    };
+                                }
+                                else
+                                    return NotFound();
+
+                                // Move to second result set: passengers
+                                if (reader.NextResult())
+                                {
+                                    while (reader.Read())
+                                    {
+                                        passengers.Add(new Passenger
+                                        {
+                                            Name = reader.GetString(reader.GetOrdinal("Name")),
+                                            Age = reader.GetInt32(reader.GetOrdinal("Age")),
+                                            Gender = reader.GetString(reader.GetOrdinal("Gender")),
+                                            SeatNumber = reader.IsDBNull(reader.GetOrdinal("SeatNumber")) ? null : reader.GetString(reader.GetOrdinal("SeatNumber")),
+                                            Berth = reader.IsDBNull(reader.GetOrdinal("Berth")) ? null : reader.GetString(reader.GetOrdinal("Berth")),
+                                            BookingStatus = null, // Will compute below
+                                            Position = null       // Will compute below
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    booking.Passengers = passengers;
+                    return View(booking);
+                }
+        */
         // GET: /Booking/MyBookings
         [HttpGet]
         public IActionResult MyBookings()
@@ -1325,6 +2109,7 @@ namespace IRCTCClone.Controllers
                                 BaseFare = reader.GetDecimal(reader.GetOrdinal("BaseFare")),
                                 Frmst = reader.GetString(reader.GetOrdinal("Frmst")),
                                 Tost = reader.GetString(reader.GetOrdinal("Tost")),
+                                SeatPrefix = reader.GetString(reader.GetOrdinal("SeatPrefix")),
                                 Passengers = new List<Passenger>()
                             };
                         }
@@ -1339,9 +2124,26 @@ namespace IRCTCClone.Controllers
                                     Name = reader.GetString(reader.GetOrdinal("Name")),
                                     Age = reader.GetInt32(reader.GetOrdinal("Age")),
                                     Gender = reader.GetString(reader.GetOrdinal("Gender")),
-                                    SeatNumber = reader.GetString(reader.GetOrdinal("SeatNumber")),
-                                    Berth = reader.GetString(reader.GetOrdinal("Berth"))
+                                    SeatNumber = reader.IsDBNull(reader.GetOrdinal("SeatNumber"))
+                                                  ? ""
+                                                  : reader.GetString(reader.GetOrdinal("SeatNumber")),
+
+                                    Berth = reader.IsDBNull(reader.GetOrdinal("Berth"))
+                                          ? ""
+                                          : reader.GetString(reader.GetOrdinal("Berth")),
+                                    BookingStatus = reader.GetString(reader.GetOrdinal("Bookingstatus")),
+                                    Position = reader.IsDBNull(reader.GetOrdinal("Position"))
+                                          ? 0
+                                          : reader.GetInt32(reader.GetOrdinal("Position")),
+                                    SeatPrefix = booking.SeatPrefix
                                 });
+
+
+                               
+
+                    
+                           
+
                             }
                         }
                     }
