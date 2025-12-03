@@ -43,6 +43,7 @@
 
         <p><strong>Class:</strong> @Model.ClassCode</p>
 
+        <br />
         <h4>💰 Fare Breakdown</h4>
         <ul class="fare-breakdown">
             <li>
@@ -67,31 +68,54 @@
         </p>
     </div>
 
-    <h3 class="passenger-heading">👥 Passengers</h3>
-    <ul class="passenger-list">
-        @foreach (var item in Model.Passengers)
-        {
-            // Coach is SeatPrefix ONLY if CNF
-            string coach = (item.BookingStatus == "CNF" && !string.IsNullOrEmpty(item.SeatPrefix))
-            ? item.SeatPrefix
-            : "--";
+    <h3 class="passenger-heading">👥 Details of Passengers</h3>
 
-            string seat = !string.IsNullOrEmpty(item.SeatNumber)
-            ? item.SeatNumber
-            : "--";
+    <table class="table table-bordered passenger-table">
+        <thead>
+            <tr>
+                <th>Sl. No</th>
+                <th>Name</th>
+                <th>Age</th>
+                <th>Gender</th>
+                <th>Status</th>
+                <th>Coach</th>
+                <th>Seat / Berth</th>
+                <th>Current Status</th>
+            </tr>
+        </thead>
 
-            <li>
-                @item.Name, @item.Age, @item.Gender —
-                Coach: @coach,
-                Seat: @seat
-                • Status: @(string.IsNullOrEmpty(item.BookingStatus) ? "--" : item.BookingStatus)
-                • Position: @(item.Position.HasValue? item.Position.ToString() : "--")
-                • Full Seat No: @(coach != "--" && seat != "--" ? coach + seat : "--")
-            </li>
-        }
+        <tbody>
+            @{
+                int index = 1;
+            }
 
-    </ul>
-</div>
+            @foreach (var item in Model.Passengers)
+            {
+                string coach = (item.BookingStatus == "CNF" && !string.IsNullOrEmpty(item.SeatPrefix))
+                ? item.SeatPrefix
+                : "--";
+
+                string seat = !string.IsNullOrEmpty(item.SeatNumber)
+                ? item.SeatNumber
+                : "--";
+
+                string fullSeat = (coach != "--" && seat != "--") ? coach + seat : "--";
+
+                <tr>
+                    <td>@index</td>
+                    <td>@item.Name</td>
+                    <td>@item.Age</td>
+                    <td>@item.Gender</td>
+                    <td>@item.BookingStatus</td>
+                    <td>@coach</td>
+                    <td>@seat</td>
+                    <td>@item.BookingStatus</td>
+                </tr>
+
+                index++;
+            }
+        </tbody>
+    </table>
 
 
 <style>
@@ -111,5 +135,25 @@
                 border-bottom: none;
                 font-weight: bold;
                 color: #0078d7;
+            }
+
+        .passenger-table {
+            font-size: 14px;
+            background: #fff;
+        }
+
+            .passenger-table thead tr {
+                background: #dce9f9; /* Light IRCTC-blue */
+                color: #003366;
+                text-align: center;
+            }
+
+            .passenger-table th, .passenger-table td {
+                padding: 8px;
+                vertical-align: middle;
+            }
+
+            .passenger-table tbody tr td {
+                text-align: center;
             }
 </style>

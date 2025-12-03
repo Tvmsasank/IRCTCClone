@@ -1866,6 +1866,7 @@ hr {
         border-radius: 4px;
     }
 
+
 /* --------------------
      Fadeout Loader
 ---------------------*/
@@ -1874,6 +1875,36 @@ hr {
         opacity: 0;
         visibility: hidden;
     }
+}
+
+
+/* Delete Passenger Button */
+.deleteBtnpassenger {
+    background-color: #e74c3c; /* red tone */
+    color: #fff; /* white text */
+    border: none;
+    padding: 6px 12px; /* small size */
+    font-size: 13px;
+    border-radius: 4px; /* rounded corners */
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+    /* Hover effect */
+    .deleteBtnpassenger:hover {
+        background-color: #c0392b; /* darker red */
+        transform: scale(1.05); /* slight zoom */
+    }
+
+    /* Active (click) effect */
+    .deleteBtnpassenger:active {
+        background-color: #a93226;
+        transform: scale(0.95);
+    }
+
+/* Optional: add a subtle shadow */
+.deleteBtnpassenger {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
 }
 
 

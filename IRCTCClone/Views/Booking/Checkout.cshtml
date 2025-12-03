@@ -10,24 +10,25 @@
     var journey = ViewBag.JourneyDate as string ?? DateTime.Today.ToString("yyyy-MM-dd");
 }
     
+
 <section class="checkout-page">
     <div class="checkout-card">
         <h2>Booking Details</h2>
 
-@if (train != null && cls != null)
-{
-    <div class="train-info">
-        <p><strong>Train:</strong> @train.Number - @train.Name</p>
-        <p><strong>Class:</strong> @cls.Code, Fare: ₹@cls.BaseFare</p>
-        <p><strong>Route:</strong> @train.FromStation?.Name (@train.FromStation?.Code) → @train.ToStation?.Name (@train.ToStation?.Code)</p>
+        @if (train != null && cls != null)
+        {
+            <div class="train-info">
+                <p><strong>Train:</strong> @train.Number - @train.Name</p>
+                <p><strong>Class:</strong> @cls.Code, Fare: ₹@cls.BaseFare</p>
+                <p><strong>Route:</strong> @train.FromStation?.Name (@train.FromStation?.Code) → @train.ToStation?.Name (@train.ToStation?.Code)</p>
                 <p><strong>Boarding Date:</strong> @train.JourneyDate?.ToString("dd-MM-yyyy")</p>
 
-        <p>
-            <strong>Departure:</strong> @train.Departure.ToString(@"hh\:mm") |
-            <strong>Arrival:</strong> @train.Arrival.ToString(@"hh\:mm") |
-            <strong>Duration:</strong> @train.Duration
-        </p>
-    </div>
+                <p>
+                    <strong>Departure:</strong> @train.Departure.ToString(@"hh\:mm") |
+                    <strong>Arrival:</strong> @train.Arrival.ToString(@"hh\:mm") |
+                    <strong>Duration:</strong> @train.Duration
+                </p>
+            </div>
             <form method="post" action="/Booking/Confirm" class="checkout-form">
                 <input type="hidden" name="trainId" value="@train.Id" />
                 <input type="hidden" name="classId" value="@cls.Id" />
@@ -80,13 +81,14 @@
                 <button type="submit" class="btn-primary">Pay & Book (Mock)</button>
             </form>
 
-}
-else
-{
-    <p class="error-msg">Error: Train or Class data not found.</p>
-}
-</div>
+        }
+        else
+        {
+            <p class="error-msg">Error: Train or Class data not found.</p>
+        }
+    </div>
 </section>
+
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
