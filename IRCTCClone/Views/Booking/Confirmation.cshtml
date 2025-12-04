@@ -49,7 +49,14 @@
             <li>
                 <p><strong>Base Fare:</strong> ₹@Model.BaseFare</p>
                 <p><strong>Quota:</strong> @Model.Quota</p>
-                <p><strong>GST (5%):</strong> ₹@Model.GST</p>
+                <p>
+                    <strong>Convenience Fee (Incl. of GST):</strong>
+                    ₹@(Model.GST + 20.00m)
+                </p>
+                <p>
+                    <strong>Travel Insurance:</strong>
+                    ₹@(0.45m)
+                </p>
                 @if (Model.QuotaCharge != 0)
                 {
                     <p><strong>Quota Charge:</strong> ₹@Model.QuotaCharge</p>

@@ -289,13 +289,14 @@ namespace IRCTCClone.Services
                 // Rows
                 foreach (var p in booking.Passengers)
                 {
-                   
 
-                    string seatNo = p.SeatNumber.Length > 0 ? p.SeatNumber.Substring(0, 1) : "-";
-                    string coach = p.SeatPrefix;
-          
-                   /* coach = p.SeatPrefix;
-                    seatNo = p.SeatNumber.Length > 0 ? p.SeatNumber.Substring(0, 1) : "-";*/
+
+                    string seatNo = string.IsNullOrEmpty(p.SeatNumber) ? "-" : p.SeatNumber;
+
+                    string coach = string.IsNullOrEmpty(p.SeatPrefix) ? "-" : p.SeatPrefix;
+
+                    /* coach = p.SeatPrefix;
+                     seatNo = p.SeatNumber.Length > 0 ? p.SeatNumber.Substring(0, 1) : "-";*/
                     passTbl.AddCell(new PdfPCell(new Phrase(p.Name, normal)) { Padding = 4f });
                     passTbl.AddCell(new PdfPCell(new Phrase(p.Age.ToString(), normal)) { HorizontalAlignment = Element.ALIGN_CENTER });
                     passTbl.AddCell(new PdfPCell(new Phrase(p.Gender, normal)) { HorizontalAlignment = Element.ALIGN_CENTER });
@@ -329,7 +330,8 @@ namespace IRCTCClone.Services
                 }
 
                 AddPay("Base Fare:", $"₹ {booking.BaseFare:F2}");
-                AddPay("GST (5%):", $"₹ {booking.GST:F2}");
+                AddPay("Convenience Fee (Incl. of GST):", $"₹ {(booking.GST + 20.00m):F2}");
+                AddPay("Travel Insurance (Incl. of GST):", $"₹ {(0.45m):F2}");
                 AddPay("Quota Charge:", $"₹ {booking.QuotaCharge:F2}");
                 AddPay("Surge:", $"₹ {booking.SurgeAmount:F2}");
 
