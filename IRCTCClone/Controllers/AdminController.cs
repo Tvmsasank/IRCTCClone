@@ -535,7 +535,7 @@ namespace IrctcClone.Controllers
             }
 
             TempData["SuccessMessage"] = "✅ Station updated successfully!";
-            return RedirectToAction("StationList");
+            return RedirectToAction("EditStation");
         }
 
         [HttpPost]

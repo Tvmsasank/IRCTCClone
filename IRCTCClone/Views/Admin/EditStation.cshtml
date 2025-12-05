@@ -1,33 +1,56 @@
 ﻿@model IRCTCClone.Models.Station
 @{
     ViewData["Title"] = "Edit Station";
-    Layout = "~/Views/Shared/_Layout.cshtml";
 }
 
-<div class="container mt-5">
-    <div class="card shadow-lg p-4">
-        <h3 class="text-center mb-4">Edit Station</h3>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
-        <form asp-action="EditStation" method="post" class="needs-validation" novalidate>
-            <input type="hidden" asp-for="Id" />
+<div class="container mt-4">
 
-            <div class="mb-3">
-                <label asp-for="Code" class="form-label fw-bold">Station Code</label>
-                <input asp-for="Code" class="form-control" placeholder="Enter Station Code" required />
-                <span asp-validation-for="Code" class="text-danger"></span>
-            </div>
+    <h3 class="mb-3">@ViewData["Title"]</h3>
 
-            <div class="mb-3">
-                <label asp-for="Name" class="form-label fw-bold">Station Name</label>
-                <input asp-for="Name" class="form-control" placeholder="Enter Station Name" required />
-                <span asp-validation-for="Name" class="text-danger"></span>
-            </div>
+    <!-- Alerts -->
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            @TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
 
-            <div class="d-flex justify-content-between mt-4">
-                <a asp-action="StationList" class="btn btn-secondary">Back to List</a>
-                <button type="submit" class="btn btn-primary">Save Changes</button>
-            </div>
-        </form>
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+
+            <form asp-action="EditStation" method="post">
+
+                <input type="hidden" asp-for="Id" />
+
+                <div class="mb-3">
+                    <label asp-for="Code" class="form-label">Station Code</label>
+                    <input asp-for="Code" class="form-control" placeholder="Enter Station Code" required />
+                    <span asp-validation-for="Code" class="text-danger small"></span>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="Name" class="form-label">Station Name</label>
+                    <input asp-for="Name" class="form-control" placeholder="Enter Station Name" required />
+                    <span asp-validation-for="Name" class="text-danger small"></span>
+                </div>
+
+                <div class="d-flex justify-content-between">
+                    <a asp-action="StationList" class="btn btn-secondary">Back to List</a>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
-

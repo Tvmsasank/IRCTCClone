@@ -1,0 +1,59 @@
+﻿body.d-flex.align-items-center {
+    height: 100vh;
+    margin: 0;
+    background-image: url('/images/beautifulirctc.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.admin-login-card {
+    width: 20rem;
+    backdrop-filter: blur(6px);
+    background: rgba(255,255,255,0.85);
+    margin-right: 20px; /* default position on large screens */
+}
+
+/* Extra small devices <480px */
+@media (max-width: 480px) {
+    body.d-flex.align-items-center {
+        justify-content: center !important;
+        padding: 20px;
+    }
+
+    .admin-login-card {
+        width: 90% !important;
+        margin: 0 auto;
+    }
+}
+
+/* Small devices <576px */
+@media (max-width: 576px) {
+    .admin-login-card {
+        width: 95% !important;
+        max-width: 320px;
+    }
+}
+
+/* Tablets <768px */
+@media (max-width: 768px) {
+    .admin-login-card {
+        width: 85%;
+        max-width: 350px;
+    }
+}
+
+/* Small laptops <992px */
+@media (max-width: 992px) {
+    .admin-login-card {
+        width: 20rem;
+        margin-right: 0;
+    }
+}
+
+/* Large screens <1200px */
+@media (max-width: 1200px) {
+    .admin-login-card {
+        margin-right: 20px;
+    }
+}

@@ -1908,3 +1908,174 @@ hr {
 }
 
 
+/* === Admin Login Page Background === */
+body.d-flex.align-items-center {
+    height: 100vh;
+    margin: 0;
+    background-image: url('/images/beautifulirctc.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat; 
+}
+
+/* === Admin Login Card === */
+.admin-login-card {
+    width: 20rem;
+    backdrop-filter: blur(6px);
+    background: rgba(255, 255, 255, 0.85);
+}
+
+
+/* ------------ Extra Small Devices (Portrait Mobiles < 480px) ------------ */
+@media (max-width: 480px) {
+    .header-container {
+        flex-direction: column;
+        padding: 10px;
+        text-align: center;
+    }
+
+    body.d-flex.align-items-center {
+        justify-content: center !important;
+        padding: 20px;
+    }
+
+    .admin-login-card {
+        width: 90% !important;
+        margin: 0 auto;
+    }
+
+    .nav-links a {
+        display: block;
+        margin: 8px 0;
+    }
+
+    .home-page {
+        padding: 30px 15px;
+        justify-content: center;
+    }
+
+    .auth-card,
+    .checkout-card,
+    .results-container {
+        max-width: 90%;
+        padding: 15px;
+    }
+
+    .train-table th,
+    .train-table td {
+        padding: 6px;
+        font-size: 12px;
+    }
+
+    .swapStations button {
+        width: 40px;
+        height: 40px;
+    }
+}
+
+/* ------------ Small Devices (Mobiles < 576px) ------------ */
+@media (max-width: 576px) {
+    .search-box {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    body.d-flex.align-items-center {
+        justify-content: center !important;
+    }
+
+    .admin-login-card {
+        width: 95% !important;
+        max-width: 320px;
+    }
+
+    .auth-card {
+        width: 100%;
+        max-width: 300px;
+    }
+
+    .page-centered {
+        justify-content: center;
+        padding: 20px;
+    }
+}
+
+/* ------------ Tablets (Landscape Mobiles / Tablets < 768px) ------------ */
+@media (max-width: 768px) {
+    .header-container {
+        padding: 10px 15px;
+    }
+
+    .home-page {
+        flex-direction: column;
+        text-align: center;
+        padding: 40px 20px;
+    }
+
+    body.d-flex.align-items-center {
+        justify-content: center !important;
+    }
+
+    .admin-login-card {
+        width: 85%;
+        max-width: 350px;
+    }
+
+    .results-page {
+        padding: 20px;
+    }
+
+    .results-container {
+        padding: 20px;
+    }
+
+    .train-table th, .train-table td {
+        font-size: 14px;
+    }
+
+    .passenger-card {
+        flex-direction: column;
+    }
+}
+
+/* ------------ Small Laptops (Laptops < 992px) ------------ */
+@media (max-width: 992px) {
+    .home-page {
+        padding: 60px 40px;
+    }
+
+    body.d-flex.align-items-center {
+        justify-content: center !important;
+    }
+
+    .admin-login-card {
+        width: 20rem;
+        margin-right: 0;
+    }
+
+    .auth-card,
+    .checkout-card {
+        max-width: 450px;
+    }
+
+    .results-container {
+        padding: 25px 30px; 
+    }
+}
+
+/* ------------ Large Screens (Monitors < 1200px) ------------ */
+@media (max-width: 1200px) {
+    .home-page {
+        padding: 80px 50px;
+    }
+
+    .admin-login-card {
+        margin-right: 20px;
+    }
+
+    .results-page {
+        padding: 40px 60px;
+    }
+}
+
+
