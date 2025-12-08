@@ -12,10 +12,10 @@
         <!-- Show ModelState errors (for invalid email/password) -->
         @if (!ViewData.ModelState.IsValid)
         {
-            <div class="alert alert-danger" role="alert">
+            <div class="" role="alert">
                 @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
                 {
-                    <p>@error.ErrorMessage</p>
+                    <p style="color: red !important">@error.ErrorMessage</p>
                 }
             </div>
         }

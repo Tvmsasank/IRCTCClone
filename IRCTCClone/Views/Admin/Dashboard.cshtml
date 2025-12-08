@@ -4,36 +4,55 @@
     ViewData["Title"] = "Admin Dashboard";
 }
 
-<div class="admin-container">
-    <!-- Top Bar -->
-    <div class="admin-header">
-        <h3>Welcome, Admin 👋</h3>
-    </div>
+<div class="admin-container mt-1 mb-3" style="
+        min-height: 81.2vh;
+        min-width: 215.7vh;
+        margin-bottom: 50rem;
+        background-image: url('/images/beautifulirctc.jpg');
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+    ">
 
-    <hr />
+    <div class="">
+        <!-- Top Bar -->
+        <div class="">
+            <h3>Welcome, Admin 👋</h3>
+        </div>
 
-    <!-- Dropdown Section -->
-    <div class="text-center mt-3">
-        <div class="nav-item dropdown">
-            <button class="btn bg-light" type="button" data-bs-toggle="dropdown" aria-expanded="false">Manage IRCTC Data ▼</button>
-            <ul class="dropdown-menu p-1 small">
-                <li>
-                    <a class="dropdown-item text-black"
-                        asp-action="CreateStation" asp-controller="Admin">Create Station</a></li>
-                <li>
-                    <a class="dropdown-item text-black" 
-                        asp-action="StationList" asp-controller="Admin">Edit/Delete Stations</a>
-                </li>
-                <li>
-                    <a class="dropdown-item text-black"
-                        asp-action="CreateTrain" asp-controller="Admin">Add Train</a>
-                </li>
-                <li>
-                    <a class="dropdown-item text-black"
-                       asp-controller="Admin" asp-action="TrainList" class="btn btn-warning btn-sm">Edit/Delete Trains</a>
-                </li>
-            </ul>
-         </div>
+        <hr />
+
+        <!-- Dropdown Section -->
+        <div class="">
+            <div class="nav-item dropdown">
+                <button class="btn bg-light text-primary border border-info" type="button" data-bs-toggle="dropdown" aria-expanded="false">Manage IRCTC Data ▼</button>
+                <ul class="dropdown-menu p-1 small">
+                    <li>
+                        <a class="dropdown-item text-black"
+                           onmouseover="this.classList.replace('text-black','text-primary')"
+                           onmouseout="this.classList.replace('text-primary','text-black')"
+                            asp-action="CreateStation" asp-controller="Admin">Create Station</a></li>
+                    <li>
+                        <a class="dropdown-item text-black"
+                           onmouseover="this.classList.replace('text-black','text-primary')"
+                           onmouseout="this.classList.replace('text-primary','text-black')"
+                           asp-action="StationList" asp-controller="Admin">Edit/Delete Stations</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item text-black"
+                           onmouseover="this.classList.replace('text-black','text-primary')"
+                           onmouseout="this.classList.replace('text-primary','text-black')"
+                           asp-action="CreateTrain" asp-controller="Admin">Add Train</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item text-black"
+                           onmouseover="this.classList.replace('text-black','text-primary')"
+                           onmouseout="this.classList.replace('text-primary','text-black')"
+                           asp-controller="Admin" asp-action="TrainList" class="btn btn-warning btn-sm">Edit/Delete Trains</a>
+                    </li>
+                </ul>
+             </div>
+        </div>
     </div>
 </div>
 

@@ -160,7 +160,7 @@ body {
     box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
     max-width: 290px;
     width: 100%;
-    animation: fadeInUp 0.6s ease-out;
+    animation: fadeInUp 0.6s ease-out;  
 } 
 
     .auth-card h2 {
@@ -832,7 +832,7 @@ hr {
 .custom-dropdown-menu {
     display: none;
     position: absolute;
-    top: 100%;  appears below the button 
+    top: 100%;  
     left: 0;
     background-color: #fff;
     min-width: 200px;
@@ -1923,6 +1923,7 @@ body.d-flex.align-items-center {
     width: 20rem;
     backdrop-filter: blur(6px);
     background: rgba(255, 255, 255, 0.85);
+    animation: fadeInUp 0.6s ease-out;
 }
 
 

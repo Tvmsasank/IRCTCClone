@@ -48,8 +48,11 @@
                 else if (User?.Identity?.IsAuthenticated == true)
                 {
                     <!-- ✅ Normal User Logged In -->
-                    var username = User.Identity.Name?.Split('@')[0];
-                    <span class="welcome-text">👋 Welcome, @username </span>
+                    var fullName = User.Identity.Name;
+                    <span class="welcome-text">👋 Welcome, @fullName</span>
+
+          @*           var username = User.Identity.Name?.Split('@')[0];
+                    <span class="welcome-text">👋 Welcome, @username </span> *@
 @*                     @if (User.Identity.IsAuthenticated)
                     {
                         <a href="/Account/Profile" class="nav-link">Profile</a>

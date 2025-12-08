@@ -37,10 +37,12 @@ namespace IRCTCClone.Controllers
         [HttpPost]
         public async Task<IActionResult> Login(ViewModels model, string returnUrl = null)
         {
+
             if (!ModelState.IsValid)
                 return View(model);
 
-            bool validUser = false;
+            /*bool validUser = false;
+            string FullName = "";
 
             // --- validate credentials ---
             using (var conn = new SqlConnection(_connectionString))
@@ -55,10 +57,38 @@ namespace IRCTCClone.Controllers
                     if (result != null)
                     {
                         validUser = result.ToString() == HashPassword(model.Password);
+                        FullName = result["FullName"].ToString();
                     }
                 }
             }
 
+*/
+
+            bool validUser = false;
+            string fullName = "";
+            string passwordHashFromDb = "";
+
+            using (var conn = new SqlConnection(_connectionString))
+            {
+                conn.Open();
+
+                using (var cmd = new SqlCommand("sp_CheckUserLogin", conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@Email", model.Email);
+
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            passwordHashFromDb = reader["PasswordHash"].ToString();
+                            fullName = reader["FullName"].ToString();
+
+                            validUser = passwordHashFromDb == HashPassword(model.Password);
+                        }
+                    }
+                }
+            }
             if (!validUser)
             {
                 ModelState.AddModelError("", "Invalid email or password");
@@ -80,7 +110,7 @@ namespace IRCTCClone.Controllers
             // ✅ Claims login
             var claims = new List<Claim>
             {
-                new Claim(ClaimTypes.Name, model.Email),
+                new Claim(ClaimTypes.Name, fullName),
                 new Claim(ClaimTypes.NameIdentifier, model.Email)
             };
 
