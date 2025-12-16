@@ -1,4 +1,6 @@
-﻿using IRCTCClone.Models;
+﻿using IrctcClone.Models;
+using IRCTCClone.Helpers;
+using IRCTCClone.Models;
 using IRCTCClone.Services;
 using iTextSharp.text;
 using iTextSharp.text.pdf;
@@ -8,6 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Data.SqlClient;
 using Microsoft.SqlServer.Server;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -31,6 +34,17 @@ namespace IRCTCClone.Controllers
         private readonly EmailService _emailService;
         private const int RAC_LIMIT = 8; //recently added
         private readonly IAvailabilityService _availabilityService;
+        private readonly IConfiguration _configuration;
+
+        public BookingController(IConfiguration configuration, EmailService emailService)
+        {
+            _connectionString = configuration.GetConnectionString("DefaultConnection");
+            _emailService = emailService;
+            _configuration = configuration;
+
+            /*            _baseUrl = configuration["AppSettings:BaseUrl"];*/
+        }
+
 
         private string GetBerthBySeatNumber(string seatNumber)
         {
@@ -48,34 +62,33 @@ namespace IRCTCClone.Controllers
         }
 
         /*---------------------------------GETS SEATS STATUS------------------------------*/
-        private Booking GetSeatStatus(int trainId, int classId)
+        private SeatStatus GetSeatStatus(int trainId, int classId)
         {
-            Booking result = new Booking();
-
+            var seatStatus = new SeatStatus();
             using (var conn = new SqlConnection(_connectionString))
+            using (var cmd = new SqlCommand("spGetSeatStatusCounts", conn))
             {
-                using (var cmd = new SqlCommand("spGetSeatStatusCounts", conn))
-                {
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@TrainId", trainId);
-                    cmd.Parameters.AddWithValue("@ClassId", classId);
+                conn.Open();
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@TrainId", trainId);
+                cmd.Parameters.AddWithValue("@ClassId", classId);
 
-                    conn.Open();
-                    using (var reader = cmd.ExecuteReader())
+                using (var rdr = cmd.ExecuteReader())
+                {
+                    if (rdr.Read())
                     {
-                        if (reader.Read())
+                        return new SeatStatus
                         {
-                            result.SeatsAvailable = Convert.ToInt32(reader["SeatsAvailable"]);
-                            result.RACSeats = Convert.ToInt32(reader["RACSeats"]);
-                            result.ConfirmedCount = Convert.ToInt32(reader["ConfirmedCount"]);
-                            result.RACCount = Convert.ToInt32(reader["RACCount"]);
-                            result.WLCount = Convert.ToInt32(reader["WLCount"]); // read from SQL
-                        }
+                            SeatsAvailable = Convert.ToInt32(rdr["SeatsAvailable"]),
+                            RACSeats = Convert.ToInt32(rdr["RACSeats"]),
+                            ConfirmedCount = Convert.ToInt32(rdr["ConfirmedCount"]),
+                            RACCount = Convert.ToInt32(rdr["RACCount"]),
+                            WLCount = Convert.ToInt32(rdr["WLCount"])
+                        };
                     }
                 }
             }
-
-            return result;
+            return null;
         }
 
         /*------------------------------COUNTS THE BOOKED SEATS---------------------------------*/
@@ -218,18 +231,19 @@ namespace IRCTCClone.Controllers
 
         //---------------------------------------recently added down---------------------------------------//
 
-
         private void AllocateAndInsertPassengers(
-    SqlConnection conn,
-    int bookingId,
-    int trainId,
-    int classId,
-    DateTime journeyDate,
-    List<string> passengerNames,
-    List<int> passengerAges,
-    List<string> passengerGenders,
-    List<string> passengerBerths,
-    int seatsCapacity)
+            SqlConnection conn,
+            int bookingId,
+            int trainId,
+            int classId,
+            DateTime journeyDate,
+            List<string> passengerNames,
+            List<int> passengerAges,
+            List<string> passengerGenders,
+            List<string> passengerBerths,
+            int seatsCapacity,
+            int raccount,
+            int racSeats)
         {
             if (passengerNames == null || passengerNames.Count == 0)
                 throw new ArgumentException("No passengers provided.", nameof(passengerNames));
@@ -243,19 +257,21 @@ namespace IRCTCClone.Controllers
                 {
                     // 1) Get current CNF/RAC/WL counts
                     int cnfCount = 0, racCount = 0, wlCount = 0;
+
                     using (var cmd = new SqlCommand("spGetPassengerCounts", conn, tx))
                     {
                         cmd.CommandType = CommandType.StoredProcedure;
                         cmd.Parameters.AddWithValue("@TrainId", trainId);
                         cmd.Parameters.AddWithValue("@TrainClassId", classId);
                         cmd.Parameters.AddWithValue("@JourneyDate", journeyDate);
-                        using (var r = cmd.ExecuteReader())
+
+                        using (var rdr = cmd.ExecuteReader())
                         {
-                            if (r.Read())
+                            if (rdr.Read())
                             {
-                                cnfCount = r["CNFCount"] != DBNull.Value ? Convert.ToInt32(r["CNFCount"]) : 0;
-                                racCount = r["RACCount"] != DBNull.Value ? Convert.ToInt32(r["RACCount"]) : 0;
-                                wlCount = r["WLCount"] != DBNull.Value ? Convert.ToInt32(r["WLCount"]) : 0;
+                                cnfCount = rdr["CNFCount"] != DBNull.Value ? Convert.ToInt32(rdr["CNFCount"]) : 0;
+                                racCount = rdr["RACCount"] != DBNull.Value ? Convert.ToInt32(rdr["RACCount"]) : 0;
+                                wlCount = rdr["WLCount"] != DBNull.Value ? Convert.ToInt32(rdr["WLCount"]) : 0;
                             }
                         }
                     }
@@ -324,7 +340,7 @@ namespace IRCTCClone.Controllers
                         string requestedBerth = (passengerBerths != null && passengerBerths.Count > i && !string.IsNullOrWhiteSpace(passengerBerths[i]))
                                                 ? passengerBerths[i] : null;
 
-                        string bookingStatus;
+                        string bookingStatus=null;
                         int? position = null;
                         string seatNumber = null;
                         string berthAssigned = null;
@@ -337,7 +353,7 @@ namespace IRCTCClone.Controllers
                             seatNumber = seatNum.ToString();
                             berthAssigned = requestedBerth ?? (seatNum % 3 == 1 ? "LB" : seatNum % 3 == 2 ? "MB" : "UB");
                         }
-                        else if (racCount < RAC_LIMIT)
+                        else if (racCount < racSeats)   // FIXED LINE
                         {
                             bookingStatus = "RAC";
                             racCount++;
@@ -345,7 +361,7 @@ namespace IRCTCClone.Controllers
                         }
                         else
                         {
-                            bookingStatus = "WL";
+                            bookingStatus = "WL"; // automatically goes to WL once RAC full
                             wlCount++;
                             position = wlCount;
                         }
@@ -375,142 +391,6 @@ namespace IRCTCClone.Controllers
             }
         }
 
-
-
-/*        private void AllocateAndInsertPassengers(SqlConnection conn,
-            int bookingId,
-            int trainId,
-            int classId,
-            DateTime journeyDate,
-            List<string> names,
-            List<int> ages,
-            List<string> genders,
-            List<string> berths, // requested berth preference (optional)
-            int seatsAvailable) // total seats in class)
-        {
-            // 1) Get existing counts
-            int cnfCount = 0, racCount = 0, wlCount = 0;
-            using (var cmd = new SqlCommand("spGetPassengerCounts", conn))
-            {
-                cmd.CommandType = CommandType.StoredProcedure;
-                cmd.Parameters.AddWithValue("@TrainId", trainId);
-                cmd.Parameters.AddWithValue("@TrainClassId", classId);
-                cmd.Parameters.AddWithValue("@JourneyDate", journeyDate.Date);
-                using (var r = cmd.ExecuteReader())
-                {
-                    if (r.Read())
-                    {
-                        cnfCount = r["CNFCount"] != DBNull.Value ? Convert.ToInt32(r["CNFCount"]) : 0;
-                        racCount = r["RACCount"] != DBNull.Value ? Convert.ToInt32(r["RACCount"]) : 0;
-                        wlCount = r["WLCount"] != DBNull.Value ? Convert.ToInt32(r["WLCount"]) : 0;
-                    }
-                }
-            }
-
-            // 2) Get used seat numbers to pick next free numbers for CNF
-            var usedSeatNums = new HashSet<int>();
-            using (var cmd = new SqlCommand("spGetUsedSeatNumbers", conn))
-            {
-                cmd.CommandType = CommandType.StoredProcedure;
-                cmd.Parameters.AddWithValue("@TrainId", trainId);
-                cmd.Parameters.AddWithValue("@TrainClassId", classId);
-                cmd.Parameters.AddWithValue("@JourneyDate", journeyDate.Date);
-                using (var r = cmd.ExecuteReader())
-                {
-                    while (r.Read())
-                    {
-                        var sn = r["SeatNumber"]?.ToString();
-                        if (!string.IsNullOrEmpty(sn))
-                        {
-                            // extract numeric part
-                            var digits = new string(sn.SkipWhile(ch => !char.IsDigit(ch)).ToArray());
-                            if (int.TryParse(digits, out var val)) usedSeatNums.Add(val);
-                        }
-                    }
-                }
-            }
-
-            // helper to get next free seat number (numeric)
-            int nextFreeSeat()
-            {
-                for (int i = 1; i <= seatsAvailable * 2; i++) // iterate up to a safe limit
-                {
-                    if (!usedSeatNums.Contains(i))
-                    {
-                        usedSeatNums.Add(i);
-                        return i;
-                    }
-                }
-                return -1; // fallback
-            }
-
-            // Insert passenger loop
-            for (int i = 0; i < names.Count; i++)
-            {
-                string pName = names[i];
-                int pAge = ages[i];
-                string pGender = genders[i];
-                string pBerth = (berths != null && berths.Count > i) ? berths[i] : null;
-
-                string bookingStatus = null;
-                int? position = null;
-                string seatNumber = null;
-                string berthAssigned = null;
-
-                // If seats still available -> CNF
-                if (cnfCount < seatsAvailable)
-                {
-                    // assign CNF seat
-                    bookingStatus = "CNF";
-                    cnfCount++;
-
-                    int num = nextFreeSeat(); // numeric seat
-                    if (num > 0)
-                    {
-                        // create seat string using class seat prefix logic (existing seatPrefix)
-                        // you may have seatPrefix in TrainClass object; for demo assume 'S' or from DB
-                        string prefix = ""; // fetch or pass seatPrefix
-                                            // if you have cls.SeatPrefix available pass it to this method
-                        seatNumber = $"{prefix}{num}";
-                        berthAssigned = pBerth ?? ""; // you can compute LB/UB logic here if you want
-                    }
-                }
-                else if (racCount < RAC_LIMIT)
-                {
-                    // assign RAC
-                    racCount++;
-                    bookingStatus = "RAC";
-                    position = racCount; // RAC1, RAC2...
-                    seatNumber = null;
-                    berthAssigned = null;
-                }
-                else
-                {
-                    // WL
-                    wlCount++;
-                    bookingStatus = "WL";
-                    position = wlCount; // WL1, WL2...
-                    seatNumber = null;
-                    berthAssigned = null;
-                }
-
-                // Insert passenger (update your InsertPassenger proc to include @BookingStatus,@Position,@SeatNumber,@Berth)
-                using (var cmd = new SqlCommand("InsertPassenger", conn))
-                {
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@BookingId", bookingId);
-                    cmd.Parameters.AddWithValue("@Name", pName);
-                    cmd.Parameters.AddWithValue("@Age", pAge);
-                    cmd.Parameters.AddWithValue("@Gender", pGender);
-                    cmd.Parameters.AddWithValue("@SeatNumber", (object)seatNumber ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@Berth", (object)berthAssigned ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@BookingStatus", bookingStatus);
-                    cmd.Parameters.AddWithValue("@Position", (object)position ?? DBNull.Value);
-                    cmd.ExecuteNonQuery();
-                }
-            }
-        }
-*/
         private void PromoteQueuesOnSeatFreed(
             SqlConnection conn,
             int trainId,
@@ -610,35 +490,135 @@ namespace IRCTCClone.Controllers
             }
         }
 
-
-
-        public BookingController(IConfiguration configuration, EmailService emailService)
-        {
-            _connectionString = configuration.GetConnectionString("DefaultConnection");
-            _emailService = emailService;
-            /*            _baseUrl = configuration["AppSettings:BaseUrl"];*/
-        }
-
         //--------------------------------------recently added up and original down------------------------------//
 
-        // GET: /Booking/Checkout
+        // ---------- POST: receive form -> store payload in TempData -> Redirect ----------
+        [HttpGet]
+        public IActionResult CheckoutPost(int trainId, int classId, string journeyDate, int FromStationId, int ToStationId, string seatStatus, int numPassengers = 1)
+        {
+
+            string connStr = _configuration.GetConnectionString("DefaultConnection");
+          
+            if (numPassengers <= 0) numPassengers = 1;
+
+
+            // Use seatStatus if needed
+
+            ViewBag.SeatStatus = seatStatus;
+            // Save payload in session before redirect
+            var payload = new CheckoutPayload
+            {
+                TrainId = trainId,
+                ClassId = classId,
+                JourneyDate = journeyDate,
+                FromStationId = FromStationId,
+                ToStationId = ToStationId,
+                NumPassengers = numPassengers,
+                SeatStatus= seatStatus
+
+            };
+            HttpContext.Session.SetString("CheckoutPayload", JsonConvert.SerializeObject(payload));
+
+
+            Train train = Train.GetTrainById(connStr, trainId, classId, journeyDate);
+
+            var validation = TrainRouteValidator.Validate(FromStationId, ToStationId, train);
+
+            if (!validation.IsValid)
+            {
+                TempData["RouteMismatch"] = "YES";
+                TempData["ActualFrom"] = validation.ActualFrom;
+                TempData["ActualTo"] = validation.ActualTo;
+                TempData["SearchedFrom"] = validation.SearchedFrom;
+                TempData["SearchedTo"] = validation.SearchedTo;
+
+                //   return RedirectToAction("TrainResults", "Train");
+
+                return RedirectToAction("TrainResults", "Train", new
+                {
+                    fromStationId = FromStationId,
+                    toStationId = ToStationId,
+                    journeyDateStr = journeyDate
+                });
+            }
+
+            // Auth check
+            if (!User.Identity.IsAuthenticated)
+            {
+                return RedirectToAction("Login", "Account",
+                    new { returnUrl = Url.Action("Checkout", "Booking") });
+            }
+
+            return RedirectToAction("Checkout", "Booking");
+
+        }
+
+        // ---------- GET: reads payload from TempData and runs DB logic to build view model ----------
         [Authorize]
         [HttpGet]
-        public IActionResult Checkout(int trainId, int classId, string journeyDate, int FromStationId, int ToStationId, int numPassengers)
+        public IActionResult Checkout()
         {
+            // Get JSON string from session
+            var payloadJson = HttpContext.Session.GetString("CheckoutPayload");
+
+            if (string.IsNullOrEmpty(payloadJson))
+            {
+                TempData["Error"] = "Invalid access. Please search and select a train before checkout.";
+                return RedirectToAction("SearchTrain"); // redirect to train search page
+            }
+            var payload = JsonConvert.DeserializeObject<CheckoutPayload>(payloadJson);
+
+            // Now you can use 'payload' as before
+            int trainId = payload.TrainId;
+            int classId = payload.ClassId;
+            string journeyDate = payload.JourneyDate;
+            int FromStationId = payload.FromStationId;
+            int ToStationId = payload.ToStationId;
+            int numPassengers = payload.NumPassengers;
+            int searchedFromId = payload.FromStationId; // the station user searched
+            int searchedToId = payload.ToStationId;     // the station user searched
+
+            string SeatStatus = payload.SeatStatus;
+
+            string[] parts = SeatStatus.Split('-');
+            string numberPart = parts[1].Trim();   // "5"
+            string textPart = parts[0].Trim();   // "5"
+
+            int SeatStatuscount = 0;
+            int RacSeatStatuscount = 0;
+            int WLSeatStatuscount = 0;
+
+
+            if (textPart == "AVAILABLE")
+            {
+                SeatStatuscount = int.Parse(numberPart);
+            }
+
+          
+            if (textPart == "RAC")
+            {
+                 RacSeatStatuscount = int.Parse(numberPart);
+
+            }
+            else if ((textPart == "WL"))
+            {
+
+                 WLSeatStatuscount = int.Parse(numberPart);
+
+            }
+                
+
+            ViewBag.SeatStatusCount = SeatStatuscount;
+
             // 1️⃣ Create a booking object with empty passengers
             Booking booking = new Booking();
             booking.Passengers = new List<Passenger>();
-
-            // Populate empty Passenger objects based on number of passengers
-            for (int i = 0; i < numPassengers; i++)
-            {
-                booking.Passengers.Add(new Passenger());
-            }
+            for (int i = 0; i < numPassengers; i++) booking.Passengers.Add(new Passenger());
 
             Train train = null;
             TrainClass cls = null;
 
+            // ---------- DB: load train + class info ----------
             using (var conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
@@ -647,11 +627,15 @@ namespace IRCTCClone.Controllers
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@TrainId", trainId);
                     cmd.Parameters.AddWithValue("@ClassId", classId);
-                    cmd.Parameters.AddWithValue("@JourneyDate", journeyDate);
+
+                    // If your SP expects DATE type, parse into DateTime
+                    if (DateTime.TryParse(journeyDate, out var jd))
+                        cmd.Parameters.AddWithValue("@JourneyDate", jd);
+                    else
+                        cmd.Parameters.AddWithValue("@JourneyDate", journeyDate);
 
                     using (var reader = cmd.ExecuteReader())
                     {
-                        // Read train details
                         if (reader.Read())
                         {
                             train = new Train
@@ -663,10 +647,8 @@ namespace IRCTCClone.Controllers
                                 Arrival = reader.GetTimeSpan(reader.GetOrdinal("Arrival")),
                                 Duration = reader.GetString(reader.GetOrdinal("Duration")),
                                 JourneyDate = reader.GetDateTime(reader.GetOrdinal("JourneyDate")).Date,
-
                                 FromStationId = reader.GetInt32(reader.GetOrdinal("FromStationId")),
                                 ToStationId = reader.GetInt32(reader.GetOrdinal("ToStationId")),
-
                                 FromStation = new Station
                                 {
                                     Id = reader.GetInt32(reader.GetOrdinal("FromStationId")),
@@ -682,7 +664,6 @@ namespace IRCTCClone.Controllers
                             };
                         }
 
-                        // Read class details
                         if (reader.NextResult() && reader.Read())
                         {
                             cls = new TrainClass
@@ -700,26 +681,25 @@ namespace IRCTCClone.Controllers
             }
 
             if (train == null || cls == null)
-                return NotFound();
+            {
+                TempData["Error"] = "Train or class details not found.";
+                return RedirectToAction("Index", "Home");
+            }
 
-            // Override route based on user search
+            // Override route based on user search if needed
             train.FromStationId = FromStationId;
             train.ToStationId = ToStationId;
             train.FromStation = GetStationById(FromStationId);
             train.ToStation = GetStationById(ToStationId);
 
-            // ----------------------------
-            // ✅ CNF / RAC / WL logic
-            // ----------------------------
-            // After you populate booking.Passengers
-
+            // ---------- CNF / RAC / WL logic ----------
             booking.TrainId = trainId;
             booking.TrainClassId = classId;
 
             var seatStatus = GetSeatStatus(booking.TrainId, booking.TrainClassId);
-            int remainingSeats = seatStatus.SeatsAvailable - seatStatus.ConfirmedCount;
+            int remainingSeats = seatStatus.SeatsAvailable/* - seatStatus.ConfirmedCount*/;
             int racCount = seatStatus.RACCount;
-            int wlCount = seatStatus.WLCount;
+            int wlCount = WLSeatStatuscount;
 
             foreach (var passenger in booking.Passengers)
             {
@@ -732,7 +712,7 @@ namespace IRCTCClone.Controllers
                     passenger.Position = null;
                     remainingSeats--;
                 }
-                else if (racCount < seatStatus.RACSeats)
+                else if (racCount < seatStatus.RACSeats)   // RESTORED ORIGINAL WORKING LOGIC
                 {
                     racCount++;
                     status = "RAC";
@@ -748,8 +728,8 @@ namespace IRCTCClone.Controllers
                 }
 
                 passenger.BookingStatus = status;
+                ViewBag.BookingStatus = status;
             }
-
 
             // Pass to ViewBag for display
             ViewBag.Train = train;
@@ -757,10 +737,12 @@ namespace IRCTCClone.Controllers
             ViewBag.JourneyDate = journeyDate;
             ViewBag.FromStationId = FromStationId;
             ViewBag.ToStationId = ToStationId;
-            ViewBag.Booking = booking; // Pass the booking with passengers to view
-
+            ViewBag.Booking = booking; // booking with passengers
             return View("Checkout", booking);
         }
+   
+
+
 
         [EnableRateLimiting("BookingLimiter")]
         [HttpPost]
@@ -776,8 +758,12 @@ namespace IRCTCClone.Controllers
             string trainNumber,
             string Class,
             int FromStationId,
-            int ToStationId)
+            int ToStationId,
+            int SeatStatuscount,
+            string BookingStatus
+            )
         {
+            int availableCount = SeatStatuscount;
             if (passengerNames == null || passengerNames.Count == 0)
             {
                 TempData["Error"] = "Please add at least one passenger.";
@@ -793,6 +779,8 @@ namespace IRCTCClone.Controllers
 
             Station fromStation = null;
             Station toStation = null;
+    
+
 
             using (var conn = new SqlConnection(_connectionString))
             {
@@ -908,13 +896,17 @@ namespace IRCTCClone.Controllers
                 decimal totalSurge = surge;
                 decimal totalQuotaCharge = quotaCharge;
                 decimal totalFare = bookingFinalFare;
+                string status = BookingStatus;
+
+                var seatStatus = GetSeatStatus(trainId, classId);
 
                 // Update seats availability
                 using (var cmd = new SqlCommand("UpdateTrainClassSeats", conn))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@ClassId", cls.Id);
-                    cmd.Parameters.AddWithValue("@SeatsBooked", passengerCount);
+                    cmd.Parameters.AddWithValue("@Status", BookingStatus);
+                    cmd.Parameters.AddWithValue("@Count", passengerCount);
                     cmd.ExecuteNonQuery();
                 }
 
@@ -932,7 +924,7 @@ namespace IRCTCClone.Controllers
                     cmd.Parameters.AddWithValue("@JourneyDate", DateTime.Parse(journeyDate));
                     cmd.Parameters.AddWithValue("@BookingDate", DateTime.UtcNow);
                     cmd.Parameters.AddWithValue("@BaseFare", totalBaseFare);
-                    cmd.Parameters.AddWithValue("@Status", "CONFIRMED");
+                    cmd.Parameters.AddWithValue("@Status", status);
                     cmd.Parameters.AddWithValue("@TrainNumber", trainNumber);
                     cmd.Parameters.AddWithValue("@TrainName", trainName);
                     cmd.Parameters.AddWithValue("@Class", Class);
@@ -948,6 +940,12 @@ namespace IRCTCClone.Controllers
                 }
 
                 // ---------------------------- ALLOCATE SEATS RANDOMLY ----------------------------
+
+                // Before calling AllocateAndInsertPassengers
+
+                // GetSeatStatus should call spGetSeatStatusCounts and return an object with SeatsAvailable and RACSeats
+
+
                 AllocateAndInsertPassengers(
                     conn,
                     bookingId,
@@ -958,24 +956,12 @@ namespace IRCTCClone.Controllers
                     passengerAges,
                     passengerGenders,
                     passengerBerths,
-                    cls.SeatsAvailable // this will now be updated inside method
+                    seatsCapacity: availableCount,
+                    raccount: seatStatus.RACCount,
+                    racSeats: seatStatus.RACSeats// this will now be updated inside method,
+
                 );
 
-
-                // Allocate random sequential seats for passengers and insert into DB
-/*                AllocateRandomeSeqPassengers(
-                    conn,
-                    bookingId,
-                    trainId,
-                    classId,
-                    DateTime.Parse(journeyDate),
-                    passengerNames,
-                    passengerAges,
-                    passengerGenders,
-                    passengerBerths,
-                    cls.SeatsAvailable
-                );
-*/
                 // -------------------------------------------------------------------------------
 
                 // Build booking object for email
@@ -989,7 +975,7 @@ namespace IRCTCClone.Controllers
                     JourneyDate = DateTime.Parse(journeyDate),
                     BookingDate = DateTime.UtcNow,
                     BaseFare = cls.BaseFare,
-                    Status = "CONFIRMED",
+                    Status = status,
                     TrainNumber = int.TryParse(trainNumber, out var tn) ? tn : 0,
                     TrainName = trainName,
                     ClassCode = Class,
@@ -1000,13 +986,25 @@ namespace IRCTCClone.Controllers
                     SurgeAmount = surge,
                     FinalFare = totalBaseFare,
                     TotalFare = totalFare,
+     
+                    
+                 
+
                 };
 
                 // Build email content
-                string userEmail = User.FindFirstValue(ClaimTypes.Email) ?? User.Identity.Name;
+                string userEmail = User.FindFirstValue(ClaimTypes.NameIdentifier); 
+       
+
                 string userName = User.Identity.Name ?? "Passenger";
-                string pnrLocal = pnr;
-                var pdfBytes = _emailService.GeneratePdf(bookingId);
+                var pdfResult = _emailService.GeneratePdf(bookingId);
+                if (pdfResult.pdfBytes == null)
+                {
+                    //handle error
+                    return NotFound("PDF generation failed");
+                }
+                var pdfBytes = pdfResult.pdfBytes;
+                string pnrLocal = pdfResult.PNR;
                 string body = $@"
                         <h3>Booking Confirmed ✅</h3>
                         <p>Hi {userName},</p>
@@ -1047,140 +1045,6 @@ namespace IRCTCClone.Controllers
             }
         }
 
-/*        private void AllocateRandomeSeqPassengers(
-            SqlConnection conn,
-            int bookingId,
-            int trainId,
-            int classId,
-            DateTime journeyDate,
-            List<string> passengerNames,
-            List<int> passengerAges,
-            List<string> passengerGenders,
-            List<string> passengerBerths,
-            int seatsCapacity)
-        {
-            if (passengerNames == null || passengerNames.Count == 0)
-                throw new ArgumentException("No passengers provided.", nameof(passengerNames));
-
-            int passengerCount = passengerNames.Count;
-
-            // Ensure journeyDate is date-only
-            journeyDate = journeyDate.Date;
-
-            using (var tx = conn.BeginTransaction())
-            {
-                try
-                {
-                    // 1) Get already confirmed seat numbers for this train/class/date
-                    var occupied = new HashSet<int>();
-                    using (var cmd = new SqlCommand("spGetConfirmedSeats", conn, tx))
-                    {
-                        cmd.CommandType = CommandType.StoredProcedure;
-                        cmd.Parameters.AddWithValue("@TrainId", trainId);
-                        cmd.Parameters.AddWithValue("@ClassId", classId);
-                        cmd.Parameters.AddWithValue("@JourneyDate", journeyDate);
-
-                        using (var rdr = cmd.ExecuteReader())
-                        {
-                            while (rdr.Read())
-                            {
-                                var seatStr = rdr["SeatNumber"]?.ToString();
-                                if (string.IsNullOrWhiteSpace(seatStr)) continue;
-
-                                var digits = new string(seatStr.Where(char.IsDigit).ToArray());
-                                if (int.TryParse(digits, out int seatNum))
-                                {
-                                    if (seatNum >= 1 && seatNum <= seatsCapacity)
-                                        occupied.Add(seatNum);
-                                }
-                            }
-                        }
-                    }
-
-                    // 2) Build list of available seat numbers
-                    var available = Enumerable.Range(1, seatsCapacity)
-                                              .Where(n => !occupied.Contains(n))
-                                              .OrderBy(n => n)
-                                              .ToList();
-
-                    if (available.Count < passengerCount)
-                        throw new InvalidOperationException("Not enough seats available to allocate.");
-
-                    // 3) Find contiguous blocks of length passengerCount
-                    var possibleStartIndices = new List<int>();
-                    for (int i = 0; i <= available.Count - passengerCount; i++)
-                    {
-                        bool continuous = true;
-                        for (int j = 1; j < passengerCount; j++)
-                        {
-                            if (available[i + j] != available[i] + j)
-                            {
-                                continuous = false;
-                                break;
-                            }
-                        }
-                        if (continuous) possibleStartIndices.Add(i);
-                    }
-
-                    List<int> allocatedSeatNumbers;
-                    var rng = new Random();
-                    if (possibleStartIndices.Count > 0)
-                    {
-                        int startIndexInAvailable = possibleStartIndices[rng.Next(possibleStartIndices.Count)];
-                        allocatedSeatNumbers = available.Skip(startIndexInAvailable).Take(passengerCount).ToList();
-                    }
-                    else
-                    {
-                        allocatedSeatNumbers = available.Take(passengerCount).ToList();
-                    }
-
-                    // 4) Insert passengers using stored procedure
-                    for (int i = 0; i < passengerCount; i++)
-                    {
-                        string name = passengerNames[i];
-                        int age = (passengerAges != null && passengerAges.Count > i) ? passengerAges[i] : 0;
-                        string gender = (passengerGenders != null && passengerGenders.Count > i) ? passengerGenders[i] : null;
-                        int seatNum = allocatedSeatNumbers[i];
-                        string seatStr = seatNum.ToString();
-                        string berth = (passengerBerths != null && passengerBerths.Count > i && !string.IsNullOrWhiteSpace(passengerBerths[i]))
-                                        ? passengerBerths[i]
-                                        : (seatNum % 3 == 1 ? "LB" : seatNum % 3 == 2 ? "MB" : "UB");
-
-                        using (var cmd = new SqlCommand("InsertRandomSeatSeqPassenger", conn, tx))
-                        {
-                            cmd.CommandType = CommandType.StoredProcedure;
-                            cmd.Parameters.AddWithValue("@BookingId", bookingId);
-                            cmd.Parameters.AddWithValue("@Name", name);
-                            cmd.Parameters.AddWithValue("@Age", age);
-                            cmd.Parameters.AddWithValue("@Gender", gender);
-                            cmd.Parameters.AddWithValue("@SeatNumber", (object)seatStr ?? DBNull.Value);
-                            cmd.Parameters.AddWithValue("@Berth", (object)berth ?? DBNull.Value);
-                            cmd.Parameters.AddWithValue("@BookingStatus", "CNF");
-                            cmd.Parameters.AddWithValue("@Position", DBNull.Value);
-
-                            cmd.ExecuteNonQuery();
-                        }
-                    }
-
-                    // 5) Update TrainClass seat availability
-                    using (var cmd = new SqlCommand("UpdateTrainClassSeatsSeq", conn, tx))
-                    {
-                        cmd.CommandType = CommandType.StoredProcedure;
-                        cmd.Parameters.AddWithValue("@ClassId", classId);
-                        cmd.Parameters.AddWithValue("@SeatsBooked", passengerCount);
-                        cmd.ExecuteNonQuery();
-                    }
-
-                    tx.Commit();
-                }
-                catch
-                {
-                    try { tx.Rollback(); } catch { }
-                    throw;
-                }
-            }
-        }
-*/
 
         // GET: /Booking/Confirmation
         [HttpGet]
@@ -1225,7 +1089,7 @@ namespace IRCTCClone.Controllers
                                 Frmst = reader["Frmst"].ToString(),
                                 Tost = reader["Tost"].ToString(),
                                 Passengers = new List<Passenger>(),
-                           
+                                Stations = new List<Station>()
                             };
 
                         }
@@ -1260,6 +1124,20 @@ namespace IRCTCClone.Controllers
 
                             }
                         }
+
+                        // 3️⃣ Stations
+                        if (reader.NextResult())
+                        {
+                            while (reader.Read())
+                            {
+                                booking.Stations.Add(new Station
+                                {
+                                    Code = reader["Code"]?.ToString(),
+                                    Name = reader["Name"]?.ToString()
+                                });
+                            }
+                        }
+
                     }
                 }
             }
@@ -1533,355 +1411,14 @@ namespace IRCTCClone.Controllers
         [HttpGet]
         public IActionResult DownloadTicket(int id)
         {
-            var pdfBytes = _emailService.GeneratePdf(id);
+            var result = _emailService.GeneratePdf(id);
 
-            if (pdfBytes == null)
+            if (result.pdfBytes == null)
                 return NotFound("Booking not found");
 
-            return File(pdfBytes, "application/pdf", $"Ticket_{id}.pdf");
+            return File(result.pdfBytes, "application/pdf", $"{result.PNR}.pdf");
         }
 
-        /*  [HttpGet]
-          public IActionResult DownloadTicket(int id)
-          {
-              var booking = GetBookingDetails(id); // your method to fetch booking (must include Passengers, fares etc.)
-              if (booking == null) return NotFound();
-
-              using (var ms = new MemoryStream())
-              {
-                  // Document setup
-                  var doc = new iTextSharp.text.Document(PageSize.A4, 36, 36, 36, 36);
-                  var writer = PdfWriter.GetInstance(doc, ms);
-                  writer.CloseStream = false;
-                  doc.Open();
-
-                  // Fonts
-                  var titleFont = FontFactory.GetFont(FontFactory.HELVETICA_BOLD, 18);
-                  var sectionWhite = FontFactory.GetFont(FontFactory.HELVETICA_BOLD, 11, BaseColor.WHITE);
-                  var sectionBlue = FontFactory.GetFont(FontFactory.HELVETICA_BOLD, 12, new BaseColor(0, 102, 204));
-                  var labelFont = FontFactory.GetFont(FontFactory.HELVETICA_BOLD, 10);
-                  var normal = FontFactory.GetFont(FontFactory.HELVETICA, 9);
-                  var small = FontFactory.GetFont(FontFactory.HELVETICA, 8);
-
-                  // Colors
-                  var premiumBlue = new BaseColor(0, 102, 204);
-                  var lightPanel = new BaseColor(245, 246, 250);
-                  var frameColor = BaseColor.BLACK;
-
-                  var cb = writer.DirectContent;
-
-                  // --- Page border/frame ---
-                  Rectangle page = doc.PageSize;
-                  page = new Rectangle(doc.PageSize.Left + 15, doc.PageSize.Bottom + 15, doc.PageSize.Right - 15, doc.PageSize.Top - 15);
-                  page.Border = Rectangle.BOX;
-                  page.BorderWidth = 1.0f;
-                  page.BorderColor = frameColor;
-                  page.GetLeft(page.Left);
-                  doc.Add(new Chunk()); // ensure content started
-                  cb.Rectangle(page.Left, page.Bottom, page.Width, page.Height);
-                  cb.SetLineWidth(1.2f);
-                  cb.SetColorStroke(frameColor);
-                  cb.Stroke();
-
-                  // --- Light background panel behind ticket content ---
-                  cb.SetColorFill(lightPanel);
-                  float panelX = doc.Left + 8;
-                  float panelY = doc.Top - 300; // adjust height start
-                  float panelW = doc.PageSize.Width - doc.Left - doc.Right - 0;
-                  float panelH = 360f;
-                  cb.RoundRectangle(panelX, panelY, panelW, panelH, 6f);
-                  cb.Fill();
-
-                  // --- Watermark (faint, centered, rotated) ---
-                  cb.SaveState();
-                  cb.SetGState(new PdfGState { FillOpacity = 0.06f, StrokeOpacity = 0.06f });
-                  var wmFont = FontFactory.GetFont(FontFactory.HELVETICA_BOLD, 60);
-                  ColumnText.ShowTextAligned(cb, Element.ALIGN_CENTER, new Phrase("IRCTC CLONE", wmFont),
-                      doc.PageSize.Width / 2, doc.PageSize.Height / 2, 45);
-                  cb.RestoreState();
-
-                  // --- Header: logo + title + PNR/Date
-                  var headerTbl = new PdfPTable(3) { WidthPercentage = 100f };
-                  headerTbl.SetWidths(new float[] { 1f, 3f, 1.7f });
-
-                  // Logo
-                  string logoPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "irctc_logo.png");
-                  if (System.IO.File.Exists(logoPath))
-                  {
-                      var logo = iTextSharp.text.Image.GetInstance(logoPath);
-                      logo.ScaleToFit(55f, 55f);
-                      headerTbl.AddCell(new PdfPCell(logo)
-                      {
-                          Border = Rectangle.NO_BORDER,
-                          HorizontalAlignment = Element.ALIGN_LEFT,
-                          VerticalAlignment = Element.ALIGN_MIDDLE,
-                          PaddingLeft = 2f
-                      });
-                  }
-                  else
-                  {
-                      headerTbl.AddCell(new PdfPCell(new Phrase("IRCTC", titleFont))
-                      {
-                          Border = Rectangle.NO_BORDER,
-                          HorizontalAlignment = Element.ALIGN_LEFT,
-                          VerticalAlignment = Element.ALIGN_MIDDLE
-                      });
-                  }
-
-                  // Title (center)
-                  headerTbl.AddCell(new PdfPCell(new Phrase("E - TICKET", titleFont))
-                  {
-                      Border = Rectangle.NO_BORDER,
-                      HorizontalAlignment = Element.ALIGN_CENTER,
-                      VerticalAlignment = Element.ALIGN_MIDDLE,
-                      PaddingTop = 12f
-                  });
-
-                  // Right PNR + Date (proper blue color)
-                  var right = new PdfPTable(1) { WidthPercentage = 100f };
-
-                  right.AddCell(new PdfPCell(new Phrase($"PNR: {booking.PNR}",
-                      FontFactory.GetFont(FontFactory.HELVETICA_BOLD, 12, BaseColor.BLUE)))
-                  {
-                      Border = Rectangle.NO_BORDER,
-                      HorizontalAlignment = Element.ALIGN_RIGHT
-                  });
-
-                  right.AddCell(new PdfPCell(new Phrase($"Booked On: {booking.BookingDate:dd-MMM-yyyy}",
-                      FontFactory.GetFont(FontFactory.HELVETICA, 10)))
-                  {
-                      Border = Rectangle.NO_BORDER,
-                      HorizontalAlignment = Element.ALIGN_RIGHT
-                  });
-
-                  headerTbl.AddCell(new PdfPCell(right)
-                  {
-                      Border = Rectangle.NO_BORDER,
-                      PaddingTop = 5f
-                  });
-
-                  doc.Add(headerTbl);
-                  doc.Add(new Paragraph("\n"));
-
-
-                  // --- Top info table: Train/Route/Status and QR/barcode
-                  var topTbl = new PdfPTable(2) { WidthPercentage = 100f, SpacingBefore = 6f };
-                  topTbl.SetWidths(new float[] { 2.7f, 1f });
-
-                  // Left: Train details
-                  var leftTbl = new PdfPTable(2) { WidthPercentage = 100f };
-                  leftTbl.DefaultCell.Border = Rectangle.NO_BORDER;
-                  leftTbl.AddCell(new PdfPCell(new Phrase("Train", labelFont)) { Border = Rectangle.NO_BORDER });
-                  leftTbl.AddCell(new PdfPCell(new Phrase($"{booking.TrainNumber} - {booking.TrainName}", normal)) { Border = Rectangle.NO_BORDER });
-
-                  leftTbl.AddCell(new PdfPCell(new Phrase("From", labelFont)) { Border = Rectangle.NO_BORDER });
-                  leftTbl.AddCell(new PdfPCell(new Phrase($"{booking.Frmst} ({booking.Frmst?.Split(' ').FirstOrDefault()})", normal)) { Border = Rectangle.NO_BORDER });
-
-                  leftTbl.AddCell(new PdfPCell(new Phrase("To", labelFont)) { Border = Rectangle.NO_BORDER });
-                  leftTbl.AddCell(new PdfPCell(new Phrase($"{booking.Tost} ({booking.Tost?.Split(' ').FirstOrDefault()})", normal)) { Border = Rectangle.NO_BORDER });
-
-                  leftTbl.AddCell(new PdfPCell(new Phrase("Journey Date", labelFont)) { Border = Rectangle.NO_BORDER });
-                  leftTbl.AddCell(new PdfPCell(new Phrase(booking.JourneyDate.ToString("dd-MMM-yyyy"), normal)) { Border = Rectangle.NO_BORDER });
-
-                  leftTbl.AddCell(new PdfPCell(new Phrase("Class / Quota", labelFont)) { Border = Rectangle.NO_BORDER });
-                  leftTbl.AddCell(new PdfPCell(new Phrase($"{booking.ClassCode} / {booking.Quota}", normal)) { Border = Rectangle.NO_BORDER });
-
-                  leftTbl.AddCell(new PdfPCell(new Phrase("Status", labelFont)) { Border = Rectangle.NO_BORDER });
-                  var statusCell = new PdfPCell(new Phrase(booking.Status, FontFactory.GetFont(FontFactory.HELVETICA_BOLD, 10, booking.Status == "CONFIRMED" ? BaseColor.GREEN : BaseColor.RED))) { Border = Rectangle.NO_BORDER };
-                  leftTbl.AddCell(statusCell);
-
-                  topTbl.AddCell(leftTbl);
-
-                  // Right: QR + Barcode
-                  var rightTbl = new PdfPTable(1) { WidthPercentage = 100f };
-
-
-
-                  // QR code (PNR + Train + Date)
-                  // Build passenger details
-                  string passengerInfo = string.Join(";", booking.Passengers.Select(p =>
-                      $"{p.Name} | {p.Age} | {p.Gender} | {p.SeatNumber}"
-                  ));
-                  // Build QR text
-                  string qrText =
-                  $"PNR: {booking.PNR} \nTrain: {booking.TrainNumber} - {booking.TrainName} \nFrom: {booking.Frmst} \nTo: {booking.Tost} \nDOJ: {booking.JourneyDate:yyyy-MM-dd} \nQuota: {booking.Quota} \nPassenger Details: \n\n{passengerInfo}"; 
-                  var qr = new BarcodeQRCode(qrText, 150, 150, null);
-                  var qrImage = qr.GetImage();
-                  qrImage.ScaleToFit(110f, 110f);
-                  var qrCell = new PdfPCell(qrImage) { Border = Rectangle.NO_BORDER, HorizontalAlignment = Element.ALIGN_RIGHT, Padding = 2f };
-                  rightTbl.AddCell(qrCell);
-
-                  topTbl.AddCell(rightTbl);
-
-                  doc.Add(topTbl);
-                  doc.Add(new Paragraph("\n"));
-
-                  // --- Passenger table (premium style) ---
-                  var passTbl = new PdfPTable(6) { WidthPercentage = 100f, SpacingBefore = 6f };
-                  passTbl.SetWidths(new float[] { 3f, 1f, 1f, 1.4f, 1.4f, 1.8f });
-
-                  // Header row with blue background
-                  var hdrCell = new PdfPCell(new Phrase("Passenger Details", sectionWhite))
-                  {
-                      BackgroundColor = premiumBlue,
-                      Colspan = 6,
-                      HorizontalAlignment = Element.ALIGN_CENTER,
-                      Padding = 6f,
-                      Border = Rectangle.NO_BORDER
-                  };
-                  passTbl.AddCell(hdrCell);
-
-                  // Column headers
-                  var cols = new[] { "Name", "Age", "Gender", "Coach", "Seat", "Berth" };
-                  foreach (var c in cols)
-                  {
-                      passTbl.AddCell(new PdfPCell(new Phrase(c, labelFont)) { BackgroundColor = BaseColor.LIGHT_GRAY, HorizontalAlignment = Element.ALIGN_CENTER, Padding = 4f });
-                  }
-
-                  // Rows
-                  foreach (var p in booking.Passengers)
-                  {
-                      string coach = "-";
-                      string seatNo = "-";
-                      if (!string.IsNullOrEmpty(p.SeatNumber))
-                      {
-                          coach = p.SeatNumber.Length > 0 ? p.SeatNumber.Substring(0, 1) : "-";
-                          seatNo = p.SeatNumber.Length > 1 ? p.SeatNumber.Substring(1) : "-";
-                      }
-
-                      passTbl.AddCell(new PdfPCell(new Phrase(p.Name, normal)) { Padding = 4f });
-                      passTbl.AddCell(new PdfPCell(new Phrase(p.Age.ToString(), normal)) { HorizontalAlignment = Element.ALIGN_CENTER });
-                      passTbl.AddCell(new PdfPCell(new Phrase(p.Gender, normal)) { HorizontalAlignment = Element.ALIGN_CENTER });
-                      passTbl.AddCell(new PdfPCell(new Phrase(coach, normal)) { HorizontalAlignment = Element.ALIGN_CENTER });
-                      passTbl.AddCell(new PdfPCell(new Phrase(seatNo, normal)) { HorizontalAlignment = Element.ALIGN_CENTER });
-                      passTbl.AddCell(new PdfPCell(new Phrase(p.Berth ?? "-", normal)) { HorizontalAlignment = Element.ALIGN_CENTER });
-                  }
-
-                  doc.Add(passTbl);
-                  doc.Add(new Paragraph("\n"));
-
-                  // --- Payment Summary (Appears immediately after Passenger table) ---
-                  var payTbl = new PdfPTable(2) { WidthPercentage = 50f, HorizontalAlignment = Element.ALIGN_LEFT };
-                  payTbl.SetWidths(new float[] { 2f, 1f });
-
-                  // Header
-                  payTbl.AddCell(new PdfPCell(new Phrase("Payment Summary", sectionWhite))
-                  {
-                      BackgroundColor = premiumBlue,
-                      Colspan = 2,
-                      HorizontalAlignment = Element.ALIGN_CENTER,
-                      Padding = 6f,
-                      Border = Rectangle.NO_BORDER
-                  });
-
-                  // Function to add rows
-                  void AddPay(string label, string val)
-                  {
-                      payTbl.AddCell(new PdfPCell(new Phrase(label, labelFont)) { Border = Rectangle.NO_BORDER, Padding = 5f });
-                      payTbl.AddCell(new PdfPCell(new Phrase(val, normal)) { Border = Rectangle.NO_BORDER, Padding = 5f, HorizontalAlignment = Element.ALIGN_RIGHT });
-                  }
-
-                  AddPay("Base Fare:", $"₹ {booking.BaseFare:F2}");
-                  AddPay("GST (5%):", $"₹ {booking.GST:F2}");
-                  AddPay("Quota Charge:", $"₹ {booking.QuotaCharge:F2}");
-                  AddPay("Surge:", $"₹ {booking.SurgeAmount:F2}");
-
-                  // Line + Total Fare
-                  payTbl.AddCell(new PdfPCell(new Phrase("")) { Border = Rectangle.TOP_BORDER, BorderWidthTop = 0.7f, Colspan = 2, Padding = 6f });
-                  AddPay("Total Paid:", $"₹ {booking.TotalFare:F2}");
-
-                  doc.Add(payTbl);
-
-                  // Push Signature near bottom of page
-                  var sigTable = new PdfPTable(1);
-                  sigTable.TotalWidth = 200f;
-
-                  string sigPathF = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "signature_placeholder.png");
-                  if (System.IO.File.Exists(sigPathF))
-                  {
-                      var sImg = Image.GetInstance(sigPathF);
-                      sImg.ScaleToFit(120f, 40f);
-                      sigTable.AddCell(new PdfPCell(sImg)
-                      {
-                          Border = Rectangle.NO_BORDER,
-                          HorizontalAlignment = Element.ALIGN_CENTER
-                      });
-                  }
-                  else
-                  {
-                      sigTable.AddCell(new PdfPCell(new Phrase("Authorized Signatory", labelFont))
-                      {
-                          Border = Rectangle.NO_BORDER,
-                          HorizontalAlignment = Element.ALIGN_CENTER
-                      });
-                  }
-
-                  sigTable.AddCell(new PdfPCell(new Phrase("IRCTC Clone", small)) { Border = Rectangle.NO_BORDER, HorizontalAlignment = Element.ALIGN_CENTER });
-                  sigTable.AddCell(new PdfPCell(new Phrase($"PNR: {booking.PNR}", small)) { Border = Rectangle.NO_BORDER, HorizontalAlignment = Element.ALIGN_CENTER });
-
-                  // FIXED POSITION (BOTTOM RIGHT)
-                  sigTable.WriteSelectedRows(0, -1, doc.PageSize.Width - 220, 140, writer.DirectContent);
-
-
-                  // --- Terms & Conditions box ---
-                  // ---- TERMS & CONDITIONS (Fixed Position Above Footer) ----
-                  var termsText = new Paragraph();
-                  termsText.Add(new Chunk("Terms & Conditions\n",
-                      FontFactory.GetFont(FontFactory.HELVETICA_BOLD, 10)));
-                  termsText.Add(new Chunk("• Carry valid ID.\n", small));
-                  termsText.Add(new Chunk("• Boarding time subject to announcement.\n", small));
-                  termsText.Add(new Chunk("• Ticket is non-transferable.\n", small));
-                  termsText.Add(new Chunk("• Berth/coach may change by railway authority.\n", small));
-                  termsText.Add(new Chunk("• Refund rules as per IRCTC guidelines.\n", small));
-
-                  ColumnText ctTerms = new ColumnText(cb);
-
-                  // LEFT, BOTTOM-Y, RIGHT, TOP-Y
-                  ctTerms.SetSimpleColumn(
-                      40,                                // X-left
-                      doc.PageSize.GetBottom(60),        // bottom (80 px above bottom)
-                      doc.PageSize.Width - 40,           // right
-                      doc.PageSize.GetBottom(160)        // top of T&C block
-                  );
-                  ctTerms.AddElement(termsText);
-                  ctTerms.Go();
-                  cb.SetLineWidth(0.5f);
-                  cb.SetColorStroke(BaseColor.GRAY);
-
-                  // Draw line just above footer
-                  cb.MoveTo(40, doc.PageSize.GetBottom(60));
-                  cb.LineTo(doc.PageSize.Width - 40, doc.PageSize.GetBottom(60));
-                  cb.Stroke();
-
-                  // --- Footer small print centered
-                  cb.BeginText();
-
-                  var footerFont = FontFactory.GetFont(FontFactory.HELVETICA, 8);
-                  cb.SetFontAndSize(footerFont.BaseFont, 8);
-
-                  float centerX = (doc.PageSize.Left + doc.PageSize.Right) / 2;
-                  float footerY = doc.PageSize.GetBottom(40);
-
-                  cb.ShowTextAligned(
-                      Element.ALIGN_CENTER,
-                      $"Generated on {DateTime.UtcNow:dd-MMM-yyyy HH:mm} UTC | IRCTC Clone",
-                      centerX,
-                      footerY,
-                      0
-                  );
-
-                  cb.EndText();
-
-                  // finalize
-                  doc.Close();
-                  writer.Flush();
-
-                  ms.Position = 0;
-                  var fileName = $"{booking.PNR}_{booking.TrainName}_{booking.TrainNumber}.pdf";
-                  return File(ms.ToArray(), "application/pdf", fileName);
-              }
-          }
-  */
 
         private Booking GetBookingDetails(int bookingId)
         {
@@ -1897,33 +1434,34 @@ namespace IRCTCClone.Controllers
 
                     using (var reader = cmd.ExecuteReader())
                     {
-                        // --- 1️⃣ Read Booking Info ---
+                        // 1️⃣ Booking
                         if (reader.Read())
                         {
                             booking = new Booking
                             {
-                                Id = reader["Id"] != DBNull.Value ? Convert.ToInt32(reader["Id"]) : 0,
+                                Id = Convert.ToInt32(reader["Id"]),
                                 UserId = reader["UserId"]?.ToString(),
                                 PNR = reader["PNR"]?.ToString(),
                                 TrainName = reader["TrainName"]?.ToString(),
-                                TrainNumber = reader["TrainNumber"] != DBNull.Value ? Convert.ToInt32(reader["TrainNumber"]) : 0,
+                                TrainNumber = Convert.ToInt32(reader["TrainNumber"]),
                                 Frmst = reader["Frmst"]?.ToString(),
                                 Tost = reader["Tost"]?.ToString(),
-                                JourneyDate = reader["JourneyDate"] != DBNull.Value ? Convert.ToDateTime(reader["JourneyDate"]) : DateTime.MinValue,
-                                BookingDate = reader["BookingDate"] != DBNull.Value ? Convert.ToDateTime(reader["BookingDate"]) : DateTime.MinValue,
+                                JourneyDate = Convert.ToDateTime(reader["JourneyDate"]),
+                                BookingDate = Convert.ToDateTime(reader["BookingDate"]),
                                 Status = reader["Status"]?.ToString(),
                                 ClassCode = reader["ClassCode"]?.ToString(),
                                 Quota = reader["Quota"]?.ToString(),
-                                BaseFare = reader["BaseFare"] != DBNull.Value ? Convert.ToDecimal(reader["BaseFare"]) : 0,
-                                GST = reader["GST"] != DBNull.Value ? Convert.ToDecimal(reader["GST"]) : 0,
-                                SurgeAmount = reader["SurgeAmount"] != DBNull.Value ? Convert.ToDecimal(reader["SurgeAmount"]) : 0,
-                                TotalFare = reader["TotalFare"] != DBNull.Value ? Convert.ToDecimal(reader["TotalFare"]) : 0,
-                                QuotaCharge = reader["QuotaCharge"] != DBNull.Value ? Convert.ToDecimal(reader["QuotaCharge"]) : 0,
-                                Passengers = new List<Passenger>()
+                                BaseFare = Convert.ToDecimal(reader["BaseFare"]),
+                                GST = Convert.ToDecimal(reader["GST"]),
+                                SurgeAmount = Convert.ToDecimal(reader["SurgeAmount"]),
+                                TotalFare = Convert.ToDecimal(reader["TotalFare"]),
+                                QuotaCharge = Convert.ToDecimal(reader["QuotaCharge"]),
+                                Passengers = new List<Passenger>(),
+                                Stations = new List<Station>()
                             };
                         }
 
-                        // --- 2️⃣ Read Passenger Info ---
+                        // 2️⃣ Passengers
                         if (reader.NextResult())
                         {
                             while (reader.Read())
@@ -1931,10 +1469,25 @@ namespace IRCTCClone.Controllers
                                 booking.Passengers.Add(new Passenger
                                 {
                                     Name = reader["Name"]?.ToString(),
-                                    Age = reader["Age"] != DBNull.Value ? Convert.ToInt32(reader["Age"]) : 0,
+                                    Age = Convert.ToInt32(reader["Age"]),
                                     Gender = reader["Gender"]?.ToString(),
                                     SeatNumber = reader["SeatNumber"]?.ToString(),
-                                    Berth = reader["Berth"]?.ToString()
+                                    Berth = reader["Berth"]?.ToString(),
+                                    BookingStatus = reader["BookingStatus"]?.ToString(),
+                                    Position = reader["Position"] as int?
+                                });
+                            }
+                        }
+
+                        // 3️⃣ Stations
+                        if (reader.NextResult())
+                        {
+                            while (reader.Read())
+                            {
+                                booking.Stations.Add(new Station
+                                {
+                                    Code = reader["Code"]?.ToString(),
+                                    Name = reader["Name"]?.ToString()
                                 });
                             }
                         }
@@ -2051,6 +1604,53 @@ namespace IRCTCClone.Controllers
             var data = await _availabilityService.GetNext7DaysAsync(trainId, travelClass);
             return Json(data);
         }
+
+
+        public IActionResult ConfirmRoute(int trainId, int classId, string journeyDate)
+        {
+            string connStr = _configuration.GetConnectionString("DefaultConnection");
+
+            var payloadJson = HttpContext.Session.GetString("CheckoutPayload");
+            if (string.IsNullOrEmpty(payloadJson))
+            {
+                TempData["Error"] = "Invalid access. Please search and select a train before checkout.";
+                return RedirectToAction("SearchTrain");
+            }
+
+            var payload = JsonConvert.DeserializeObject<CheckoutPayload>(payloadJson);
+            int searchedFromId = payload.FromStationId;
+            int searchedToId = payload.ToStationId;
+
+            Train train = Train.GetTrainById(connStr, trainId, classId, journeyDate);
+            if (train == null)
+            {
+                TempData["Error"] = "Selected train not found.";
+                return RedirectToAction("SearchTrain");
+            }
+
+            try
+            {
+                // Will throw if searched route does not match train's actual route
+                TrainRouteValidator.ValidateTrainRoute(searchedFromId, searchedToId, train, connStr);
+            }
+            catch (InvalidOperationException ex)
+            {
+                TempData["RouteWarning"] = ex.Message;
+                return RedirectToAction("ConfirmRoutePage", new { trainId });
+            }
+
+            return RedirectToAction("Checkout", new { trainId });
+        }
+
+
+        [HttpPost]
+        [Authorize]
+        public IActionResult ProceedWithRoute(int trainId)
+        {
+            // User confirmed to continue despite route mismatch
+            return RedirectToAction("Checkout", new { trainId });
+        }
+
 
         private string GeneratePnr()
         {

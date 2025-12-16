@@ -23,14 +23,21 @@
         <form method="post" action="/Account/Login" class="auth-form">
 
             <input type="hidden" name="returnUrl" value="@ViewBag.ReturnUrl" />
+
             <label>
                 Email
                 <input type="email" name="Email" value="@Model.Email" required />
             </label>
 
-            <label>
+            <label style="position: relative;">
                 Password
-                <input type="password" name="Password" required />
+                <input type="password" name="Password" id="passwordInput" required />
+
+                <span id="togglePassword"
+                      onclick="togglePasswordVisibility()"
+                      style="position:absolute; right:10px; top:50%; transform:translateY(-50%); cursor:pointer;">
+                    <i class="fa-solid fa-eye"></i>
+                </span>
             </label>
 
             <div class="auth-actions">
@@ -42,3 +49,24 @@
         <p class="muted small">Don't have an account? <a href="/Account/Register">Register</a></p>
     </div>
 </section>
+
+@section Scripts {
+    <script>
+        function togglePasswordVisibility() {
+            const passwordField = document.getElementById('passwordInput');
+            const icon = document.querySelector('#togglePassword i');
+
+            if (!passwordField || !icon) return;
+
+            if (passwordField.type === 'password') {
+                passwordField.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                passwordField.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+    </script>
+}

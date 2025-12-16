@@ -1,0 +1,35 @@
+﻿@using IRCTCClone.Models
+@model IRCTCClone.Models.Booking
+
+@foreach (var p in Model.Passengers)
+{
+    string coach = (p.BookingStatus == "CNF" && !string.IsNullOrEmpty(p.SeatPrefix))
+        ? p.SeatPrefix
+        : "--";
+
+    string seat = (p.BookingStatus == "CNF" && !string.IsNullOrEmpty(p.SeatNumber))
+        ? new string(p.SeatNumber.SkipWhile(c => !char.IsDigit(c)).ToArray())
+        : "--";
+
+    <tr id="passenger-row-@p.Id">
+        <td>@p.Id</td>
+        <td>@p.Name</td>
+        <td>@p.Age</td>
+        <td>@p.Gender</td>
+        <td>@coach</td>
+        <td>@seat</td>
+        <td>@p.Berth</td>
+        <td>@Model.Frmst</td>
+        <td>@Model.Tost</td>
+        <td>
+            @p.BookingStatus
+            @if (p.Position.HasValue)
+            {
+                <text>(@p.Position)</text>
+            }
+        </td>
+        <td>
+            <button class="deleteBtnpassenger" data-id="@p.Id">Delete</button>
+        </td>
+    </tr>
+}

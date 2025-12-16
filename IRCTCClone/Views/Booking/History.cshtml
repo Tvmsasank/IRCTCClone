@@ -44,9 +44,16 @@ else
                         <td>@b.ClassCode</td>
                         <td>@b.JourneyDate.ToString("dd-MM-yyyy")</td>
                         <td>₹@b.BaseFare</td>
-                        <td class="@(b.Status == "CONFIRMED" ? "status-confirmed" : "status-cancelled")">
-                            @b.Status
-                        </td>
+                        @{
+                            string statusClass = b.Status switch
+                            {
+                                "CONFIRMED" or "CNF" => "History-CNF",
+                                "RAC" => "History-RAC",
+                                "WL" => "History-WL",
+                                _ => "History-Default"
+                            };
+                        }
+                        <td class="@statusClass">@b.Status</td>
                         <td>
                             <a asp-controller="Booking" asp-action="Details" asp-route-id="@b.BookingId" class="view-details-btn">
                                 View
@@ -56,18 +63,18 @@ else
                             <form asp-controller="Booking" asp-action="Cancel" asp-route-id="@b.BookingId" method="post" class="inline-cancel-form">
                                 <button type="submit" class="cancel-btn" onclick="return confirm('Are you sure you want to cancel this booking?')">Cancel</button>
                             </form>
-                        <td>
-                            @if (User.Identity.IsAuthenticated && b.Status?.ToUpper() == "CONFIRMED")
-                            {
-                                <a asp-action="DownloadTicket" asp-route-id="@b.BookingId"
-                                   class="btn btn-outline-primary btn-sm ms-1">
-                                    ⬇️ Download E-Ticket
-                                </a>
-                            }
                         </td>
-                        </td>
-                    </tr>
-                }
+                            <td>
+                                @if (User.Identity.IsAuthenticated)
+                                {
+                                    <a asp-action="DownloadTicket" asp-route-id="@b.BookingId"
+                                       class="btn btn-outline-primary btn-sm ms-1">
+                                        ⬇️ Download E-Ticket
+                                    </a>
+                                }
+                            </td>
+                        </tr>
+                    }
             </tbody>
         </table>
     </div>

@@ -24,9 +24,62 @@ namespace IRCTCClone.Models
         public String? PNR { get; set; }  
         public DateTime? JourneyDate { get; set; }  
         public int Amount { get; set; }  
-        public string Status { get; set; }  
+        public string Status { get; set; }
+        public int RACSeats { get; set; }      // Number of RAC seats allowed
+        public int SeatsAvailable { get; set; }
         public List<TrainClass> Classes { get; set; } = new();
 
+
+
+
+        public static Train GetTrainById(string connectionString, int trainId, int classId, string journeyDate)
+        {
+            Train train = null;
+
+            using (var conn = new SqlConnection(connectionString))
+            {
+                conn.Open();
+                using (var cmd = new SqlCommand("spGetTrainForCheckout", conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@TrainId", trainId);
+                    cmd.Parameters.AddWithValue("@ClassId", classId);
+                    cmd.Parameters.AddWithValue("@JourneyDate", journeyDate);
+
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            train = new Train
+                            {
+                                Id = reader.GetInt32(reader.GetOrdinal("TrainId")),
+                                Number = reader.GetInt32(reader.GetOrdinal("Number")),
+                                Name = reader.GetString(reader.GetOrdinal("TrainName")),
+                                Departure = reader.GetTimeSpan(reader.GetOrdinal("Departure")),
+                                Arrival = reader.GetTimeSpan(reader.GetOrdinal("Arrival")),
+                                Duration = reader.GetString(reader.GetOrdinal("Duration")),
+                                FromStationId = reader.GetInt32(reader.GetOrdinal("FromStationId")),
+                                ToStationId = reader.GetInt32(reader.GetOrdinal("ToStationId")),
+                                FromStation = new Station
+                                {
+                                    Id = reader.GetInt32(reader.GetOrdinal("FromStationId")),
+                                    Name = reader.GetString(reader.GetOrdinal("FromStationName")),
+                                    Code = reader.GetString(reader.GetOrdinal("FromStationCode"))
+                                },
+                                ToStation = new Station
+                                {
+                                    Id = reader.GetInt32(reader.GetOrdinal("ToStationId")),
+                                    Name = reader.GetString(reader.GetOrdinal("ToStationName")),
+                                    Code = reader.GetString(reader.GetOrdinal("ToStationCode"))
+                                }
+                            };
+                        }
+                    }
+                }
+            }
+
+            return train;
+        }
 
         // ✅ Static method to get trains via stored procedure
         public static List<Train> SearchTrains(string connectionString, string from, string to)
@@ -68,18 +121,27 @@ namespace IRCTCClone.Models
 
 
         // ✅ Fetch trains between 2 stations (calls spSearchTrains)
-        public static List<Train> GetTrains(string connectionString, int fromStationId, int toStationId)
+        public static List<Train> GetTrains(string connectionString, int fromStationId, int toStationId, string journeyDateStr)
         {
+
+            // Parse journey date from query string or default to today
+            DateTime journeyDate;
+            if (!DateTime.TryParse(journeyDateStr, out journeyDate))
+            {
+                journeyDate = DateTime.Today;
+            }
+
             var trains = new List<Train>();
 
             using (var conn = new SqlConnection(connectionString))
             {
                 conn.Open();
 
-                using (var cmd = new SqlCommand("spSearchTrains1", conn))
+                using (var cmd = new SqlCommand("spSearchTrainsCluster", conn))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@FromStationId", fromStationId);
+                    cmd.Parameters.AddWithValue("@ToStationId", toStationId);
 /*                    cmd.Parameters.AddWithValue("@ToStationId", toStationId);
 */
                     using (var reader = cmd.ExecuteReader())
@@ -92,19 +154,32 @@ namespace IRCTCClone.Models
                                 Number = reader.GetInt32(reader.GetOrdinal("Number")),
                                 Name = reader.GetString(reader.GetOrdinal("Name")),
 
-                                // 👉 Read the correct IDs coming from SQL 
                                 FromStationId = fromStationId,
                                 ToStationId = toStationId,
 
-                                Departure = reader.GetTimeSpan(reader.GetOrdinal("Departure")),
-                                Arrival = reader.GetTimeSpan(reader.GetOrdinal("Arrival")),
-                                Duration = reader.GetString(reader.GetOrdinal("Duration")),
+                                Departure = reader.IsDBNull(reader.GetOrdinal("FromDeparture"))
+                                    ? TimeSpan.Zero
+                                    : reader.GetTimeSpan(reader.GetOrdinal("FromDeparture")),
 
-                                FromStationName1 = reader.GetString(reader.GetOrdinal("FromStationName")),
-                                ToStationName1 = reader.GetString(reader.GetOrdinal("ToStationName")),
+                                Arrival = reader.IsDBNull(reader.GetOrdinal("ToArrival"))
+                                    ? TimeSpan.Zero
+                                    : reader.GetTimeSpan(reader.GetOrdinal("ToArrival")),
+
+                                Duration = reader.IsDBNull(reader.GetOrdinal("Duration"))
+                                    ? ""
+                                    : reader.GetString(reader.GetOrdinal("Duration")),
+
+                                FromStationName1 = reader.IsDBNull(reader.GetOrdinal("FromStation"))
+                                    ? ""
+                                    : reader.GetString(reader.GetOrdinal("FromStation")),
+
+                                ToStationName1 = reader.IsDBNull(reader.GetOrdinal("ToStation"))
+                                    ? ""
+                                    : reader.GetString(reader.GetOrdinal("ToStation")),
 
                                 Classes = new List<TrainClass>()
                             });
+
                         }
                     }
                 }
@@ -112,7 +187,7 @@ namespace IRCTCClone.Models
                 // Load classes for each train
                 foreach (var train in trains)
                 {
-                    train.Classes = TrainClass.GetClasses(connectionString, train.Id);
+                    train.Classes = TrainClass.GetClasses(connectionString, train.Id, journeyDate);
                 }
             }
 
@@ -319,6 +394,5 @@ namespace IRCTCClone.Models
 
             return trains;
         }
-
     }
 }

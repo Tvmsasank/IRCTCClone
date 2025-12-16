@@ -754,12 +754,12 @@ namespace IrctcClone.Controllers
 
                     // --- ✅ Update / Insert Train Routes ---
                     // You can first delete old routes (optional) and then insert new ones
-                    using (var delCmd = new SqlCommand("spDeleteTrainRoutesByTrainId", conn))
+/*                    using (var delCmd = new SqlCommand("spDeleteTrainRoutesByTrainId", conn))
                     {
                         delCmd.CommandType = CommandType.StoredProcedure;
                         delCmd.Parameters.AddWithValue("@TrainId", train.Id);
                         delCmd.ExecuteNonQuery();
-                    }
+                    }*/
 
                     for (int i = 0; i < routeStations.Count; i++)
                     {

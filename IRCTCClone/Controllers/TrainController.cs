@@ -73,13 +73,36 @@ namespace IRCTCClone.Controllers
 
         //----------------------------------------train results----------------------------------------------//
 
+        [HttpGet]
+        public IActionResult TrainResults(int? fromStationId, int? toStationId, string? journeyDateStr)
+        {
+            if (fromStationId == null || toStationId == null)
+                return View(); // blank
+
+            // Parse date
+            DateTime journeyDate;
+            if (!DateTime.TryParse(journeyDateStr, out journeyDate))
+                journeyDate = DateTime.Today;
+
+            var trains = Train.GetTrains(_connectionString, fromStationId.Value, toStationId.Value, journeyDate.ToString("yyyy-MM-dd"));
+
+            ViewBag.JourneyDate = journeyDate.ToString("yyyy-MM-dd");
+            return View(trains);
+        }
+
+
         [EnableRateLimiting("SearchLimiter")]
 
         [HttpPost]
-        public IActionResult TrainResults(int fromStationId, int toStationId, DateTime journeyDate)
+        public IActionResult TrainResults(int fromStationId, int toStationId, DateTime journeyDate, string journeyDateStr)
         {
-            var trains = Train.GetTrains(_connectionString, fromStationId, toStationId);
 
+            if (!DateTime.TryParse(journeyDateStr, out journeyDate))
+            {
+                journeyDate = DateTime.Today;
+            }
+
+            var trains = Train.GetTrains(_connectionString, fromStationId, toStationId, journeyDate.ToString("yyyy-MM-dd"));
 
             ViewBag.JourneyDate = journeyDate.ToString("yyyy-MM-dd");
             return View(trains);

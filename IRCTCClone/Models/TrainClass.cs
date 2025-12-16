@@ -30,10 +30,16 @@ namespace IRCTCClone.Models
         public int RACSeats { get; set; }      // Number of RAC seats allowed
         public int WLSeats { get; set; }       // Number of waiting list seats allowed
 
+        // These are computed remaining values (to be populated)
+        public int RemainingCNF { get; set; }
+        public int RacCount { get; set; }
+        public int RemainingWL { get; set; }
+        public DateTime JourneyDate { get; set; }
+
 
 
         // ✅ Get all classes for a specific train
-        public static List<TrainClass> GetClasses(string connectionString, int trainId)
+        public static List<TrainClass> GetClasses(string connectionString, int trainId, DateTime journeyDate)
         {
             var classes = new List<TrainClass>();
 
@@ -41,15 +47,22 @@ namespace IRCTCClone.Models
             {
                 conn.Open();
 
-                using (var cmd = new SqlCommand("spLoadTrainClasses", conn))
+                using (var cmd = new SqlCommand("spLoadTrainClassAvailability", conn))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@TrainId", trainId);
+                    cmd.Parameters.AddWithValue("@JourneyDate", journeyDate.Date);
 
                     using (var reader = cmd.ExecuteReader())
                     {
                         while (reader.Read())
                         {
+                            int totalSeats = reader.GetInt32(5);
+                            int totalRACSeats = reader.GetInt32(6);
+                            int cnfCount = reader.GetInt32(7);
+                            int racCount = reader.GetInt32(8);
+                            int wlCount = reader.GetInt32(9);
+
                             classes.Add(new TrainClass
                             {
                                 Id = reader.GetInt32(0),
@@ -57,7 +70,13 @@ namespace IRCTCClone.Models
                                 Code = reader.GetString(2),
                                 SeatPrefix = reader.GetString(3),
                                 BaseFare = reader.GetDecimal(4),
-                                SeatsAvailable = reader.GetInt32(5)
+
+                                // REAL availability
+                                //SeatsAvailable = Math.Max(totalSeats - cnfCount, 0),
+                                SeatsAvailable = reader.GetInt32(5),
+                                RACSeats = totalRACSeats,
+                                RacCount= racCount,
+                                WLSeats = wlCount
                             });
                         }
                     }

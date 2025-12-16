@@ -89,11 +89,11 @@ namespace IRCTCClone.Services
 
 
 
-        public byte[] GeneratePdf(int bookingId)
+        public (byte[] pdfBytes, string PNR) GeneratePdf(int bookingId)
         {
          
             var booking = GetBookingDetails(bookingId);
-            if (booking == null) return null;
+            if (booking == null) return (null, null);
 
             using (var ms = new MemoryStream())
             {
@@ -223,10 +223,10 @@ namespace IRCTCClone.Services
                 leftTbl.AddCell(new PdfPCell(new Phrase($"{booking.TrainNumber} - {booking.TrainName}", normal)) { Border = Rectangle.NO_BORDER });
 
                 leftTbl.AddCell(new PdfPCell(new Phrase("From", labelFont)) { Border = Rectangle.NO_BORDER });
-                leftTbl.AddCell(new PdfPCell(new Phrase($"{booking.Frmst} ({booking.Frmst?.Split(' ').FirstOrDefault()})", normal)) { Border = Rectangle.NO_BORDER });
+                leftTbl.AddCell(new PdfPCell(new Phrase($"{booking.Frmst}({booking.FromStationCode})", normal)) { Border = Rectangle.NO_BORDER });
 
                 leftTbl.AddCell(new PdfPCell(new Phrase("To", labelFont)) { Border = Rectangle.NO_BORDER });
-                leftTbl.AddCell(new PdfPCell(new Phrase($"{booking.Tost} ({booking.Tost?.Split(' ').FirstOrDefault()})", normal)) { Border = Rectangle.NO_BORDER });
+                leftTbl.AddCell(new PdfPCell(new Phrase($"{booking.Tost} ({booking.ToStationCode})", normal)) { Border = Rectangle.NO_BORDER });
 
                 leftTbl.AddCell(new PdfPCell(new Phrase("Journey Date", labelFont)) { Border = Rectangle.NO_BORDER });
                 leftTbl.AddCell(new PdfPCell(new Phrase(booking.JourneyDate.ToString("dd-MMM-yyyy"), normal)) { Border = Rectangle.NO_BORDER });
@@ -235,7 +235,30 @@ namespace IRCTCClone.Services
                 leftTbl.AddCell(new PdfPCell(new Phrase($"{booking.ClassCode} / {booking.Quota}", normal)) { Border = Rectangle.NO_BORDER });
 
                 leftTbl.AddCell(new PdfPCell(new Phrase("Status", labelFont)) { Border = Rectangle.NO_BORDER });
-                var statusCell = new PdfPCell(new Phrase(booking.Status, FontFactory.GetFont(FontFactory.HELVETICA_BOLD, 10, booking.Status == "CONFIRMED" ? BaseColor.GREEN : BaseColor.RED))) { Border = Rectangle.NO_BORDER };
+
+                BaseColor statusColor;
+
+                if (booking.Status == "CONFIRMED" || booking.Status == "CNF")
+                {
+                    statusColor = BaseColor.GREEN;
+                }
+
+                else if (booking.Status == "RAC")
+                {
+                    statusColor = new BaseColor(255, 165, 0); // Yellowish-Orange
+                }
+
+                else if (booking.Status == "WL")
+                {
+                    statusColor = BaseColor.RED;
+                }
+
+                else
+                {
+                    statusColor = BaseColor.BLACK; //default
+                }
+
+                var statusCell = new PdfPCell(new Phrase(booking.Status, FontFactory.GetFont(FontFactory.HELVETICA_BOLD, 10, statusColor))) { Border = Rectangle.NO_BORDER };
                 leftTbl.AddCell(statusCell);
 
                 topTbl.AddCell(leftTbl);
@@ -291,17 +314,19 @@ namespace IRCTCClone.Services
                 {
 
 
-                    string seatNo = string.IsNullOrEmpty(p.SeatNumber) ? "-" : p.SeatNumber;
-
-                    string coach = string.IsNullOrEmpty(p.SeatPrefix) ? "-" : p.SeatPrefix;
-
+                    string seat = (p.BookingStatus == "CNF" && !string.IsNullOrEmpty(p.SeatNumber))
+                    ? new string(p.SeatNumber.SkipWhile(c => !char.IsDigit(c)).ToArray())
+                    : "--";
+                    string coach = (p.BookingStatus == "CNF" && !string.IsNullOrEmpty(p.SeatPrefix))
+                    ? p.SeatPrefix
+                    : "--";
                     /* coach = p.SeatPrefix;
                      seatNo = p.SeatNumber.Length > 0 ? p.SeatNumber.Substring(0, 1) : "-";*/
                     passTbl.AddCell(new PdfPCell(new Phrase(p.Name, normal)) { Padding = 4f });
                     passTbl.AddCell(new PdfPCell(new Phrase(p.Age.ToString(), normal)) { HorizontalAlignment = Element.ALIGN_CENTER });
                     passTbl.AddCell(new PdfPCell(new Phrase(p.Gender, normal)) { HorizontalAlignment = Element.ALIGN_CENTER });
                     passTbl.AddCell(new PdfPCell(new Phrase(coach, normal)) { HorizontalAlignment = Element.ALIGN_CENTER });
-                    passTbl.AddCell(new PdfPCell(new Phrase(seatNo, normal)) { HorizontalAlignment = Element.ALIGN_CENTER });
+                    passTbl.AddCell(new PdfPCell(new Phrase(seat, normal)) { HorizontalAlignment = Element.ALIGN_CENTER });
                     passTbl.AddCell(new PdfPCell(new Phrase(p.Berth ?? "-", normal)) { HorizontalAlignment = Element.ALIGN_CENTER });
                 }
 
@@ -428,7 +453,7 @@ namespace IRCTCClone.Services
                 ms.Position = 0;
                 var fileName = $"{booking.PNR}_{booking.TrainName}_{booking.TrainNumber}.pdf";
          
-                return ms.ToArray();
+                return (ms.ToArray(), booking.PNR);
             }
         }
 
@@ -470,7 +495,8 @@ namespace IRCTCClone.Services
                                 SurgeAmount = reader["SurgeAmount"] != DBNull.Value ? Convert.ToDecimal(reader["SurgeAmount"]) : 0,
                                 TotalFare = reader["TotalFare"] != DBNull.Value ? Convert.ToDecimal(reader["TotalFare"]) : 0,
                                 QuotaCharge = reader["QuotaCharge"] != DBNull.Value ? Convert.ToDecimal(reader["QuotaCharge"]) : 0,
-                                Passengers = new List<Passenger>()
+                                Passengers = new List<Passenger>(),
+                                Stations = new List<Station>()
                             };
                         }
 
@@ -489,6 +515,27 @@ namespace IRCTCClone.Services
                                 });
                             }
                         }
+                        // 3️⃣ Stations
+                        if (reader.NextResult())
+                        {
+                            while (reader.Read())
+                            {
+                                var type = reader["StationType"]?.ToString();
+                                var code = reader["Code"]?.ToString();
+
+                                if (type == "FROM")
+                                {
+                                    booking.FromStationCode = code;
+                                }
+                                else if (type == "TO")
+                                {
+                                    booking.ToStationCode = code;
+                                }
+                            }
+                        }
+
+
+
                     }
                 }
             }

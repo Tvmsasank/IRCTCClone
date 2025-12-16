@@ -11,6 +11,7 @@
     var journey = ViewBag.JourneyDate ?? DateTime.Today.ToString("yyyy-MM-dd");
 }
 
+
 <section class="results-page fadeInUp">
     <div class="results-container">
         <h2 class="results-title">
@@ -41,29 +42,29 @@
                         @foreach (var t in Model)
                         {
                             <tr>
-                                <td>@t.Number</td>
+                                <td><strong>@t.Number</strong></td>
 
                                 <td>
                                     <a href="#" class="train-link"
                                        data-train-id="@t.Id"
                                        data-train-name="@t.Name"
-                                       data-train-number="@t.Number">
-                                        @t.Name
+                                       data-train-number="@t.Number"><strong>
+                                        @t.Name</strong>
                                     </a>
                                 </td>
 
-                                <td>@t.FromStationName1</td>
-                                <td>@t.Departure.ToString(@"hh\:mm")</td>
-                                <td>@t.Duration.Substring(0,5)</td>
-                                <td>@t.ToStationName1</td>
-                                <td>@t.Arrival.ToString(@"hh\:mm")</td>
+                                <td><strong>@t.FromStationName1</strong></td>
+                                <td><strong>@t.Departure.ToString(@"hh\:mm")</strong></td>
+                                <td>@t.Duration</td>
+                                <td><strong>@t.ToStationName1</strong></td>
+                                <td><strong>@t.Arrival.ToString(@"hh\:mm")</strong></td>
 
                                 <td>
                                     <div class="class-scroll">
                                         <div class="class-buttons">
                                             @foreach (var c in t.Classes)
                                             {
-                                                <form method="get" action="/Booking/Checkout" class="inline-form">
+                                                <form method="get" action="/Booking/CheckoutPost" class="inline-form">
                                                     <input type="hidden" name="trainId" value="@t.Id" />
                                                     <input type="hidden" name="classId" value="@c.Id" />
                                                     <input type="hidden" name="journeyDate" value="@journey" />
@@ -79,18 +80,22 @@
                                                             {
                                                                 seatStatus = "AVAILABLE - " + c.SeatsAvailable;
                                                             }
-                                                            else if (c.SeatsAvailable == 0)
+                                                            else if (c.RACSeats > 0)
                                                             {
-                                                                seatStatus = "RAC";
+                                                                seatStatus = "RAC - " + c.RACSeats; // <-- show count
+                                                            }
+                                                            else if (c.WLSeats > 0) 
+                                                            {
+                                                                seatStatus = "WL - " + c.WLSeats;
                                                             }
                                                             else
                                                             {
-                                                                seatStatus = "WL " + Math.Abs(c.SeatsAvailable);
+                                                                seatStatus = "Available - ";
                                                             }
                                                         }
-
                                                         @c.Code - ₹@c.BaseFare (@seatStatus)
                                                     </button>
+                                                    <input type="hidden" name="seatStatus" value="@seatStatus" />
                                                 </form>
                                             }
                                         </div>
@@ -103,6 +108,37 @@
             </div>
         }
     </div>
+
+
+
+
+    @if (TempData["RouteMismatch"] != null)
+    {
+        <div class="modal-overlay">
+            <div class="modal-box">
+
+                <h3 class="modal-title">Confirmation</h3>
+
+                <div class="popmodal">
+                    You searched trains from
+                    <strong>@TempData["SearchedFrom"]</strong> to
+                    <strong>@TempData["SearchedTo"]</strong>,<br />
+                    but the selected train runs from
+                    <strong>@TempData["ActualFrom"]</strong> to
+                    <strong>@TempData["ActualTo"]</strong>.<br /><br />
+                    Do you want to continue booking with the actual route?
+                </div>
+
+                <div class="modalbutton">
+                    <a href="/Booking/Checkout" class="btnmodal yes">✔ Yes</a>
+                    <a href="#" class="btnmodal no" id="closeRouteMismatch"><strong>X</strong> No</a>
+                </div>
+
+            </div>
+        </div>
+    }
+
+
 
     <!-- ✅ Right Side Drawer -->
     <div id="route-sidebar" class="route-sidebar">
@@ -119,10 +155,14 @@
     <!-- Background Overlay -->
     <div id="sidebar-overlay" class="sidebar-overlay"></div>
 
-</section>
+</section> 
 
 
 @section Scripts {
+
+    <!-- Bootstrap JS REQUIRED for modal -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
     <script>
         $(document).on("click", ".train-link", function (e) {
             e.preventDefault();
@@ -131,10 +171,8 @@
             var trainName = $(this).data("train-name");
             var trainNumber = $(this).data("train-number");
 
-            // Update Sidebar Title
             $(".sidebar-title").text(`Train Route of ${trainNumber} - ${trainName}`);
 
-            // Load via AJAX
             $.get("/Admin/GetTrainRoute", { trainId: trainId }, function (html) {
 
                 $("#sidebar-content").html(html);
@@ -144,10 +182,27 @@
             });
         });
 
-        // Close sidebar
         $(document).on("click", "#close-sidebar, #sidebar-overlay", function () {
             $("#route-sidebar").css("right", "-450px");
             $("#sidebar-overlay").fadeOut(200);
         });
+
+                document.addEventListener("click", function (e) {
+            if (e.target.id === "closeRouteMismatch") {
+                e.preventDefault();
+                document.querySelector(".modal-overlay").remove();
+            }
+        });
+
+            // document.addEventListener("DOMContentLoaded", function () {
+            //     var modal = new bootstrap.Modal(document.getElementById('routeMismatchModal'));
+            //     modal.show();
+            // });
+
+
+
     </script>
+
+
 }
+

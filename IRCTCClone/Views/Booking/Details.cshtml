@@ -18,7 +18,17 @@
         <p><strong>From:</strong> @Model.Frmst</p>
         <p><strong>To:</strong> @Model.Tost</p>
         <p><strong>Amount:</strong> ₹@Model.BaseFare</p>
-        <p><strong>Status:</strong> <span class="@(Model.Status == "CONFIRMED" ? "status-confirmed" : "status-cancelled")">@Model.Status</span></p>
+        @{
+            string ModelStatus = @Model.Status switch
+            {
+                "CONFIRMED" or "CNF" => "booking-CNF",
+                "RAC" => "booking-RAC",
+                "WL" => "booking-WL",
+                _ => "booking-Default"
+
+            };
+        }
+        <p><strong>Status:</strong> <span class="@ModelStatus">@Model.Status</span></p>
     </div>
 </div>
 
@@ -27,7 +37,7 @@
 <table class="passengers-table">
     <thead>
         <tr>
-            <th>ID</th>
+            <th class="hide-column"> ID</th>
             <th>Name</th>
             <th>Age</th>
             <th>Gender</th>
@@ -53,7 +63,7 @@
             : "--";
 
             <tr >
-                <td>@p.Id</td>
+                <td class=" hide-column">@p.Id</td>
                 <td>@p.Name</td>
                 <td>@p.Age</td>
                 <td>@p.Gender</td>
@@ -62,7 +72,17 @@
                 <td>@p.Berth</td>
                 <td>@Model.Frmst</td>
                 <td>@Model.Tost</td>
-                <td>
+                @{
+                    string BookingStatus = p.BookingStatus switch
+                    {
+                        "CONFIRMED" or "CNF" => "details-CNF",
+                        "RAC" => "details-RAC",
+                        "WL" => "details-WL",
+                        _ => "details-Default"
+
+                    };
+                }
+                <td class="@BookingStatus">
                     @p.BookingStatus
                     @if (p.Position.HasValue)
                     {
@@ -70,7 +90,7 @@
                     }
                 </td>
                 <td>
-                    <button class="deleteBtnpassenger " data-id="@p.Id">Delete</button>
+                    <button class="deleteBtnpassenger " data-id="@p.Id">Cancel</button>
 
                 </td>
                
@@ -91,7 +111,7 @@
 @section Scripts {
 
     <script>
-       $(document).on("click", ".deleteBtn", function () {
+           $(document).on("click", ".deleteBtnpassenger", function () {
         let id = $(this).data("id");
 
         if (!confirm("Are you sure you want to delete this passenger?"))
@@ -109,7 +129,7 @@
                     // Reload page after 1 second
                     setTimeout(() => {
                         location.reload();
-                    }, 800);
+                    }, 100);
                 }
                 else {
                     alert(res.message);

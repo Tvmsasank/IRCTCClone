@@ -14,7 +14,7 @@
                 <div class="col-md-6"><strong>PNR:</strong> @Model.PNR</div>
                 <div class="col-md-6 text-end">
                     <strong>Status:</strong>
-                    <span class="@(Model.Status == "CONFIRMED" ? "status-confirmed" : "status-cancelled")">
+                    <span class="@(Model.Status)">
                         @Model.Status
                     </span>
                 </div>

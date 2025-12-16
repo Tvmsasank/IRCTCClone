@@ -8,6 +8,9 @@ namespace IRCTCClone.Models
         public int Id { get; set; }
         public string PNR { get; set; } = null!;
         public string UserId { get; set; } = null!;
+
+        public string FromStationCode { get; set; }
+        public string ToStationCode { get; set; }
         public ApplicationUser? User { get; set; }
 
         public int TrainId { get; set; }
@@ -24,6 +27,8 @@ namespace IRCTCClone.Models
         public string Status { get; set; }
 
         public List<Passenger> Passengers { get; set; } = new();
+
+        public List<Station> Stations { get; set; } = new();
 
         public int BookingId { get; set; }
         public int TrainNumber { get; set; }
@@ -58,10 +63,15 @@ namespace IRCTCClone.Models
         public decimal Fare { get; set; }
         public bool IsWeekend { get; set; }
         public bool IsTatkalWindow { get; set; }
+    }
+
+    public class SeatStatus
+    {
         public int SeatsAvailable { get; set; }
         public int RACSeats { get; set; }
         public int ConfirmedCount { get; set; }
         public int RACCount { get; set; }
         public int WLCount { get; set; } = 0; // Add WLCount if needed
+
     }
 }

@@ -30,6 +30,8 @@
                 </p>
             </div>
             <form method="post" action="/Booking/Confirm" class="checkout-form">
+                <!-- 🔐 ENCRYPTED BOOKING DATA -->
+                <input type="hidden" name="edata" value="@ViewBag.EncryptedData" />
                 <input type="hidden" name="trainId" value="@train.Id" />
                 <input type="hidden" name="classId" value="@cls.Id" />
                 <input type="hidden" name="journeyDate" value="@journey" />
@@ -38,6 +40,11 @@
                 <input type="hidden" name="Class" value="@cls.Code" />
                 <input type="hidden" name="FromStationId" value="@ViewBag.FromStationId" />
                 <input type="hidden" name="ToStationId" value="@ViewBag.ToStationId" />
+                <input type="hidden" name="SeatStatuscount" value="@ViewBag.SeatStatusCount" />
+                <input type="hidden" name="BookingStatus" value="@ViewBag.BookingStatus" />
+
+
+
                 <div class="form-group mb-3">
                     <label for="Quota"><strong>Select Quota:</strong></label>
                     <select name="Quota" class="form-control" required>
@@ -78,6 +85,7 @@
                 <p class="total-fare">
                     Total Fare: ₹<span id="totalFare" data-fare="@cls.BaseFare">@cls.BaseFare</span>
                 </p>
+                <input type="hidden" name="edata" value="@ViewBag.EncryptedData" />
                 <button type="submit" class="btn-primary">Pay & Book (Mock)</button>
             </form>
 

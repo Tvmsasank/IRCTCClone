@@ -69,11 +69,12 @@
 
         <p>
             <strong>Status:</strong>
-            <span class="@(Model.Status == "CONFIRMED" ? "status-confirmed" : "status-cancelled")">
+            <span class="@(Model.Status)">
                 @Model.Status
             </span>
         </p>
     </div>
+
 
     <h3 class="passenger-heading">👥 Details of Passengers</h3>
 
