@@ -9,6 +9,8 @@
         public int ToStationId { get; set; }
         public int NumPassengers { get; set; }
         public string  SeatStatus { get; set; }
+        public string  FromStation { get; set; }
+        public string  ToStation { get; set; }
     }
 
 }

@@ -12,17 +12,21 @@ public static class TrainRouteValidator
     {
 
 
-        public static TrainRouteCheckResult Validate(int searchedFromId, int searchedToId, Train selectedTrain)
+        public static TrainRouteCheckResult Validate(int searchedFromId, int searchedToId, Train selectedTrain ,string FromStationName1,string ToStationName1, string FromStation, string ToStation)
         {
             var result = new TrainRouteCheckResult
             {
                 IsValid = (searchedFromId == selectedTrain.FromStationId &&
                            searchedToId == selectedTrain.ToStationId),
 
-                ActualFrom = selectedTrain.FromStationId,
-                ActualTo = selectedTrain.ToStationId,
-                SearchedFrom = searchedFromId,
-                SearchedTo = searchedToId
+                /* ActualFrom = selectedTrain.FromStationId,
+                 ActualTo = selectedTrain.ToStationId,*/
+
+
+                ActualFrom = FromStationName1,
+                ActualTo = ToStationName1,
+                SearchedFrom = FromStation,
+                SearchedTo = ToStation
             };
 
             return result;
@@ -31,10 +35,11 @@ public static class TrainRouteValidator
     public class TrainRouteCheckResult
     {
         public bool IsValid { get; set; }
-        public int ActualFrom { get; set; }
-        public int ActualTo { get; set; }
-        public int SearchedFrom { get; set; }
-        public int SearchedTo { get; set; }
+        public string ActualFrom { get; set; }
+        public string ActualTo { get; set; }
+        public string SearchedFrom { get; set; }
+        public string SearchedTo { get; set; }
+
 }
 
 

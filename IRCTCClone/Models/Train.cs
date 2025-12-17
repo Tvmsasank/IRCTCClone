@@ -8,7 +8,7 @@ namespace IRCTCClone.Models
         public int Id { get; set; }
         public int Number { get; set; }
         public string Name { get; set; } = null!;
-        public string FromStationName1 { get; set; } = null!;
+        public string FromStationName1  { get; set; } = null!;
         public string ToStationName1 { get; set; } = null!;
         public int FromStationId { get; set; }
         public Station? FromStation { get; set; }

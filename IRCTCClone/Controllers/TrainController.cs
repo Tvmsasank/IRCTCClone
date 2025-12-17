@@ -94,7 +94,7 @@ namespace IRCTCClone.Controllers
         [EnableRateLimiting("SearchLimiter")]
 
         [HttpPost]
-        public IActionResult TrainResults(int fromStationId, int toStationId, DateTime journeyDate, string journeyDateStr)
+        public IActionResult TrainResults(int fromStationId, int toStationId, DateTime journeyDate, string journeyDateStr,string fromStation, string toStation)
         {
 
             if (!DateTime.TryParse(journeyDateStr, out journeyDate))
@@ -104,6 +104,8 @@ namespace IRCTCClone.Controllers
 
             var trains = Train.GetTrains(_connectionString, fromStationId, toStationId, journeyDate.ToString("yyyy-MM-dd"));
 
+            ViewBag.From = fromStation; 
+            ViewBag.To = toStation; 
             ViewBag.JourneyDate = journeyDate.ToString("yyyy-MM-dd");
             return View(trains);
         }

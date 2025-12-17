@@ -9,6 +9,8 @@
     ViewData["Title"] = "Train Results";
     Layout = "~/Views/Shared/_Layout.cshtml";
     var journey = ViewBag.JourneyDate ?? DateTime.Today.ToString("yyyy-MM-dd");
+    var fromStation = ViewBag.From;
+    var toStation = ViewBag.To;
 }
 
 
@@ -70,7 +72,14 @@
                                                     <input type="hidden" name="journeyDate" value="@journey" />
 
                                                     <input type="hidden" name="FromStationId" value="@t.FromStationId" />
+                                                    <input type="hidden" name="FromStation" value="@fromStation" />
+                                                    <input type="hidden" name="ToStation" value="@toStation" />
                                                     <input type="hidden" name="ToStationId" value="@t.ToStationId" />
+
+
+                                                    <input type="hidden" name="FromStationName1" value="@t.FromStationName1" />
+                                                    <input type="hidden" name="ToStationName1" value="@t.ToStationName1" />
+
 
                                                     <button type="submit" class="class-btn">
                                                         @{

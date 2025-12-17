@@ -494,7 +494,7 @@ namespace IRCTCClone.Controllers
 
         // ---------- POST: receive form -> store payload in TempData -> Redirect ----------
         [HttpGet]
-        public IActionResult CheckoutPost(int trainId, int classId, string journeyDate, int FromStationId, int ToStationId, string seatStatus, int numPassengers = 1)
+        public IActionResult CheckoutPost(int trainId, int classId, string journeyDate, int FromStationId, int ToStationId, string seatStatus, string FromStationName1, string ToStationName1, string FromStation,string ToStation, int numPassengers = 1)
         {
 
             string connStr = _configuration.GetConnectionString("DefaultConnection");
@@ -513,6 +513,8 @@ namespace IRCTCClone.Controllers
                 JourneyDate = journeyDate,
                 FromStationId = FromStationId,
                 ToStationId = ToStationId,
+                FromStation = FromStationName1,
+                ToStation = ToStationName1,
                 NumPassengers = numPassengers,
                 SeatStatus= seatStatus
 
@@ -522,7 +524,9 @@ namespace IRCTCClone.Controllers
 
             Train train = Train.GetTrainById(connStr, trainId, classId, journeyDate);
 
-            var validation = TrainRouteValidator.Validate(FromStationId, ToStationId, train);
+      var validation = TrainRouteValidator.Validate(FromStationId, ToStationId, train, FromStationName1, ToStationName1, FromStation, ToStation);
+     
+
 
             if (!validation.IsValid)
             {
@@ -579,6 +583,8 @@ namespace IRCTCClone.Controllers
             int searchedToId = payload.ToStationId;     // the station user searched
 
             string SeatStatus = payload.SeatStatus;
+            string FromStation = payload.FromStation;
+            string ToStation = payload.ToStation;
 
             string[] parts = SeatStatus.Split('-');
             string numberPart = parts[1].Trim();   // "5"
@@ -738,6 +744,8 @@ namespace IRCTCClone.Controllers
             ViewBag.FromStationId = FromStationId;
             ViewBag.ToStationId = ToStationId;
             ViewBag.Booking = booking; // booking with passengers
+            ViewBag.FromStation = FromStation;
+            ViewBag.ToStation = ToStation;
             return View("Checkout", booking);
         }
    
@@ -1606,7 +1614,7 @@ namespace IRCTCClone.Controllers
         }
 
 
-        public IActionResult ConfirmRoute(int trainId, int classId, string journeyDate)
+/*        public IActionResult ConfirmRoute(int trainId, int classId, string journeyDate)
         {
             string connStr = _configuration.GetConnectionString("DefaultConnection");
 
@@ -1641,7 +1649,7 @@ namespace IRCTCClone.Controllers
 
             return RedirectToAction("Checkout", new { trainId });
         }
-
+*/
 
         [HttpPost]
         [Authorize]

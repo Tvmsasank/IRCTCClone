@@ -12,8 +12,9 @@
         <form method="post" action="/Train/TrainResults">
             <div class="new-search">
             <div class="form-group position-relative">
-                <input type="text" id="fromStation" placeholder="From Station" autocomplete="off" required />
+                    <input type="text" id="fromStation" placeholder="From Station" name="fromStation" autocomplete="off" required />
                 <input type="hidden" id="fromStationId" name="fromStationId" />  <!-- hidden -->
+                               
                 <div id="fromStationList" class="autocomplete-list"></div>
             </div>
             </div>
@@ -24,7 +25,7 @@
 
             <div class="new-search">
             <div class="form-group position-relative">
-                <input type="text" id="toStation" placeholder="To Station" autocomplete="off" required />
+                    <input type="text" id="toStation" placeholder="To Station" name="toStation" autocomplete="off" required />
                 <input type="hidden" id="toStationId" name="toStationId" />  <!-- hidden -->
                 <div id="toStationList" class="autocomplete-list"></div>
             </div>
