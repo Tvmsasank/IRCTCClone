@@ -8,9 +8,13 @@ namespace IRCTCClone.Models
         public int Id { get; set; }
         public int Number { get; set; }
         public string Name { get; set; } = null!;
+        public string FSM { get; set; } = null!;
+        public string TSM { get; set; } = null!;
         public string FromStationName1  { get; set; } = null!;
         public string ToStationName1 { get; set; } = null!;
         public int FromStationId { get; set; }
+        public int userfromid { get; set; }
+        public int usertoid { get; set; }
         public Station? FromStation { get; set; }
         public int ToStationId { get; set; }
         public Station? ToStation { get; set; }
@@ -154,8 +158,8 @@ namespace IRCTCClone.Models
                                 Number = reader.GetInt32(reader.GetOrdinal("Number")),
                                 Name = reader.GetString(reader.GetOrdinal("Name")),
 
-                                FromStationId = fromStationId,
-                                ToStationId = toStationId,
+                                FromStationId = reader.GetInt32(reader.GetOrdinal("FromStationId")),
+                                ToStationId = reader.GetInt32(reader.GetOrdinal("ToStationId")),
 
                                 Departure = reader.IsDBNull(reader.GetOrdinal("FromDeparture"))
                                     ? TimeSpan.Zero
@@ -176,6 +180,10 @@ namespace IRCTCClone.Models
                                 ToStationName1 = reader.IsDBNull(reader.GetOrdinal("ToStation"))
                                     ? ""
                                     : reader.GetString(reader.GetOrdinal("ToStation")),
+
+                                FSM = reader.GetString(reader.GetOrdinal("FSM")),
+                                TSM = reader.GetString(reader.GetOrdinal("TSM")),
+                                
 
                                 Classes = new List<TrainClass>()
                             });

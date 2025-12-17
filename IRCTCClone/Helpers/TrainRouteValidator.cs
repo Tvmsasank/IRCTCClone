@@ -7,17 +7,17 @@ namespace IRCTCClone.Helpers
 
 
 
-  
-public static class TrainRouteValidator
+
+    public static class TrainRouteValidator
     {
 
 
-        public static TrainRouteCheckResult Validate(int searchedFromId, int searchedToId, Train selectedTrain ,string FromStationName1,string ToStationName1, string FromStation, string ToStation)
+        public static TrainRouteCheckResult Validate(int searchedFromId, int searchedToId, Train selectedTrain, string FromStationName1, string ToStationName1, string FromStation, string ToStation)
         {
             var result = new TrainRouteCheckResult
             {
                 IsValid = (searchedFromId == selectedTrain.FromStationId &&
-                           searchedToId == selectedTrain.ToStationId),
+                       searchedToId == selectedTrain.ToStationId),
 
                 /* ActualFrom = selectedTrain.FromStationId,
                  ActualTo = selectedTrain.ToStationId,*/
@@ -25,27 +25,37 @@ public static class TrainRouteValidator
 
                 ActualFrom = FromStationName1,
                 ActualTo = ToStationName1,
-                SearchedFrom = FromStation,
-                SearchedTo = ToStation
+
+
+            SearchedFrom = FromStation.Contains("(")
+            ? FromStation[(FromStation.IndexOf('(') + 1)..FromStation.IndexOf(')')]
+            : FromStation,
+
+            SearchedTo = ToStation.Contains("(")
+            ? ToStation[(ToStation.IndexOf('(') + 1)..ToStation.IndexOf(')')]
+            : ToStation,
+
             };
 
             return result;
         }
 
-    public class TrainRouteCheckResult
-    {
-        public bool IsValid { get; set; }
-        public string ActualFrom { get; set; }
-        public string ActualTo { get; set; }
-        public string SearchedFrom { get; set; }
-        public string SearchedTo { get; set; }
+        public class TrainRouteCheckResult
+        {
+            public bool IsValid { get; set; }
+            public string ActualFrom { get; set; }
+            public string ActualTo { get; set; }
+            public string SearchedFrom { get; set; }
+            public string SearchedTo { get; set; }
 
+        }
+    }
 }
 
 
 
 
-        public static void ValidateTrainRoute(int searchedFromId, int searchedToId, Train selectedTrain, string connectionString)
+/*        public static void ValidateTrainRoute(int searchedFromId, int searchedToId, Train selectedTrain, string connectionString)
         {
             if (searchedFromId != selectedTrain.FromStationId || searchedToId != selectedTrain.ToStationId)
             {
@@ -68,5 +78,5 @@ public static class TrainRouteValidator
                 }
             }
         }
-    }
-}
+    }*/
+

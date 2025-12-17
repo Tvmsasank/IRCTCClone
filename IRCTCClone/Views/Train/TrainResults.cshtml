@@ -2,15 +2,19 @@
 @using IRCTCClone.E_D
 
 @{
-    string encryptedDate = UrlEncryptionHelper.Encrypt(ViewBag.JourneyDate.ToString());
-}
-
-@{
     ViewData["Title"] = "Train Results";
     Layout = "~/Views/Shared/_Layout.cshtml";
     var journey = ViewBag.JourneyDate ?? DateTime.Today.ToString("yyyy-MM-dd");
-    var fromStation = ViewBag.From;
-    var toStation = ViewBag.To;
+    // var fromStation = ViewBag.From;
+    // var toStation = ViewBag.To;
+
+     var fromStation = TempData["FromStation"]?.ToString();
+    var toStation = TempData["ToStation"]?.ToString();
+
+    var userfromid= TempData["fromStationId"];
+    var usertoid= TempData["toStationId"] ;
+
+
 }
 
 
@@ -33,7 +37,7 @@
                             <th>Number</th>
                             <th>Name</th>
                             <th>From</th>
-                            <th>Departure</th>
+                            <th>Departure</th>  
                             <th>Duration</th>
                             <th>To</th>
                             <th>Arrival</th>
@@ -55,7 +59,7 @@
                                     </a>
                                 </td>
 
-                                <td><strong>@t.FromStationName1</strong></td>
+                                <td><strong>@t.FromStationName1</strong></td>                     
                                 <td><strong>@t.Departure.ToString(@"hh\:mm")</strong></td>
                                 <td>@t.Duration</td>
                                 <td><strong>@t.ToStationName1</strong></td>
@@ -71,16 +75,23 @@
                                                     <input type="hidden" name="classId" value="@c.Id" />
                                                     <input type="hidden" name="journeyDate" value="@journey" />
 
+                                                    <input type="hidden" name="userfromid" value="@userfromid" />
+                                                    <input type="hidden" name="usertoid" value="@usertoid" />
+
                                                     <input type="hidden" name="FromStationId" value="@t.FromStationId" />
-                                                    <input type="hidden" name="FromStation" value="@fromStation" />
-                                                    <input type="hidden" name="ToStation" value="@toStation" />
                                                     <input type="hidden" name="ToStationId" value="@t.ToStationId" />
 
+                                                     <input type="hidden" name="FromStation" value="@fromStation" />
+                                                    <input type="hidden" name="ToStation" value="@toStation" />
 
-                                                    <input type="hidden" name="FromStationName1" value="@t.FromStationName1" />
-                                                    <input type="hidden" name="ToStationName1" value="@t.ToStationName1" />
 
+                                                    <!-- ✅ ADD THESE -->
+                                                    <input type="hidden" name="Departure" value="@t.Departure.ToString(@"hh\:mm")" />
+                                                    <input type="hidden" name="Arrival" value="@t.Arrival.ToString(@"hh\:mm")" />
+                                                    <input type="hidden" name="Duration" value="@t.Duration" />
 
+                                                    <input type="hidden" name="FSM" value="@t.FSM" />  
+                                                    <input type="hidden" name="TSM" value="@t.TSM" />
                                                     <button type="submit" class="class-btn">
                                                         @{
                                                             string seatStatus;
@@ -140,7 +151,7 @@
 
                 <div class="modalbutton">
                     <a href="/Booking/Checkout" class="btnmodal yes">✔ Yes</a>
-                    <a href="#" class="btnmodal no" id="closeRouteMismatch"><strong>X</strong> No</a>
+                     <a href="/Train/TrainResults" class="btnmodal no" id="closeRouteMismatch"><strong>X</strong> No</a>
                 </div>
 
             </div>

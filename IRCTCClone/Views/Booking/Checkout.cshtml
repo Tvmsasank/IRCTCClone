@@ -10,6 +10,15 @@
     var journey = ViewBag.JourneyDate as string ?? DateTime.Today.ToString("yyyy-MM-dd");
     var frmst = ViewBag.FromStation;
     var tost = ViewBag.ToStation;
+    var FromStation1 = ViewBag.FromStation1;
+    var ToStation1 = ViewBag.ToStation1;
+
+
+    var Departure= ViewBag.Departure;
+    var Arrival=ViewBag.Arrival;
+    var Duration=ViewBag.Duration;
+
+
  }
     
 
@@ -22,14 +31,14 @@
             <div class="train-info">
                 <p><strong>Train:</strong> @train.Number - @train.Name</p>
                 <p><strong>Class:</strong> @cls.Code, Fare: ₹@cls.BaseFare</p>
-                <p><strong>Route:</strong> @train.FromStation?.Name (@train.FromStation?.Code) → @train.ToStation?.Name (@train.ToStation?.Code)</p>
-                <p><strong>Route:</strong> @train.FromStation?.Name (@train.FromStation?.Code) → @train.ToStation?.Name (@train.ToStation?.Code)</p>
+                <p><strong>Route:</strong> @FromStation1 → @ToStation1</p>
+        
                 <p><strong>Boarding Date:</strong> @train.JourneyDate?.ToString("dd-MM-yyyy")</p>
 
                 <p>
-                    <strong>Departure:</strong> @train.Departure.ToString(@"hh\:mm") |
-                    <strong>Arrival:</strong> @train.Arrival.ToString(@"hh\:mm") |
-                    <strong>Duration:</strong> @train.Duration
+                    <strong>Departure:</strong> @Departure |
+                    <strong>Arrival:</strong> @Arrival |
+                    <strong>Duration:</strong> @Duration
                 </p>
             </div>
             <form method="post" action="/Booking/Confirm" class="checkout-form">

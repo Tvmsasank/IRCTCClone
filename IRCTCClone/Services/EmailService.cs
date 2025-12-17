@@ -223,7 +223,7 @@ namespace IRCTCClone.Services
                 leftTbl.AddCell(new PdfPCell(new Phrase($"{booking.TrainNumber} - {booking.TrainName}", normal)) { Border = Rectangle.NO_BORDER });
 
                 leftTbl.AddCell(new PdfPCell(new Phrase("From", labelFont)) { Border = Rectangle.NO_BORDER });
-                leftTbl.AddCell(new PdfPCell(new Phrase($"{booking.Frmst}({booking.FromStationCode})", normal)) { Border = Rectangle.NO_BORDER });
+                leftTbl.AddCell(new PdfPCell(new Phrase($"{booking.Frmst} ({booking.FromStationCode})", normal)) { Border = Rectangle.NO_BORDER });
 
                 leftTbl.AddCell(new PdfPCell(new Phrase("To", labelFont)) { Border = Rectangle.NO_BORDER });
                 leftTbl.AddCell(new PdfPCell(new Phrase($"{booking.Tost} ({booking.ToStationCode})", normal)) { Border = Rectangle.NO_BORDER });
@@ -314,10 +314,10 @@ namespace IRCTCClone.Services
                 {
 
 
-                    string seat = (p.BookingStatus == "CNF" && !string.IsNullOrEmpty(p.SeatNumber))
+                    string seat = (booking.Status == "CNF" && !string.IsNullOrEmpty(p.SeatNumber))
                     ? new string(p.SeatNumber.SkipWhile(c => !char.IsDigit(c)).ToArray())
                     : "--";
-                    string coach = (p.BookingStatus == "CNF" && !string.IsNullOrEmpty(p.SeatPrefix))
+                    string coach = (booking.Status == "CNF" && !string.IsNullOrEmpty(p.SeatPrefix))
                     ? p.SeatPrefix
                     : "--";
                     /* coach = p.SeatPrefix;

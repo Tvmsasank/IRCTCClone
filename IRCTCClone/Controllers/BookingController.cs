@@ -494,7 +494,7 @@ namespace IRCTCClone.Controllers
 
         // ---------- POST: receive form -> store payload in TempData -> Redirect ----------
         [HttpGet]
-        public IActionResult CheckoutPost(int trainId, int classId, string journeyDate, int FromStationId, int ToStationId, string seatStatus, string FromStationName1, string ToStationName1, string FromStation,string ToStation, int numPassengers = 1)
+        public IActionResult CheckoutPost(int trainId, int classId, string journeyDate, int FromStationId, int ToStationId, string seatStatus, string FSM, string TSM, string FromStation,string ToStation,int userfromid, int usertoid, string Departure, string Arrival,string Duration,int numPassengers = 1)
         {
 
             string connStr = _configuration.GetConnectionString("DefaultConnection");
@@ -513,18 +513,29 @@ namespace IRCTCClone.Controllers
                 JourneyDate = journeyDate,
                 FromStationId = FromStationId,
                 ToStationId = ToStationId,
-                FromStation = FromStationName1,
-                ToStation = ToStationName1,
+                FromStation = FromStation,
+                FromStation1 = FSM,
+                ToStation = ToStation,
+                ToStation1 = TSM,
                 NumPassengers = numPassengers,
-                SeatStatus= seatStatus
+                SeatStatus= seatStatus,
+                userfromid= userfromid,
+                usertoid= usertoid,
+                Departure=Departure,
+                Arrival=Arrival,
+                Duration=Duration
+
 
             };
             HttpContext.Session.SetString("CheckoutPayload", JsonConvert.SerializeObject(payload));
 
 
-            Train train = Train.GetTrainById(connStr, trainId, classId, journeyDate);
+            /*            Train train = Train.GetTrainById(connStr, trainId, classId, journeyDate);*/
+            var trains = Train.GetTrains(connStr, FromStationId, ToStationId, journeyDate);
+            Train train = trains.FirstOrDefault();
 
-      var validation = TrainRouteValidator.Validate(FromStationId, ToStationId, train, FromStationName1, ToStationName1, FromStation, ToStation);
+
+            var validation = TrainRouteValidator.Validate(userfromid, usertoid, train, FSM, TSM, FromStation, ToStation);
      
 
 
@@ -542,6 +553,8 @@ namespace IRCTCClone.Controllers
                 {
                     fromStationId = FromStationId,
                     toStationId = ToStationId,
+                    FromStation= FromStation,
+                    ToStation= ToStation,
                     journeyDateStr = journeyDate
                 });
             }
@@ -585,6 +598,15 @@ namespace IRCTCClone.Controllers
             string SeatStatus = payload.SeatStatus;
             string FromStation = payload.FromStation;
             string ToStation = payload.ToStation;
+
+            string FromStationName1 = payload.FromStation1;
+            string ToStationName1 = payload.ToStation1;
+
+            string Arrival = payload.Arrival;
+            string Duration = payload.Duration;
+            string Departure = payload.Departure;
+
+
 
             string[] parts = SeatStatus.Split('-');
             string numberPart = parts[1].Trim();   // "5"
@@ -744,8 +766,15 @@ namespace IRCTCClone.Controllers
             ViewBag.FromStationId = FromStationId;
             ViewBag.ToStationId = ToStationId;
             ViewBag.Booking = booking; // booking with passengers
+            ViewBag.FromStation1 = FromStationName1;
+            ViewBag.ToStation1 = ToStationName1;
             ViewBag.FromStation = FromStation;
             ViewBag.ToStation = ToStation;
+
+            ViewBag.Departure = Departure;
+            ViewBag.Arrival = Arrival;
+            ViewBag.Duration = Duration;
+
             return View("Checkout", booking);
         }
    
@@ -1002,8 +1031,6 @@ namespace IRCTCClone.Controllers
 
                 // Build email content
                 string userEmail = User.FindFirstValue(ClaimTypes.NameIdentifier); 
-       
-
                 string userName = User.Identity.Name ?? "Passenger";
                 var pdfResult = _emailService.GeneratePdf(bookingId);
                 if (pdfResult.pdfBytes == null)

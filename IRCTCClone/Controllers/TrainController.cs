@@ -74,7 +74,7 @@ namespace IRCTCClone.Controllers
         //----------------------------------------train results----------------------------------------------//
 
         [HttpGet]
-        public IActionResult TrainResults(int? fromStationId, int? toStationId, string? journeyDateStr)
+        public IActionResult TrainResults(int? fromStationId, int? toStationId,string FromStation, string ToStation, string? journeyDateStr)
         {
             if (fromStationId == null || toStationId == null)
                 return View(); // blank
@@ -85,7 +85,10 @@ namespace IRCTCClone.Controllers
                 journeyDate = DateTime.Today;
 
             var trains = Train.GetTrains(_connectionString, fromStationId.Value, toStationId.Value, journeyDate.ToString("yyyy-MM-dd"));
-
+            TempData["FromStation"] = FromStation;
+            TempData["ToStation"] = ToStation;
+            TempData["fromStationId"] = fromStationId;
+            TempData["toStationId"] = toStationId;
             ViewBag.JourneyDate = journeyDate.ToString("yyyy-MM-dd");
             return View(trains);
         }
@@ -103,9 +106,14 @@ namespace IRCTCClone.Controllers
             }
 
             var trains = Train.GetTrains(_connectionString, fromStationId, toStationId, journeyDate.ToString("yyyy-MM-dd"));
+            /*
+                        ViewBag.From = fromStation; 
+                        ViewBag.To = toStation; */
 
-            ViewBag.From = fromStation; 
-            ViewBag.To = toStation; 
+            TempData["FromStation"] = fromStation;
+            TempData["ToStation"] = toStation;
+            TempData["fromStationId"] = fromStationId;
+            TempData["toStationId"] = toStationId;
             ViewBag.JourneyDate = journeyDate.ToString("yyyy-MM-dd");
             return View(trains);
         }
