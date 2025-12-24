@@ -14,19 +14,23 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Reflection.Metadata;
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using static System.Net.Mime.MediaTypeNames;
 using Font = iTextSharp.text.Font;
 using Image = iTextSharp.text.Image;
+using Microsoft.AspNetCore.RateLimiting;
 
 
 namespace IRCTCClone.Controllers
 {
     [EnableRateLimiting("DefaultPolicy")]
-
     [Authorize]
     public class BookingController : Controller
     {
@@ -60,6 +64,54 @@ namespace IRCTCClone.Controllers
                 _ => "--"
             };
         }
+
+
+        //-------------------------------SENDS OTP EMAIL---------------------------------//
+        private void SendOTPEmail(string userEmail, string otp)
+        {
+            string subject = "IRCTC Clone – OTP Verification";
+            string body = $@"
+                <h3>OTP Verification</h3>
+                <p>Your One-Time Password (OTP) is:</p>
+                <h2>{otp}</h2>
+                <p>This OTP is valid for <strong>1 minute</strong>.</p>
+                <p>If you did not initiate this request, please ignore this email.</p>";
+
+            _emailService.SendEmail(
+                userEmail,
+                subject,
+                body
+            );
+        }
+
+
+        //-------------------------------HASHES OTP---------------------------------//
+        private bool VerifyOTP(string userId, string enteredOtp, string purpose)
+        {
+            using (var conn = new SqlConnection(_connectionString))
+            {
+                conn.Open();
+
+                string enteredOtpHash = HashOTP(enteredOtp);
+
+                using (var cmd = new SqlCommand("spVerifyOTP", conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@UserId", userId);
+                    cmd.Parameters.AddWithValue("@EnteredOtpHash", enteredOtpHash);
+                    cmd.Parameters.AddWithValue("@Purpose", "PAYMENT");
+
+                    var isValidParam = new SqlParameter("@IsValid", SqlDbType.Bit) { Direction = ParameterDirection.Output };
+                    cmd.Parameters.Add(isValidParam);
+
+                    cmd.ExecuteNonQuery();
+                    return (bool)isValidParam.Value;
+                }
+            }
+
+        }
+
+
 
         /*---------------------------------GETS SEATS STATUS------------------------------*/
         private SeatStatus GetSeatStatus(int trainId, int classId)
@@ -228,6 +280,41 @@ namespace IRCTCClone.Controllers
 
             return null;
         }
+
+        //--------------------------------------- CAPTCHA ----------------------------------------//
+
+/*        [DisableRateLimiting]
+        [HttpGet("Generate")]
+        public IActionResult Generate()
+        {
+            string captchaText = GenerateRandomText(5);
+            HttpContext.Session.SetString("CAPTCHA", captchaText);
+
+            using (Bitmap bmp = new Bitmap(120, 40))
+            using (Graphics g = Graphics.FromImage(bmp))
+            using (MemoryStream ms = new MemoryStream())
+            {
+                g.Clear(Color.White);
+
+                using (var font = new System.Drawing.Font("Arial", 20, System.Drawing.FontStyle.Bold))
+                {
+                    g.DrawString(captchaText, font, Brushes.Black, 10, 5);
+                }
+
+                // noise
+                Random rnd = new Random();
+                for (int i = 0; i < 10; i++)
+                {
+                    g.DrawLine(Pens.Gray,
+                        rnd.Next(120), rnd.Next(40),
+                        rnd.Next(120), rnd.Next(40));
+                }
+
+                bmp.Save(ms, ImageFormat.Png);
+                return File(ms.ToArray(), "image/png");
+            }
+        }
+*/
 
         //---------------------------------------recently added down---------------------------------------//
 
@@ -494,7 +581,7 @@ namespace IRCTCClone.Controllers
 
         // ---------- POST: receive form -> store payload in TempData -> Redirect ----------
         [HttpGet]
-        public IActionResult CheckoutPost(int trainId, int classId, string journeyDate, int FromStationId, int ToStationId, string seatStatus, string FSM, string TSM, string FromStation,string ToStation,int userfromid, int usertoid, string Departure, string Arrival,string Duration,int numPassengers = 1)
+        public IActionResult PrepareCheckout(int trainId, int classId, string journeyDate, int FromStationId, int ToStationId, string seatStatus, string FSM, string TSM, string FromStation,string ToStation,int userfromid, int usertoid, string Departure, string Arrival,string Duration,int numPassengers = 1)
         {
 
             string connStr = _configuration.GetConnectionString("DefaultConnection");
@@ -777,7 +864,36 @@ namespace IRCTCClone.Controllers
 
             return View("Checkout", booking);
         }
-   
+
+
+        [HttpPost]
+        public IActionResult RequestOtp(Booking model)
+        {
+            string userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId))
+                return Json(new { success = false, message = "Not authenticated" });
+
+            string otp = GenerateOTP();
+            string hashedOtp = HashOTP(otp);
+
+            using (var conn = new SqlConnection(_connectionString))
+            {
+                conn.Open();
+                using (var cmd = new SqlCommand("spRequestOtp", conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@UserId", userId);
+                    cmd.Parameters.AddWithValue("@OtpHash", hashedOtp);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+
+            // send email after SP execution
+            SendOTPEmail(userId, otp);
+
+            return Json(new { success = true });
+        }
+
 
 
 
@@ -797,9 +913,52 @@ namespace IRCTCClone.Controllers
             int FromStationId,
             int ToStationId,
             int SeatStatuscount,
-            string BookingStatus
+            string BookingStatus,
+            string CaptchaInput,
+            string otp = null
             )
         {
+
+            // ================= AUTH =================
+            string userid = User.FindFirstValue(ClaimTypes.NameIdentifier); // email
+            string username = User.Identity.Name ?? "Passenger";
+
+            // ================= CAPTCHA VERIFICATION (FIRST GATE) =================
+            string sessionCaptcha = HttpContext.Session.GetString("CAPTCHA");
+
+            if (string.IsNullOrEmpty(sessionCaptcha) ||
+                string.IsNullOrEmpty(CaptchaInput) ||
+                !CaptchaInput.Equals(sessionCaptcha, StringComparison.OrdinalIgnoreCase))
+            {
+                TempData["Error"] = "Invalid captcha.";
+                return RedirectToAction("Checkout", new { trainId, classId, journeyDate });
+            }
+
+            // OPTIONAL: prevent captcha reuse
+            HttpContext.Session.Remove("CAPTCHA");
+
+            // ================= OTP VERIFICATION (MANDATORY) =================
+            if (string.IsNullOrEmpty(otp))
+            {
+                TempData["Error"] = "OTP is required to complete booking.";
+                return RedirectToAction("Checkout", new { trainId, classId, journeyDate });
+            }
+
+            bool isOtpValid = VerifyOTP(userid, otp, "PAYMENT");
+
+            if (!isOtpValid)
+            {
+                TempData["Error"] = "Invalid or expired OTP.";
+                return RedirectToAction("Checkout", new { trainId, classId, journeyDate });
+            }
+
+            if (string.IsNullOrEmpty(userid))
+            {
+                TempData["Error"] = "Please log in to continue.";
+                return RedirectToAction("Login", "Account");
+            }
+
+            // ================= BASIC VALIDATION =================
             int availableCount = SeatStatuscount;
             if (passengerNames == null || passengerNames.Count == 0)
             {
@@ -814,9 +973,9 @@ namespace IRCTCClone.Controllers
                 return RedirectToAction("Checkout", new { trainId, classId, journeyDate });
             }
 
-            Station fromStation = null;
-            Station toStation = null;
-    
+                Station fromStation = null;
+                Station toStation = null;
+
 
 
             using (var conn = new SqlConnection(_connectionString))
@@ -935,6 +1094,63 @@ namespace IRCTCClone.Controllers
                 decimal totalFare = bookingFinalFare;
                 string status = BookingStatus;
 
+
+
+/*                // ================= OTP GATE =================
+                string userid = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(userid))
+                {
+                    TempData["Error"] = "Please log in to continue.";
+                    return RedirectToAction("Login", "Account");
+                }
+
+                // STEP 1: OTP NOT ENTERED → GENERATE & SEND
+                if (string.IsNullOrEmpty(otp))
+                {
+                    string generatedOtp = GenerateOTP();
+                    string hashedOtp = HashOTP(generatedOtp);
+
+                    using (var otpCmd = new SqlCommand(
+                        @"INSERT INTO OTPRequests (UserId, OTPHash, Purpose, ExpiryTime)
+          VALUES (@UserId, @OTPHash, 'PAYMENT', DATEADD(MINUTE,1,GETDATE()))", conn))
+                    {
+                        otpCmd.Parameters.AddWithValue("@UserId", userId);
+                        otpCmd.Parameters.AddWithValue("@OTPHash", hashedOtp);
+                        otpCmd.ExecuteNonQuery();
+                    }
+
+                    // Send OTP
+                    string useremail = User.FindFirstValue(ClaimTypes.Email);
+                    SendOTPEmail(useremail, generatedOtp);
+
+                    TempData["OTP_REQUIRED"] = true;
+
+                    // 🔴 STOP HERE — DO NOT BOOK YET
+                    return RedirectToAction("Checkout", new
+                    {
+                        trainId,
+                        classId,
+                        journeyDate
+                    });
+                }
+
+                // STEP 2: OTP ENTERED → VERIFY
+                bool isOtpValid = VerifyOTP(userid, otp, "PAYMENT");
+                if (!isOtpValid)
+                {
+                    TempData["Error"] = "Invalid or expired OTP.";
+                    TempData["OTP_REQUIRED"] = true;
+
+                    return RedirectToAction("Checkout", new
+                    {
+                        trainId,
+                        classId,
+                        journeyDate
+                    });
+                }
+                // ================= OTP VERIFIED =================
+*/
+
                 var seatStatus = GetSeatStatus(trainId, classId);
 
                 // Update seats availability
@@ -1023,10 +1239,6 @@ namespace IRCTCClone.Controllers
                     SurgeAmount = surge,
                     FinalFare = totalBaseFare,
                     TotalFare = totalFare,
-     
-                    
-                 
-
                 };
 
                 // Build email content
@@ -1687,6 +1899,8 @@ namespace IRCTCClone.Controllers
         }
 
 
+        /*------------------------------pnr and otp generation-----------------------*/
+        //pnr generation
         private string GeneratePnr()
         {
             var rand = new Random();
@@ -1702,6 +1916,29 @@ namespace IRCTCClone.Controllers
             return firstDigit + restDigits;
         }
 
+
+        //otp generation
+        public static string GenerateOTP()
+        {
+            Random rnd = new Random();
+            return rnd.Next(100000, 999999).ToString(); // 6-digit
+        }
+
+        public static string HashOTP(string otp)
+        {
+            using var sha = SHA256.Create();
+            var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(otp));
+            return Convert.ToBase64String(bytes);
+        }
+
+/*        private string GenerateRandomText(int length)
+        {
+            const string chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+            Random rnd = new Random();
+            return new string(Enumerable.Repeat(chars, length)
+                .Select(s => s[rnd.Next(s.Length)]).ToArray());
+        }
+*/
     }
 
 

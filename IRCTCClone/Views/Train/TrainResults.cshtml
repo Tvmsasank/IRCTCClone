@@ -8,18 +8,229 @@
     // var fromStation = ViewBag.From;
     // var toStation = ViewBag.To;
 
-     var fromStation = TempData["FromStation"]?.ToString();
+    var fromStation = TempData["FromStation"]?.ToString();
     var toStation = TempData["ToStation"]?.ToString();
 
     var userfromid= TempData["fromStationId"];
     var usertoid= TempData["toStationId"] ;
 
+    TempData.Keep();
 
 }
 
+<style>
+    .train-card {
+        background: var(--card-bg);
+        border: 1px solid var(--irctc-blue-border);
+        border-left: 5px solid var(--irctc-blue);
+        border-radius: 6px;
+        margin-bottom: 20px;
+        padding: 16px;
+        box-shadow: 0 2px 6px rgba(26, 79, 163, 0.08);
+    }
+
+    .train-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-bottom: 10px;
+        border-bottom: 1px solid var(--irctc-blue-border);
+    }
+
+        .train-card-header strong {
+            color: var(--irctc-blue);
+            font-size: 16px;
+        }
+
+    .runs-on {
+        color: #555;
+        font-size: 13px;
+    }
+
+    .view-route {
+        color: var(--irctc-blue);
+        font-weight: 500;
+        text-decoration: none;
+    }
+
+        .view-route:hover {
+            text-decoration: underline;
+        }
+
+
+    .train-card-body {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: var(--irctc-blue-light);
+        border-radius: 4px;
+        padding: 12px;
+        margin: 14px 0;
+    }
+
+    .station-name {
+        color: var(--irctc-blue);
+        font-weight: 600;
+    }
+
+    .station-time {
+        font-size: 18px;
+        color: #000;
+    }
+
+    .duration-block span {
+        background: #fff;
+        border: 1px solid var(--irctc-blue-border);
+        padding: 6px 14px;
+        border-radius: 20px;
+        color: var(--irctc-blue);
+        font-weight: 500;
+    }
+
+    .train-card-classes {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .class-card {
+        border: 1px solid var(--irctc-blue-border);
+        border-radius: 5px;
+        padding: 10px;
+        width: 160px;
+        background: #f9fbff;
+        transition: all 0.2s ease;
+    }
+
+        .class-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(26, 79, 163, 0.15);
+        }
+
+    .class-code {
+        font-weight: bold;
+    }
+
+    .class-fare {
+        color: #2e7d32;
+    }
+
+    .class-status {
+        font-size: 13px;
+        margin: 6px 0;
+    }
+
+    .book-btn {
+        background: #ff6f00;
+        color: #fff;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 3px;
+        cursor: pointer;
+    }
+
+    body {
+        background: var(--page-bg);
+    }
+
+    :root {
+        --irctc-blue: #1a4fa3;
+        --irctc-blue-light: #e8f0fe;
+        --irctc-blue-border: #c7d7f5;
+        --success-green: #2e7d32;
+        --warning-orange: #ef6c00;
+        --danger-red: #c62828;
+        --card-bg: #ffffff;
+        --page-bg: #f4f8ff;
+    }
+
+    .search-summary {
+        background: linear-gradient(135deg, #0b4da2, #1e88e5);
+        color: #fff;
+        padding: 14px 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+
+    .route-line {
+        font-size: 18px;
+        font-weight: 600;
+    }
+
+    .arrow {
+        margin: 0 10px;
+    }
+
+    .date-line {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 8px;
+    }
+
+    .nav-btn {
+        background: #ffffff33;
+        border: none;
+        color: #fff;
+        font-size: 18px;
+        padding: 4px 10px;
+        cursor: pointer;
+        border-radius: 4px;
+    }
+
+    .modify-btn {
+        margin-left: auto;
+        background: #fff;
+        color: #0b4da2;
+        padding: 5px 12px;
+        border-radius: 4px;
+        text-decoration: none;
+        font-weight: 600;
+    }
+
+    input[type="date"] {
+        padding: 4px 6px;
+        border-radius: 4px;
+        border: none;
+    }
+
+
+</style>
 
 <section class="results-page fadeInUp">
     <div class="results-container">
+
+        <!-- ✅ SEARCH SUMMARY BAR (ADD HERE) -->
+        @{
+            DateTime jd = DateTime.Parse(ViewBag.JourneyDate);
+        }
+
+        <div class="search-summary">
+
+            <div class="route-line">
+                <span class="station">@fromStation</span>
+                <span class="arrow">→</span>
+                <span class="station">@toStation</span>
+            </div>
+
+            <div class="date-line">
+                <button class="nav-btn" onclick="changeDate(-1)">&#8249;</button>
+
+                <input type="date"
+                       id="journeyDatePicker"
+                       value="@jd.ToString("yyyy-MM-dd")"
+                       onchange="submitDateChange()" />
+
+                <button class="nav-btn" onclick="changeDate(1)">&#8250;</button>
+
+                <span class="day">@jd.ToString("dddd")</span>
+
+                <a href="/Train/Search" class="modify-btn">Modify Search</a>
+            </div>
+
+        </div>
+        <!-- ✅ END SEARCH SUMMARY BAR -->
+
         <h2 class="results-title">
             Available Trains for <span class="highlight">@journey</span>
         </h2>
@@ -31,100 +242,94 @@
         else
         {
             <div class="table-wrapper">
-                <table class="train-table">
-                    <thead>
-                        <tr>
-                            <th>Number</th>
-                            <th>Name</th>
-                            <th>From</th>
-                            <th>Departure</th>  
-                            <th>Duration</th>
-                            <th>To</th>
-                            <th>Arrival</th>
-                            <th>Classes</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var t in Model)
-                        {
-                            <tr>
-                                <td><strong>@t.Number</strong></td>
+                <div class="train-card-list">
+                    @foreach (var t in Model)
+                    {
+                        <div class="train-card">
 
-                                <td>
-                                    <a href="#" class="train-link"
-                                       data-train-id="@t.Id"
-                                       data-train-name="@t.Name"
-                                       data-train-number="@t.Number"><strong>
-                                        @t.Name</strong>
-                                    </a>
-                                </td>
+                            <!-- Header -->
+                            <div class="train-card-header">
+                                <div>
+                                    <strong>@t.Number - @t.Name</strong><br />
+                                </div>
 
-                                <td><strong>@t.FromStationName1</strong></td>                     
-                                <td><strong>@t.Departure.ToString(@"hh\:mm")</strong></td>
-                                <td>@t.Duration</td>
-                                <td><strong>@t.ToStationName1</strong></td>
-                                <td><strong>@t.Arrival.ToString(@"hh\:mm")</strong></td>
+                                <a href="#"
+                                   class="train-link view-route"
+                                   data-train-id="@t.Id"
+                                   data-train-name="@t.Name"
+                                   data-train-number="@t.Number">
+                                    Train Route
+                                </a>
+                            </div>
 
-                                <td>
-                                    <div class="class-scroll">
-                                        <div class="class-buttons">
-                                            @foreach (var c in t.Classes)
-                                            {
-                                                <form method="get" action="/Booking/CheckoutPost" class="inline-form">
-                                                    <input type="hidden" name="trainId" value="@t.Id" />
-                                                    <input type="hidden" name="classId" value="@c.Id" />
-                                                    <input type="hidden" name="journeyDate" value="@journey" />
+                            <!-- Body -->
+                            <div class="train-card-body">
+                                <div class="station-block">
+                                    <div class="station-name">@t.FSM</div>
+                                    <div class="station-time">@t.Departure.ToString(@"hh\:mm")</div>
+                                </div>
 
-                                                    <input type="hidden" name="userfromid" value="@userfromid" />
-                                                    <input type="hidden" name="usertoid" value="@usertoid" />
+                                <div class="duration-block">
+                                    <span>@t.Duration</span>
+                                </div>
 
-                                                    <input type="hidden" name="FromStationId" value="@t.FromStationId" />
-                                                    <input type="hidden" name="ToStationId" value="@t.ToStationId" />
+                                <div class="station-block">
+                                    <div class="station-name">@t.TSM</div>
+                                    <div class="station-time">@t.Arrival.ToString(@"hh\:mm")</div>
+                                </div>
+                            </div>
 
-                                                     <input type="hidden" name="FromStation" value="@fromStation" />
-                                                    <input type="hidden" name="ToStation" value="@toStation" />
+                            <!-- Classes -->
+                            <div class="train-card-classes">
+                                @foreach (var c in t.Classes)
+                                {
+                                    <form method="get" action="/Booking/PrepareCheckout" class="class-card">
 
+                                        <input type="hidden" name="trainId" value="@t.Id" />
+                                        <input type="hidden" name="classId" value="@c.Id" />
+                                        <input type="hidden" name="journeyDate" value="@journey" />
 
-                                                    <!-- ✅ ADD THESE -->
-                                                    <input type="hidden" name="Departure" value="@t.Departure.ToString(@"hh\:mm")" />
-                                                    <input type="hidden" name="Arrival" value="@t.Arrival.ToString(@"hh\:mm")" />
-                                                    <input type="hidden" name="Duration" value="@t.Duration" />
+                                        <input type="hidden" name="userfromid" value="@userfromid" />
+                                        <input type="hidden" name="usertoid" value="@usertoid" />
 
-                                                    <input type="hidden" name="FSM" value="@t.FSM" />  
-                                                    <input type="hidden" name="TSM" value="@t.TSM" />
-                                                    <button type="submit" class="class-btn">
-                                                        @{
-                                                            string seatStatus;
+                                        <input type="hidden" name="FromStationId" value="@t.FromStationId" />
+                                        <input type="hidden" name="ToStationId" value="@t.ToStationId" />
 
-                                                            if (c.SeatsAvailable > 0)
-                                                            {
-                                                                seatStatus = "AVAILABLE - " + c.SeatsAvailable;
-                                                            }
-                                                            else if (c.RACSeats > 0)
-                                                            {
-                                                                seatStatus = "RAC - " + c.RACSeats; // <-- show count
-                                                            }
-                                                            else if (c.WLSeats > 0) 
-                                                            {
-                                                                seatStatus = "WL - " + c.WLSeats;
-                                                            }
-                                                            else
-                                                            {
-                                                                seatStatus = "Available - ";
-                                                            }
-                                                        }
-                                                        @c.Code - ₹@c.BaseFare (@seatStatus)
-                                                    </button>
-                                                    <input type="hidden" name="seatStatus" value="@seatStatus" />
-                                                </form>
-                                            }
-                                        </div>
-                                    </div>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+                                        <input type="hidden" name="FromStation" value="@fromStation" />
+                                        <input type="hidden" name="ToStation" value="@toStation" />
+
+                                        <input type="hidden" name="Departure" value="@t.Departure.ToString(@"hh\:mm")" />
+                                        <input type="hidden" name="Arrival" value="@t.Arrival.ToString(@"hh\:mm")" />
+                                        <input type="hidden" name="Duration" value="@t.Duration" />
+                                        <input type="hidden" name="FSM" value="@t.FSM" />
+                                        <input type="hidden" name="TSM" value="@t.TSM" />
+
+                                        @{
+                                            string seatStatus;
+                                            if (c.SeatsAvailable > 0)
+                                                seatStatus = "AVAILABLE - " + c.SeatsAvailable;
+                                            else if (c.RACSeats > 0)
+                                                seatStatus = "RAC - " + c.RACSeats;
+                                            else if (c.WLSeats > 0)
+                                                seatStatus = "WL - " + c.WLSeats;
+                                            else
+                                                seatStatus = "Available";
+                                        }
+
+                                        <div class="class-code">@c.Code</div>
+                                        <div class="class-fare">₹@c.BaseFare</div>
+                                        <div class="class-status">@seatStatus</div>
+
+                                        <input type="hidden" name="seatStatus" value="@seatStatus" />
+
+                                        <button type="submit" class="book-btn">Book</button>
+                                    </form>
+                                }
+                            </div>
+
+                        </div>
+                    }
+                </div>
             </div>
         }
     </div>
@@ -203,7 +408,7 @@
         });
 
         $(document).on("click", "#close-sidebar, #sidebar-overlay", function () {
-            $("#route-sidebar").css("right", "-450px");
+            $("#route-sidebar").css("right", "-600px");
             $("#sidebar-overlay").fadeOut(200);
         });
 
@@ -218,6 +423,22 @@
             //     var modal = new bootstrap.Modal(document.getElementById('routeMismatchModal'));
             //     modal.show();
             // });
+
+
+                    function changeDate(offset) {
+            let dateInput = document.getElementById("journeyDatePicker");
+            let date = new Date(dateInput.value);
+            date.setDate(date.getDate() + offset);
+            dateInput.valueAsDate = date;
+            submitDateChange();
+        }
+
+        function submitDateChange() {
+            let date = document.getElementById("journeyDatePicker").value;
+
+            let url = `/Train/TrainResults?journeyDate=${date}`;
+            window.location.href = url;
+        }
 
 
 

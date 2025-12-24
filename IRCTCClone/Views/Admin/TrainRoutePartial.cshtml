@@ -6,9 +6,11 @@
         <thead class="table-light">
             <tr>
                 <th>Stop No</th>
-                <th>Station</th>
+                <th>Station Code</th>
+                <th>Station Name</th>
                 <th>Arrival</th>
                 <th>Departure</th>
+                <th>Day</th>
             </tr>
         </thead>
         <tbody>
@@ -16,9 +18,11 @@
             {
                 <tr>
                     <td>@route.StopNumber</td>
+                    <td>@route.Station?.Code</td>
                     <td>@route.Station?.Name</td>
                     <td>@route.ArrivalTime?.ToString(@"hh\:mm")</td>
                     <td>@route.DepartureTime?.ToString(@"hh\:mm")</td>
+                    <td>@route.Day</td>
                 </tr>
             }
         </tbody>

@@ -27,6 +27,30 @@
                 <input type="password" name="ConfirmPassword" required />
             </label>
 
+            <!-- ✅ CAPTCHA BLOCK START -->
+            <label>
+                Captcha
+                <div style="display:flex; align-items:center; gap:10px; margin-top:6px;">
+                    <img id="captchaImg"
+                         src="/captcha"
+                         alt="Captcha"
+                         style="border:1px solid #ccc; height:40px;" />
+
+                    <button type="button"
+                            onclick="refreshCaptcha()"
+                            style="padding:4px 8px; cursor:pointer;">
+                        ↻
+                    </button>
+                </div>
+
+                <!-- 🔴 NAME MUST MATCH ViewModel -->
+                <input type="text"
+                       name="CaptchaInput"
+                       placeholder="Enter captcha"
+                       required />
+            </label>
+            <!-- ✅ CAPTCHA BLOCK END -->
+
             <button type="submit" class="btn-primary">Create account</button>
         </form>
 
@@ -51,3 +75,15 @@
         <p class="muted small">Already have an account? <a href="/Account/Login">Login</a></p>
     </div>
 </section>
+
+@section Scripts {
+    <script>
+        function refreshCaptcha() {
+            document.getElementById("captchaImg").src =
+                "/captcha?ts=" + new Date().getTime();
+        }
+
+        // Load captcha on page load
+        refreshCaptcha();
+    </script>
+}

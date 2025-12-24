@@ -98,9 +98,49 @@
                     Total Fare: ₹<span id="totalFare" data-fare="@cls.BaseFare">@cls.BaseFare</span>
                 </p>
                 <input type="hidden" name="edata" value="@ViewBag.EncryptedData" />
-                <button type="submit" class="btn-primary">Pay & Book (Mock)</button>
+
+                <!-- ✅ CAPTCHA BLOCK START -->
+                <label>
+                    Captcha
+                    <div style="display:flex; align-items:center; gap:10px; margin-top:6px;">
+                        <img id="captchaImg"
+                             src="/captcha"
+                             alt="Captcha"
+                             style="border:1px solid #ccc; height:40px;" />
+
+                        <button type="button"
+                                onclick="refreshCaptcha()"
+                                style="padding:4px 8px; cursor:pointer;">
+                            ↻
+                        </button>
+                    </div>
+
+                    <!-- 🔴 NAME MUST MATCH ViewModel -->
+                    <input type="text"
+                           name="CaptchaInput"
+                           placeholder="Enter captcha"
+                           required />
+                </label>
+                <!-- ✅ CAPTCHA BLOCK END -->
+
+
+                <button type="button" id="payBookBtn" class="btn-primary">Pay & Book</button>
             </form>
 
+            <div id="otpOverlay" class="otp-overlay">
+                <div class="otp-box">
+                    <h3>OTP Verification</h3>
+                    <p>An OTP has been sent to your registered email.<br>Please enter it to continue booking.</p>
+
+                    <input type="text" id="otpInput" maxlength="6" placeholder="Enter 6-digit OTP" />
+                    <div class="otp-error"></div>
+
+                    <div class="otp-actions">
+                        <button type="button" id="verifyOtpBtn">Verify OTP</button>
+                        <button type="button" id="cancelOtpBtn">Cancel</button>
+                    </div>
+                </div>
+            </div>
         }
         else
         {
@@ -163,9 +203,59 @@
             }
         });
 
-
-
         // --- Initial Fare Update ---
         updateTotal();
+
+        //----------otp starts------
+        let otpRequested = false;
+
+        $("#payBookBtn").on("click", function () {
+
+            $.ajax({
+                url: "/Booking/RequestOtp",
+                type: "POST",
+                data: $(".checkout-form").serialize(),
+                success: function (res) {
+                    if (res.success) {
+                        $("#otpOverlay").fadeIn();
+                    } else {
+                        alert("Failed to send OTP");
+                    }
+                },
+                error: function () {
+                    alert("OTP request failed");
+                }
+            });
+
+        });
+
+        $("#verifyOtpBtn").on("click", function () {
+
+            let otp = $("#otpInput").val();
+
+            if (otp.length !== 6) {
+                $(".otp-error").text("Please enter a valid 6-digit OTP");
+                return;
+            }
+
+            $("<input>").attr({
+                type: "hidden",
+                name: "otp",
+                value: otp
+            }).appendTo(".checkout-form");
+
+            $(".checkout-form").submit();
+        });
+
+
     });
+
+            function refreshCaptcha() {
+            document.getElementById("captchaImg").src =
+            "/captcha?ts=" + new Date().getTime();
+        }
+
+        // ✅ Load captcha on page load
+        refreshCaptcha();
+
 </script>

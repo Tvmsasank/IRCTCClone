@@ -8,7 +8,6 @@ namespace IRCTCClone.Models
         public int Id { get; set; }
         public string PNR { get; set; } = null!;
         public string UserId { get; set; } = null!;
-
         public string FromStationCode { get; set; }
         public string ToStationCode { get; set; }
         public ApplicationUser? User { get; set; }

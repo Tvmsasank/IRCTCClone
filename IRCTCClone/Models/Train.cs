@@ -21,6 +21,7 @@ namespace IRCTCClone.Models
         public TimeSpan Departure { get; set; }
         public TimeSpan Arrival { get; set; }
         public string Duration { get; set; }
+        public int Day { get; set; } = 1;
         public String FromStationName { get; set; } // ✅ use this
         public String ToStationName { get; set; }  
         public String? fscode { get; set; }  
@@ -351,7 +352,6 @@ namespace IRCTCClone.Models
                 cmd.Parameters.AddWithValue("@Departure", (object?)Departure ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@Arrival", (object?)Arrival ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@Duration", (object?)Duration ?? DBNull.Value);
-
                 conn.Open();
                 var result = cmd.ExecuteScalar(); // 👈 should return the TrainId
                 if (result != null)

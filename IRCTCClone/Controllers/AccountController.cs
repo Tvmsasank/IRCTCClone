@@ -41,28 +41,20 @@ namespace IRCTCClone.Controllers
             if (!ModelState.IsValid)
                 return View(model);
 
-            /*bool validUser = false;
-            string FullName = "";
+            // ================= CAPTCHA VALIDATION =================
+            string sessionCaptcha = HttpContext.Session.GetString("CAPTCHA");
 
-            // --- validate credentials ---
-            using (var conn = new SqlConnection(_connectionString))
+            if (string.IsNullOrEmpty(sessionCaptcha) ||
+                model.CaptchaInput?.ToUpper() != sessionCaptcha.ToUpper())
             {
-                conn.Open();
-                using (var cmd = new SqlCommand("sp_CheckUserLogin", conn))
-                {
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@Email", model.Email);
-
-                    var result = cmd.ExecuteScalar();
-                    if (result != null)
-                    {
-                        validUser = result.ToString() == HashPassword(model.Password);
-                        FullName = result["FullName"].ToString();
-                    }
-                }
+                ModelState.AddModelError("", "Invalid captcha");
+                return View(model);
             }
 
-*/
+            // clear captcha after validation
+            HttpContext.Session.Remove("CAPTCHA");
+            // ======================================================
+
 
             bool validUser = false;
             string fullName = "";
@@ -89,6 +81,7 @@ namespace IRCTCClone.Controllers
                     }
                 }
             }
+
             if (!validUser)
             {
                 ModelState.AddModelError("", "Invalid email or password");
@@ -96,30 +89,38 @@ namespace IRCTCClone.Controllers
             }
 
             // ✅ Fetch user by email
-/*            var user = UserRepository.GetUserByEmail(model.Email, _connectionString);
+            /*            var user = UserRepository.GetUserByEmail(model.Email, _connectionString);
 
-            if (user != null)
-            {
-                HttpContext.Session.SetString("UserEmail", user.Email);
-                HttpContext.Session.SetString("LoggedIn", "true");
-                HttpContext.Session.SetString("AadhaarVerified",
-                    user.AadhaarVerified ? "true" : "false");
-            }*/
+                        if (user != null)
+                        {
+                            HttpContext.Session.SetString("UserEmail", user.Email);
+                            HttpContext.Session.SetString("LoggedIn", "true");
+                            HttpContext.Session.SetString("AadhaarVerified",
+                                user.AadhaarVerified ? "true" : "false");
+                        }*/
+
 
             // --- claims sign-in (use user's email or username in the claim) ---
             // ✅ Claims login
+            // ================= CLAIMS LOGIN =================
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.Name, fullName),
-                new Claim(ClaimTypes.NameIdentifier, model.Email)
+                new Claim(ClaimTypes.NameIdentifier, model.Email),
+                new Claim(ClaimTypes.Email, model.Email)
             };
 
-            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+            var identity = new ClaimsIdentity(
+                claims,
+                CookieAuthenticationDefaults.AuthenticationScheme);
+
             var principal = new ClaimsPrincipal(identity);
 
-            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
+            await HttpContext.SignInAsync(
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                principal);
 
-            // redirect back if returnUrl provided and safe
+            // safe returnUrl redirect
             if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
                 return Redirect(returnUrl);
 
@@ -127,31 +128,31 @@ namespace IRCTCClone.Controllers
         }
 
         // -------------------- PROFILE --------------------
-/*        [Authorize]
-        public IActionResult Profile()
-        {
-            var email = HttpContext.Session.GetString("Email");
-            if (email == null)
-                return RedirectToAction("Login");
+        /*        [Authorize]
+                public IActionResult Profile()
+                {
+                    var email = HttpContext.Session.GetString("Email");
+                    if (email == null)
+                        return RedirectToAction("Login");
 
-            var user = UserRepository.GetUserByEmail(email, _connectionString);
-            return View(user);
-        }*/
+                    var user = UserRepository.GetUserByEmail(email, _connectionString);
+                    return View(user);
+                }*/
 
         // -------------------- VERIFY AADHAAR --------------------
-/*        [Authorize]
-        [HttpPost]
-        public IActionResult VerifyAadhaar(string aadhaarNumber)
-        {
-            string email = HttpContext.Session.GetString("Email");
-            if (email == null)
-                return RedirectToAction("Login");
+        /*        [Authorize]
+                [HttpPost]
+                public IActionResult VerifyAadhaar(string aadhaarNumber)
+                {
+                    string email = HttpContext.Session.GetString("Email");
+                    if (email == null)
+                        return RedirectToAction("Login");
 
-            UserRepository.UpdateAadhaar(email, aadhaarNumber, _connectionString);
-            HttpContext.Session.SetString("AadhaarVerified", "true");
+                    UserRepository.UpdateAadhaar(email, aadhaarNumber, _connectionString);
+                    HttpContext.Session.SetString("AadhaarVerified", "true");
 
-            return RedirectToAction("Profile");
-        }*/
+                    return RedirectToAction("Profile");
+                }*/
         // -------------------- LOGOUT --------------------
         [HttpPost]
         public async Task<IActionResult> Logout()

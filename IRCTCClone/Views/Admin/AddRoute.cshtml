@@ -104,6 +104,7 @@
                     <th>Station</th>
                     <th style="width:150px;">Arrival</th>
                     <th style="width:150px;">Departure</th>
+                    <th style="width:150px;">Day</th>
                     <th style="width:100px;" class="text-center">Action</th>
                 </tr>
             </thead>
@@ -140,6 +141,11 @@
                                        value="@(Model[i].DepartureTime?.ToString(@"hh\:mm"))" />
                             </td>
 
+                            <td>
+                                <input name="routes[@i].Day" type="number" class="form-control" value="@Model[i].Day" />
+                            </td>
+
+
                             <!-- Hidden ID -->
                             <td style="display:none;">
                                 <input name="routes[@i].Id" type="hidden" value="@Model[i].Id" />
@@ -169,10 +175,7 @@
 
                         <td><input name="routes[0].ArrivalTime" type="time" class="form-control" /></td>
                         <td><input name="routes[0].DepartureTime" type="time" class="form-control" /></td>
-
-                        <td style="display:none;">
-                            <input name="routes[0].Id" type="hidden" value="0" />
-                        </td>
+                        <td><input name="routes[0].Day" min="1" type="number" class="form-control" /></td>
 
                         <td class="text-center">
                             <button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteRouteRow(this)">
@@ -207,23 +210,34 @@
         var tableBody = document.getElementById("routeTableBody");
         var deletedIdsInput = document.getElementById("deletedIds");
 
-        // ✅ Add row
+        // ✅ Add row (MINIMAL FIX ONLY)
         document.getElementById("addRow").addEventListener("click", function () {
             var rowCount = tableBody.rows.length;
             var newRow = tableBody.rows[0].cloneNode(true);
 
             newRow.querySelectorAll("input, select").forEach(function (input) {
                 input.name = input.name.replace(/\[\d+\]/, "[" + rowCount + "]");
-                if (input.tagName.toLowerCase() === "select") input.selectedIndex = 0;
-                else input.value = "";
-                if (input.name.endsWith(".Id")) input.value = 0;
+
+                if (input.tagName.toLowerCase() === "select") {
+                    input.selectedIndex = 0;
+                }
+                else if (input.name.endsWith(".Id")) {
+                    input.value = 0;
+                }
+                else if (input.name.endsWith(".Day")) {
+                    input.value = 1;   // ✅ Default Day = 1
+                }
+                else {
+                    input.value = "";
+                }
+
             });
 
             newRow.classList.add("fade-row");
             tableBody.appendChild(newRow);
         });
 
-        // ✅ Delete row
+        // ✅ Delete row (UNCHANGED)
         function deleteRouteRow(btn) {
             var row = btn.closest("tr");
             var idInput = row.querySelector("input[name$='.Id']");
@@ -241,24 +255,23 @@
                 alert("At least one stop is required.");
             }
         }
-        
-            document.addEventListener("DOMContentLoaded", () => {
-                const popup = document.querySelector(".success-popup");
-                    if (popup) {
-                    const popupContent = popup.querySelector(".popup-content");
-                
-                        // Start fade out after 2 seconds
-                        setTimeout(() => {
-                        popupContent.classList.add("fade-out");
-                        // Then hide it after fade animation completes
-                            setTimeout(() => {
-                                popup.style.display = "none";
-                            }, 1000);
-                    }, 1000);
-                }
-            });
 
-        // ✅ Fix row indices after deletion
+        // ✅ Fade-out success popup (RESTORED 100%)
+        document.addEventListener("DOMContentLoaded", () => {
+            const popup = document.querySelector(".success-popup");
+            if (popup) {
+                const popupContent = popup.querySelector(".popup-content");
+
+                setTimeout(() => {
+                    popupContent.classList.add("fade-out");
+                    setTimeout(() => {
+                        popup.style.display = "none";
+                    }, 500);
+                }, 500);
+            }
+        });
+
+        // ✅ Fix indices after deletion (UNCHANGED)
         function updateRowIndices() {
             tableBody.querySelectorAll("tr").forEach(function (row, index) {
                 row.querySelectorAll("input, select").forEach(function (input) {

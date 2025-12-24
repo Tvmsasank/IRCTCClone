@@ -146,7 +146,7 @@ body {
     align-items: center;
     background-image: url("../images/vande-bharat-train.jpg");
     /*    background: url('https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEg5wIVGScLbfJP-U8NokGAi4UroYmTJFgv9IpImlCoUelTlfmHuu6MlfOT8SxEVK_-EtIM27eg7cYIb6xadkrydWSUaG4amwhc-siq8EFwVo7cyO5Vj5p89tPF7bVnMcIH4n6mTipWogU5ns_RfnwWTAtWRe1OvIM2UWWx9EV4HRDtlTm2LML1vyZ-dIA/s1920/kishore-v-kgH64ekcq4I-unsplash.jpg') no-repeat center center fixed;
-*/ background-size: cover;
+*/  background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
     padding: 40px 20px;
@@ -166,8 +166,8 @@ body {
     .auth-card h2 {
         text-align: center;
         color: #0078D7;
-        margin-bottom: 25px; 
-        font-size: 1.8rem;
+        margin-bottom: 20px; 
+        font-size: 1.9rem;
         padding: 1px;
     }
 
@@ -176,7 +176,7 @@ body {
     display: block;
     color: #333;
     font-weight: 500;
-    margin-bottom: 15px;
+    margin-bottom: 7px;
     font-size: 15px;
 }
 
@@ -339,7 +339,7 @@ main {
     margin-top: 40px;
 }
 
-.table-wrapper {
+.route-sidebar-wrapper {
     overflow-x: auto;
 }
 
@@ -1368,8 +1368,8 @@ hr {
 .route-sidebar {
     position: fixed;
     top: 0;
-    right: -450px; /* Hidden initially */
-    width: 450px;
+    right: -600px; /* Hidden initially */
+    width: 570px;
     height: 100%;
     background: #ffffff;
     box-shadow: -3px 0 10px rgba(0,0,0,0.2);
@@ -2238,3 +2238,79 @@ body.d-flex.align-items-center {
         background-color: #dc3545;
         color: #fff;
     }
+
+
+/*------------ OTPs ----------*/
+/* OTP MODAL STYLES — SAFE NAMESPACE */
+/* Overlay background */
+.otp-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    display: none; /* hidden by default */
+}
+
+/* Modal box */
+.otp-box {
+    margin-top: 10rem;
+    background: #fff;
+    padding: 25px 20px;
+    width: 380px;
+    height: 230px;
+    justify-self: center;
+    border-radius: 8px;
+    text-align: center;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    font-family: Arial, sans-serif;
+}
+
+/* OTP input */
+#otpInput {
+    width: 100%;
+    padding: 10px;
+    margin: 15px 0;
+    font-size: 16px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+}
+
+/* Error message */
+.otp-error {
+    color: red;
+    font-size: 14px;
+    margin-bottom: 10px;
+}
+
+/* Buttons container */
+.otp-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+    /* Buttons */
+    .otp-actions button{
+        flex: 1;
+        padding: 10px 0;
+        font-size: 16px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        color: #fff;
+        transition: background 0.2s;
+    }
+
+#verifyOtpBtn {
+    background: #28a745; /* green */
+}
+
+#cancelOtpBtn {
+    background: #dc3545; /* red */
+}
+
+

@@ -14,6 +14,7 @@
     <body class="d-flex align-items-center justify-content-end">
         <div class="card shadow p-4 border-1 ms-1 card end-100 mt-xl-5 admin-login-card">
             <h3 class="text-center mb-4 text-primary">Admin Login</h3>
+
             <form method="post">
                 <div class="mb-3">
                     <label class="form-label"><strong>Username</strong></label>
@@ -24,6 +25,26 @@
                     <input type="password" name="password" class="form-control" required />
                 </div>
 
+            <div class="mb-3">
+                <label class="form-label"><strong>Captcha</strong></label>
+
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <img id="captchaImg" src="/captcha" alt="Captcha" style="height:40px;" />
+                    <button type="button"
+                            class="btn btn-outline-secondary btn-sm"
+                            onclick="refreshCaptcha()">
+                        ↻
+                    </button>
+                </div>
+
+                <input type="text"
+                       name="captchaInput"
+                       class="form-control"
+                       placeholder="Enter captcha"
+                       required />
+            </div>
+
+
                 @if (ViewBag.Error != null)
                 {
                     <div class="alert alert-danger small">@ViewBag.Error</div>
@@ -33,7 +54,20 @@
                     <button type="submit" class="btn btn-primary align-self-center">Login</button>
                 </div>
             </form>
+
         </div>
     </body>
 
 </html>
+
+@section Scripts{
+    <script>
+        function refreshCaptcha() {
+            document.getElementById("captchaImg").src =
+                "/captcha?ts=" + new Date().getTime();
+        }
+
+        // Load captcha on page load
+        refreshCaptcha();
+    </script>
+}

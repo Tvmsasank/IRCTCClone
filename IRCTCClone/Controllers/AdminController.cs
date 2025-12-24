@@ -34,8 +34,22 @@ namespace IrctcClone.Controllers
 
         [AllowAnonymous]
         [HttpPost]
-        public IActionResult AdminLogin(string username, string password)
+        public IActionResult AdminLogin(string username, string password, string captchaInput)
         {
+            string sessionCaptcha = HttpContext.Session.GetString("CAPTCHA");
+
+            // ✅ CAPTCHA validation
+            if (string.IsNullOrEmpty(sessionCaptcha) ||
+                captchaInput?.ToUpper() != sessionCaptcha.ToUpper())
+            {
+                ViewBag.Error = "Invalid captcha";
+                return View();
+            }
+
+            // Optional but recommended
+            HttpContext.Session.Remove("CAPTCHA");
+
+            // 🔐 Existing admin validation
             if (Admin.ValidateLogin(_connectionString, username, password))
             {
                 HttpContext.Session.SetString("AdminUser", username);
@@ -159,7 +173,8 @@ namespace IrctcClone.Controllers
                                 StationName = Convert.ToString(reader["StationName"]),
                                 StopNumber = Convert.ToInt32(reader["StopNumber"]),
                                 ArrivalTime = reader["ArrivalTime"] == DBNull.Value ? null : (TimeSpan?)reader["ArrivalTime"],
-                                DepartureTime = reader["DepartureTime"] == DBNull.Value ? null : (TimeSpan?)reader["DepartureTime"]
+                                DepartureTime = reader["DepartureTime"] == DBNull.Value ? null : (TimeSpan?)reader["DepartureTime"],
+                                Day = reader["Day"] == DBNull.Value ? 0 : Convert.ToInt32(reader["Day"]),
                             });
                         }
                     }
@@ -233,7 +248,8 @@ namespace IrctcClone.Controllers
                                 ToStation = new Station { Name = reader.GetString(4) },
                                 Departure = reader.GetTimeSpan(5),
                                 Arrival = reader.GetTimeSpan(6),
-                                Duration = reader.GetString(7)
+                                Duration = reader.GetString(7),
+                                Day = reader.IsDBNull(8) ? 0 : reader.GetInt32(8)
                             };
                         }
                     }
@@ -279,6 +295,7 @@ namespace IrctcClone.Controllers
                         cmd.Parameters.AddWithValue("@StopNumber", route.StopNumber);
                         cmd.Parameters.AddWithValue("@ArrivalTime", (object?)route.ArrivalTime ?? DBNull.Value);
                         cmd.Parameters.AddWithValue("@DepartureTime", (object?)route.DepartureTime ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@Day", route.Day);
                         cmd.ExecuteNonQuery();
                     }
                 }
@@ -314,8 +331,10 @@ namespace IrctcClone.Controllers
                                 DepartureTime = reader.IsDBNull(reader.GetOrdinal("DepartureTime")) ? null : reader.GetTimeSpan(reader.GetOrdinal("DepartureTime")),
                                 Station = new Station
                                 {
-                                    Name = reader.GetString(reader.GetOrdinal("StationName"))
-                                }
+                                    Name = reader.GetString(reader.GetOrdinal("StationName")),
+                                    Code = reader.GetString(reader.GetOrdinal("StationCode"))
+                                },
+                                Day = reader.GetInt32(reader.GetOrdinal("Day")),
                             });
                         }
                     }
@@ -771,6 +790,7 @@ namespace IrctcClone.Controllers
                             cmd.Parameters.AddWithValue("@ArrivalTime", TimeSpan.Parse(routeArrivals[i]));
                             cmd.Parameters.AddWithValue("@DepartureTime", TimeSpan.Parse(routeDepartures[i]));
                             cmd.Parameters.AddWithValue("@StopNumber", routeOrder[i]);
+                            cmd.Parameters.AddWithValue("@Day", routeOrder[i]);
                             cmd.ExecuteNonQuery();
                         }
                     }
