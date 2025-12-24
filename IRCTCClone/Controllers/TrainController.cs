@@ -29,7 +29,7 @@ namespace IRCTCClone.Controllers
 
         [EnableRateLimiting("SearchLimiter")]
         [HttpGet]
-        public IActionResult Search(string from = "", string to = "", DateTime? date = null)
+        public IActionResult Search(string from, string to, DateTime? date = null)
         {
             if (Request.IsAjaxRequest())
             {
@@ -76,8 +76,19 @@ namespace IRCTCClone.Controllers
         [HttpGet]
         public IActionResult TrainResults(int? fromStationId, int? toStationId,string FromStation, string ToStation, string? journeyDateStr)
         {
-            if (fromStationId == null || toStationId == null)
-                return View(); // blank
+
+            // ✅ ALWAYS read from SearchContext
+            if (TempData["fromStationId"] == null || TempData["toStationId"] == null)
+                return View(Enumerable.Empty<Train>());
+
+            int searchFromId = (int)TempData["fromStationId"];
+            int searchToId = (int)TempData["toStationId"];
+            string searchFromName = TempData["FromStation"] as string;
+            string searchToName = TempData["ToStation"] as string;
+            string searchDateStr = TempData["JourneyDate"] as string;
+
+            //if (fromStationId == null || toStationId == null)
+            //    return View(); // blank
 
             // Parse date
             DateTime journeyDate;
@@ -85,11 +96,13 @@ namespace IRCTCClone.Controllers
                 journeyDate = DateTime.Today;
 
             var trains = Train.GetTrains(_connectionString, fromStationId.Value, toStationId.Value, journeyDate.ToString("yyyy-MM-dd"));
-            TempData["FromStation"] = FromStation;
-            TempData["ToStation"] = ToStation;
-            TempData["fromStationId"] = fromStationId;
-            TempData["toStationId"] = toStationId;
+            //TempData["FromStation"] = FromStation;
+            //TempData["ToStation"] = ToStation;
+            //TempData["fromStationId"] = fromStationId;
+            //TempData["toStationId"] = toStationId;
+            //TempData["JourneyDate"] = journeyDate;
             ViewBag.JourneyDate = journeyDate.ToString("yyyy-MM-dd");
+            TempData.Keep();
             return View(trains);
         }
 
@@ -114,7 +127,9 @@ namespace IRCTCClone.Controllers
             TempData["ToStation"] = toStation;
             TempData["fromStationId"] = fromStationId;
             TempData["toStationId"] = toStationId;
+            TempData["JourneyDate"] = journeyDateStr;
             ViewBag.JourneyDate = journeyDate.ToString("yyyy-MM-dd");
+            TempData.Keep();
             return View(trains);
         }
 
@@ -170,6 +185,38 @@ namespace IRCTCClone.Controllers
         }
 
 
+        [HttpGet]
+        public IActionResult ClearRouteMismatch()
+        {
+            // Remove only mismatch flags
+            TempData.Remove("RouteMismatch");
+            TempData.Remove("SearchedFrom");
+            TempData.Remove("SearchedTo");
+            TempData.Remove("ActualFrom");
+            TempData.Remove("ActualTo");
+
+            // READ search context
+            var fromId = TempData["fromStationId"];
+            var toId = TempData["toStationId"];
+            var date = TempData["JourneyDate"];
+            var fromName = TempData["FromStation"];
+            var toName = TempData["ToStation"];
+
+            TempData.Keep(); // IMPORTANT
+
+            return RedirectToAction("TrainResults", new
+            {
+                fromStationId = fromId,
+                toStationId = toId,
+                FromStation = fromName,
+                ToStation = toName,
+                journeyDateStr = date
+            });
+        }
+
+
+
+
         /*[HttpGet]
         public IActionResult GetTrainRoute(int trainId)
         {
@@ -180,6 +227,7 @@ namespace IRCTCClone.Controllers
         }*/
 
     }
+
 
     public static class HttpRequestExtensions
     {

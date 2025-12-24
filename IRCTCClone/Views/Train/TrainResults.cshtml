@@ -14,196 +14,23 @@
     var userfromid= TempData["fromStationId"];
     var usertoid= TempData["toStationId"] ;
 
-    TempData.Keep();
+    // TempData.Keep();
 
 }
-
-<style>
-    .train-card {
-        background: var(--card-bg);
-        border: 1px solid var(--irctc-blue-border);
-        border-left: 5px solid var(--irctc-blue);
-        border-radius: 6px;
-        margin-bottom: 20px;
-        padding: 16px;
-        box-shadow: 0 2px 6px rgba(26, 79, 163, 0.08);
-    }
-
-    .train-card-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding-bottom: 10px;
-        border-bottom: 1px solid var(--irctc-blue-border);
-    }
-
-        .train-card-header strong {
-            color: var(--irctc-blue);
-            font-size: 16px;
-        }
-
-    .runs-on {
-        color: #555;
-        font-size: 13px;
-    }
-
-    .view-route {
-        color: var(--irctc-blue);
-        font-weight: 500;
-        text-decoration: none;
-    }
-
-        .view-route:hover {
-            text-decoration: underline;
-        }
-
-
-    .train-card-body {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background: var(--irctc-blue-light);
-        border-radius: 4px;
-        padding: 12px;
-        margin: 14px 0;
-    }
-
-    .station-name {
-        color: var(--irctc-blue);
-        font-weight: 600;
-    }
-
-    .station-time {
-        font-size: 18px;
-        color: #000;
-    }
-
-    .duration-block span {
-        background: #fff;
-        border: 1px solid var(--irctc-blue-border);
-        padding: 6px 14px;
-        border-radius: 20px;
-        color: var(--irctc-blue);
-        font-weight: 500;
-    }
-
-    .train-card-classes {
-        display: flex;
-        gap: 12px;
-        flex-wrap: wrap;
-    }
-
-    .class-card {
-        border: 1px solid var(--irctc-blue-border);
-        border-radius: 5px;
-        padding: 10px;
-        width: 160px;
-        background: #f9fbff;
-        transition: all 0.2s ease;
-    }
-
-        .class-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(26, 79, 163, 0.15);
-        }
-
-    .class-code {
-        font-weight: bold;
-    }
-
-    .class-fare {
-        color: #2e7d32;
-    }
-
-    .class-status {
-        font-size: 13px;
-        margin: 6px 0;
-    }
-
-    .book-btn {
-        background: #ff6f00;
-        color: #fff;
-        border: none;
-        padding: 6px 12px;
-        border-radius: 3px;
-        cursor: pointer;
-    }
-
-    body {
-        background: var(--page-bg);
-    }
-
-    :root {
-        --irctc-blue: #1a4fa3;
-        --irctc-blue-light: #e8f0fe;
-        --irctc-blue-border: #c7d7f5;
-        --success-green: #2e7d32;
-        --warning-orange: #ef6c00;
-        --danger-red: #c62828;
-        --card-bg: #ffffff;
-        --page-bg: #f4f8ff;
-    }
-
-    .search-summary {
-        background: linear-gradient(135deg, #0b4da2, #1e88e5);
-        color: #fff;
-        padding: 14px 20px;
-        border-radius: 8px;
-        margin-bottom: 20px;
-    }
-
-    .route-line {
-        font-size: 18px;
-        font-weight: 600;
-    }
-
-    .arrow {
-        margin: 0 10px;
-    }
-
-    .date-line {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        margin-top: 8px;
-    }
-
-    .nav-btn {
-        background: #ffffff33;
-        border: none;
-        color: #fff;
-        font-size: 18px;
-        padding: 4px 10px;
-        cursor: pointer;
-        border-radius: 4px;
-    }
-
-    .modify-btn {
-        margin-left: auto;
-        background: #fff;
-        color: #0b4da2;
-        padding: 5px 12px;
-        border-radius: 4px;
-        text-decoration: none;
-        font-weight: 600;
-    }
-
-    input[type="date"] {
-        padding: 4px 6px;
-        border-radius: 4px;
-        border: none;
-    }
-
-
-</style>
 
 <section class="results-page fadeInUp">
     <div class="results-container">
 
-        <!-- ✅ SEARCH SUMMARY BAR (ADD HERE) -->
+@*         <!-- ✅ SEARCH SUMMARY BAR (ADD HERE) -->
         @{
-            DateTime jd = DateTime.Parse(ViewBag.JourneyDate);
+            DateTime jd = DateTime.Today;
+
+            if (ViewBag.JourneyDate != null)
+            {
+                DateTime.TryParse(ViewBag.JourneyDate.ToString(), out jd);
+            }
         }
+
 
         <div class="search-summary">
 
@@ -225,11 +52,11 @@
 
                 <span class="day">@jd.ToString("dddd")</span>
 
-                <a href="/Train/Search" class="modify-btn">Modify Search</a>
+                <a href="/Train/TrainResults" class="modify-btn">Modify Search</a>
             </div>
 
         </div>
-        <!-- ✅ END SEARCH SUMMARY BAR -->
+        <!-- ✅ END SEARCH SUMMARY BAR --> *@
 
         <h2 class="results-title">
             Available Trains for <span class="highlight">@journey</span>
@@ -306,19 +133,32 @@
 
                                         @{
                                             string seatStatus;
+                                            string seatColor;
                                             if (c.SeatsAvailable > 0)
+                                            {
                                                 seatStatus = "AVAILABLE - " + c.SeatsAvailable;
+                                                seatColor = "green"; // ✅ Green for available
+                                            }
                                             else if (c.RACSeats > 0)
+                                            {
                                                 seatStatus = "RAC - " + c.RACSeats;
+                                                seatColor = "orange"; // ⚠️ Orange for RAC
+                                            }
                                             else if (c.WLSeats > 0)
+                                            {
                                                 seatStatus = "WL - " + c.WLSeats;
+                                                seatColor = "red"; // ❌ Red for WL
+                                            }
                                             else
+                                            {
                                                 seatStatus = "Available";
+                                                seatColor = "gray"; // Optional fallback
+                                            }
                                         }
 
                                         <div class="class-code">@c.Code</div>
                                         <div class="class-fare">₹@c.BaseFare</div>
-                                        <div class="class-status">@seatStatus</div>
+                                        <div class="class-status" style="color: @seatColor;">@seatStatus</div>
 
                                         <input type="hidden" name="seatStatus" value="@seatStatus" />
 
@@ -356,7 +196,7 @@
 
                 <div class="modalbutton">
                     <a href="/Booking/Checkout" class="btnmodal yes">✔ Yes</a>
-                     <a href="/Train/TrainResults" class="btnmodal no" id="closeRouteMismatch"><strong>X</strong> No</a>
+                    <a href="/Train/ClearRouteMismatch" class="btnmodal no" id="closeRouteMismatch"><strong>X</strong> No</a>
                 </div>
 
             </div>
@@ -412,33 +252,28 @@
             $("#sidebar-overlay").fadeOut(200);
         });
 
-                document.addEventListener("click", function (e) {
-            if (e.target.id === "closeRouteMismatch") {
-                e.preventDefault();
-                document.querySelector(".modal-overlay").remove();
-            }
-        });
-
-            // document.addEventListener("DOMContentLoaded", function () {
-            //     var modal = new bootstrap.Modal(document.getElementById('routeMismatchModal'));
-            //     modal.show();
-            // });
+        //         document.addEventListener("click", function (e) {
+        //     if (e.target.id === "closeRouteMismatch") {
+        //         e.preventDefault();
+        //         document.querySelector(".modal-overlay").remove();
+        //     }
+        // });
 
 
-                    function changeDate(offset) {
-            let dateInput = document.getElementById("journeyDatePicker");
-            let date = new Date(dateInput.value);
-            date.setDate(date.getDate() + offset);
-            dateInput.valueAsDate = date;
-            submitDateChange();
-        }
+        //     function changeDate(offset) {
+        //     let dateInput = document.getElementById("journeyDatePicker");
+        //     let date = new Date(dateInput.value);
+        //     date.setDate(date.getDate() + offset);
+        //     dateInput.valueAsDate = date;
+        //     submitDateChange();
+        // }
 
-        function submitDateChange() {
-            let date = document.getElementById("journeyDatePicker").value;
+        // function submitDateChange() {
+        //     let date = document.getElementById("journeyDatePicker").value;
 
-            let url = `/Train/TrainResults?journeyDate=${date}`;
-            window.location.href = url;
-        }
+        //     let url = `/Train/TrainResults?journeyDate=${date}`;
+        //     window.location.href = url;
+        // }
 
 
 

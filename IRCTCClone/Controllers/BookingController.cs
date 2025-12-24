@@ -619,13 +619,11 @@ namespace IRCTCClone.Controllers
 
             /*            Train train = Train.GetTrainById(connStr, trainId, classId, journeyDate);*/
             var trains = Train.GetTrains(connStr, FromStationId, ToStationId, journeyDate);
-            Train train = trains.FirstOrDefault();
+            Train train = trains.FirstOrDefault(t => t.Id == trainId);
 
 
             var validation = TrainRouteValidator.Validate(userfromid, usertoid, train, FSM, TSM, FromStation, ToStation);
      
-
-
             if (!validation.IsValid)
             {
                 TempData["RouteMismatch"] = "YES";
