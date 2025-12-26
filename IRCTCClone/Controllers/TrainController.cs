@@ -77,25 +77,43 @@ namespace IRCTCClone.Controllers
         public IActionResult TrainResults(int? fromStationId, int? toStationId,string FromStation, string ToStation, string? journeyDateStr)
         {
 
-            // ✅ ALWAYS read from SearchContext
-            if (TempData["fromStationId"] == null || TempData["toStationId"] == null)
+            // 🔒 SEARCH CONTEXT IS THE SOURCE OF TRUTH
+            if (TempData.Peek("fromStationId") == null ||
+                TempData.Peek("toStationId") == null)
+            {
                 return View(Enumerable.Empty<Train>());
+            }
 
-            int searchFromId = (int)TempData["fromStationId"];
-            int searchToId = (int)TempData["toStationId"];
-            string searchFromName = TempData["FromStation"] as string;
-            string searchToName = TempData["ToStation"] as string;
-            string searchDateStr = TempData["JourneyDate"] as string;
+
+            int searchFromId = (int)TempData.Peek("fromStationId");
+            int searchToId = (int)TempData.Peek("toStationId");
+
+            string searchFromName = TempData.Peek("FromStation") as string;
+            string searchToName = TempData.Peek("ToStation") as string;
 
             //if (fromStationId == null || toStationId == null)
             //    return View(); // blank
 
             // Parse date
+            //DateTime journeyDate;
+            //if (!DateTime.TryParse(journeyDateStr, out journeyDate))
+            //    journeyDate = DateTime.Today;
+
             DateTime journeyDate;
             if (!DateTime.TryParse(journeyDateStr, out journeyDate))
-                journeyDate = DateTime.Today;
+            {
+                journeyDate = TempData.Peek("JourneyDate") is DateTime jd
+                    ? jd
+                    : DateTime.Today;
+            }
 
-            var trains = Train.GetTrains(_connectionString, fromStationId.Value, toStationId.Value, journeyDate.ToString("yyyy-MM-dd"));
+/*            ViewBag.FromStation = searchFromName;
+            ViewBag.ToStation = searchToName;
+            ViewBag.FromStationId = searchFromId;
+            ViewBag.ToStationId = searchToId;
+            ViewBag.JourneyDate = journeyDate.ToString("yyyy-MM-dd");
+*/
+            var trains = Train.GetTrains(_connectionString, searchFromId, searchToId, journeyDate.ToString("yyyy-MM-dd"));
             //TempData["FromStation"] = FromStation;
             //TempData["ToStation"] = ToStation;
             //TempData["fromStationId"] = fromStationId;
@@ -108,7 +126,6 @@ namespace IRCTCClone.Controllers
 
 
         [EnableRateLimiting("SearchLimiter")]
-
         [HttpPost]
         public IActionResult TrainResults(int fromStationId, int toStationId, DateTime journeyDate, string journeyDateStr,string fromStation, string toStation)
         {

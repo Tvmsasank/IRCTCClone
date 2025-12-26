@@ -8,11 +8,12 @@
     // var fromStation = ViewBag.From;
     // var toStation = ViewBag.To;
 
-    var fromStation = TempData["FromStation"]?.ToString();
-    var toStation = TempData["ToStation"]?.ToString();
+    var fromStation = TempData.Peek("FromStation")?.ToString();
+    var toStation = TempData.Peek("ToStation")?.ToString();
 
-    var userfromid= TempData["fromStationId"];
-    var usertoid= TempData["toStationId"] ;
+    var userfromid = TempData.Peek("fromStationId");
+    var usertoid = TempData.Peek("toStationId");
+
 
     // TempData.Keep();
 
@@ -21,7 +22,7 @@
 <section class="results-page fadeInUp">
     <div class="results-container">
 
-@*         <!-- ✅ SEARCH SUMMARY BAR (ADD HERE) -->
+         <!-- ✅ SEARCH SUMMARY BAR (ADD HERE) -->
         @{
             DateTime jd = DateTime.Today;
 
@@ -52,17 +53,25 @@
 
                 <span class="day">@jd.ToString("dddd")</span>
 
-                <a href="/Train/TrainResults" class="modify-btn">Modify Search</a>
+                <a href="/Train/TrainResults?
+                    fromStationId=@userfromid
+                    &toStationId=@usertoid
+                    &FromStation=@fromStation
+                    &ToStation=@toStation
+                    &journeyDateStr=@journey"
+                   class="modify-btn"> 
+                    Modify Search
+                </a>
             </div>
 
         </div>
-        <!-- ✅ END SEARCH SUMMARY BAR --> *@
+        <!-- ✅ END SEARCH SUMMARY BAR --> 
 
         <h2 class="results-title">
             Available Trains for <span class="highlight">@journey</span>
         </h2>
 
-        @if (!Model.Any())
+        @if (Model == null || !Model.Any())
         {
             <p class="no-results">No trains found for your selected route.</p>
         }
@@ -259,23 +268,31 @@
         //     }
         // });
 
+        function changeDate(offset) {
+            let dateInput = document.getElementById("journeyDatePicker");
+            let date = new Date(dateInput.value);
+            date.setDate(date.getDate() + offset);
+            dateInput.valueAsDate = date;
+            submitDateChange();
+        }
 
-        //     function changeDate(offset) {
-        //     let dateInput = document.getElementById("journeyDatePicker");
-        //     let date = new Date(dateInput.value);
-        //     date.setDate(date.getDate() + offset);
-        //     dateInput.valueAsDate = date;
-        //     submitDateChange();
-        // }
+        function submitDateChange() {
+            let date = document.getElementById("journeyDatePicker").value;
 
-        // function submitDateChange() {
-        //     let date = document.getElementById("journeyDatePicker").value;
+            let fromId = '@TempData.Peek("fromStationId")';
+            let toId   = '@TempData.Peek("toStationId")';
+            let fromNm = '@TempData.Peek("FromStation")';
+            let toNm   = '@TempData.Peek("ToStation")';
 
-        //     let url = `/Train/TrainResults?journeyDate=${date}`;
-        //     window.location.href = url;
-        // }
+            let url = `/Train/TrainResults?
+                fromStationId=${fromId}
+                &toStationId=${toId}
+                &FromStation=${encodeURIComponent(fromNm)}
+                &ToStation=${encodeURIComponent(toNm)}
+                &journeyDateStr=${date}`;
 
-
+            window.location.href = url;
+        }
 
     </script>
 
