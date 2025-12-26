@@ -44,6 +44,5 @@ A web-based **IRCTC (Indian Railway Catering and Tourism Corporation) Clone** bu
 - **Database:** SQL Server  
 - **Authentication:** Cookie-based authentication with Claims  
 - **Security:** SHA256 password hashing  
-- **Tools & Libraries:** jQuery, Chart.js, SweetAlert2, Emoji-mart
-
+- **Tools & Libraries:** jQuery, SweetAlert2
 ---
