@@ -1,4 +1,5 @@
 ﻿@model IRCTCClone.Models.Booking
+@using IRCTCClone.E_D
 
 @{
     ViewData["Title"] = "Booking Details";
@@ -43,7 +44,7 @@
             </div>
             <form method="post" action="/Booking/Confirm" class="checkout-form">
                 <!-- 🔐 ENCRYPTED BOOKING DATA -->
-                <input type="hidden" name="edata" value="@ViewBag.EncryptedData" />
+ @*               <input type="hidden" name="edata" value="@ViewBag.EncryptedData" />
                 <input type="hidden" name="trainId" value="@train.Id" />
                 <input type="hidden" name="classId" value="@cls.Id" />
                 <input type="hidden" name="journeyDate" value="@journey" />
@@ -53,9 +54,9 @@
                 <input type="hidden" name="FromStationId" value="@ViewBag.FromStationId" />
                 <input type="hidden" name="ToStationId" value="@ViewBag.ToStationId" />
                 <input type="hidden" name="SeatStatuscount" value="@ViewBag.SeatStatusCount" />
-                <input type="hidden" name="BookingStatus" value="@ViewBag.BookingStatus" />
+                <input type="hidden" name="BookingStatus" value="@ViewBag.BookingStatus" /> *@
 
-
+                <input type="hidden" name="edata" value="@ViewBag.EncryptedData" />
 
                 <div class="form-group mb-3">
                     <label for="Quota"><strong>Select Quota:</strong></label>

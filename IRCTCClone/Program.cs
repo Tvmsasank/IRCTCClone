@@ -1,12 +1,15 @@
 ﻿using IRCTCClone.Data;
+using IRCTCClone.E_D;
 using IRCTCClone.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.RateLimiting;
+using Newtonsoft.Json.Linq;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // ✅ MVC, Razor, Session
+builder.Services.AddSignalR();
 builder.Services.AddControllersWithViews();
 builder.Services.AddTransient<EmailService>();
 builder.Services.AddRazorPages();
@@ -15,6 +18,9 @@ builder.Services.AddMemoryCache();
 builder.Services.AddScoped<IAvailabilityService, AvailabilityService>();
 builder.Services.AddSession();
 builder.Services.AddDistributedMemoryCache();
+//builder.Services.AddDataProtection();
+//string encrypted = UrlEncryptionHelper.Encrypt(json);
+//string decrypted = UrlEncryptionHelper.Decrypt(token);
 builder.Services.AddSession(options =>
 {
     options.IdleTimeout = TimeSpan.FromHours(1);
@@ -147,6 +153,8 @@ app.UseAuthorization();
 
     await next();
 });*/
+
+app.MapHub<TrainHub>("/trainHub");
 
 // ✅ Rate Limiter AFTER Authentication
 app.UseRateLimiter();

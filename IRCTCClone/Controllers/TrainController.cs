@@ -1,4 +1,5 @@
-﻿using IRCTCClone.Models;
+﻿using IRCTCClone.E_D;
+using IRCTCClone.Models;
 using IRCTCClone.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -74,53 +75,51 @@ namespace IRCTCClone.Controllers
         //----------------------------------------train results----------------------------------------------//
 
         [HttpGet]
-        public IActionResult TrainResults(int? fromStationId, int? toStationId,string FromStation, string ToStation, string? journeyDateStr)
+        public IActionResult TrainResults(string t)
         {
+            // First-time load after POST (TempData exists)
+            if (!string.IsNullOrEmpty(t))
+            {
+                var decrypted = UrlEncryptionHelper.Decrypt(t);
+                var parts = decrypted.Split('|');
 
-            // 🔒 SEARCH CONTEXT IS THE SOURCE OF TRUTH
+                int fromStationId = int.Parse(parts[0]);
+                int toStationId = int.Parse(parts[1]);
+                string fromName = parts[2];
+                string toName = parts[3];
+                string dateStr = parts[4];
+
+                TempData["fromStationId"] = fromStationId;
+                TempData["toStationId"] = toStationId;
+                TempData["FromStation"] = fromName;
+                TempData["ToStation"] = toName;
+                TempData["JourneyDate"] = dateStr;
+            }
+
+            // 🔒 SINGLE SOURCE OF TRUTH
             if (TempData.Peek("fromStationId") == null ||
                 TempData.Peek("toStationId") == null)
             {
                 return View(Enumerable.Empty<Train>());
             }
 
-
             int searchFromId = (int)TempData.Peek("fromStationId");
             int searchToId = (int)TempData.Peek("toStationId");
 
-            string searchFromName = TempData.Peek("FromStation") as string;
-            string searchToName = TempData.Peek("ToStation") as string;
+            string journeyDateStr =
+                TempData.Peek("JourneyDate")?.ToString()
+                ?? DateTime.Today.ToString("yyyy-MM-dd");
 
-            //if (fromStationId == null || toStationId == null)
-            //    return View(); // blank
+            var trains = Train.GetTrains(
+                _connectionString,
+                searchFromId,
+                searchToId,
+                journeyDateStr
+            );
 
-            // Parse date
-            //DateTime journeyDate;
-            //if (!DateTime.TryParse(journeyDateStr, out journeyDate))
-            //    journeyDate = DateTime.Today;
-
-            DateTime journeyDate;
-            if (!DateTime.TryParse(journeyDateStr, out journeyDate))
-            {
-                journeyDate = TempData.Peek("JourneyDate") is DateTime jd
-                    ? jd
-                    : DateTime.Today;
-            }
-
-/*            ViewBag.FromStation = searchFromName;
-            ViewBag.ToStation = searchToName;
-            ViewBag.FromStationId = searchFromId;
-            ViewBag.ToStationId = searchToId;
-            ViewBag.JourneyDate = journeyDate.ToString("yyyy-MM-dd");
-*/
-            var trains = Train.GetTrains(_connectionString, searchFromId, searchToId, journeyDate.ToString("yyyy-MM-dd"));
-            //TempData["FromStation"] = FromStation;
-            //TempData["ToStation"] = ToStation;
-            //TempData["fromStationId"] = fromStationId;
-            //TempData["toStationId"] = toStationId;
-            //TempData["JourneyDate"] = journeyDate;
-            ViewBag.JourneyDate = journeyDate.ToString("yyyy-MM-dd");
+            ViewBag.JourneyDate = journeyDateStr;
             TempData.Keep();
+
             return View(trains);
         }
 
@@ -232,6 +231,20 @@ namespace IRCTCClone.Controllers
         }
 
 
+        public IActionResult ChangeJourneyDate(string date)
+        {
+            var fromId = TempData.Peek("fromStationId");
+            var toId = TempData.Peek("toStationId");
+            var fromNm = TempData.Peek("FromStation");
+            var toNm = TempData.Peek("ToStation");
+
+            string raw =
+                $"{fromId}|{toId}|{fromNm}|{toNm}|{date}";
+
+            string token = UrlEncryptionHelper.Encrypt(raw);
+
+            return RedirectToAction("TrainResults", new { t = token });
+        }
 
 
         /*[HttpGet]
@@ -257,5 +270,6 @@ namespace IRCTCClone.Controllers
             return false;
         }
     }
+
 }
 

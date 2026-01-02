@@ -26,6 +26,7 @@ using static System.Net.Mime.MediaTypeNames;
 using Font = iTextSharp.text.Font;
 using Image = iTextSharp.text.Image;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.SignalR;
 
 
 namespace IRCTCClone.Controllers
@@ -39,12 +40,14 @@ namespace IRCTCClone.Controllers
         private const int RAC_LIMIT = 8; //recently added
         private readonly IAvailabilityService _availabilityService;
         private readonly IConfiguration _configuration;
+        private readonly IHubContext<TrainHub> _hub;
 
-        public BookingController(IConfiguration configuration, EmailService emailService)
+        public BookingController(IConfiguration configuration, EmailService emailService, IHubContext<TrainHub> hub)
         {
             _connectionString = configuration.GetConnectionString("DefaultConnection");
             _emailService = emailService;
             _configuration = configuration;
+            _hub = hub;
 
             /*            _baseUrl = configuration["AppSettings:BaseUrl"];*/
         }
@@ -581,7 +584,25 @@ namespace IRCTCClone.Controllers
 
         // ---------- POST: receive form -> store payload in TempData -> Redirect ----------
         [HttpGet]
-        public IActionResult PrepareCheckout(int trainId, int classId, string journeyDate, int FromStationId, int ToStationId, string seatStatus, string FSM, string TSM, string FromStation,string ToStation,int userfromid, int usertoid, string Departure, string Arrival,string Duration,int numPassengers = 1)
+        public IActionResult PrepareCheckout(
+            int trainId, 
+            int classId, 
+            string journeyDate,
+            string classCode,
+            string trainName,
+            int FromStationId, 
+            int ToStationId, 
+            string seatStatus, 
+            string FSM, 
+            string TSM, 
+            string FromStation, 
+            string ToStation, 
+            int userfromid, 
+            int usertoid, 
+            string Departure, 
+            string Arrival, 
+            string Duration, 
+            int numPassengers = 1)
         {
 
             string connStr = _configuration.GetConnectionString("DefaultConnection");
@@ -592,12 +613,16 @@ namespace IRCTCClone.Controllers
             // Use seatStatus if needed
 
             ViewBag.SeatStatus = seatStatus;
+            ViewBag.classCode = classCode;
+
             // Save payload in session before redirect
             var payload = new CheckoutPayload
             {
                 TrainId = trainId,
                 ClassId = classId,
                 JourneyDate = journeyDate,
+                ClassCode = classCode,
+                TrainName = trainName,  
                 FromStationId = FromStationId,
                 ToStationId = ToStationId,
                 FromStation = FromStation,
@@ -611,11 +636,9 @@ namespace IRCTCClone.Controllers
                 Departure=Departure,
                 Arrival=Arrival,
                 Duration=Duration
-
-
             };
-            HttpContext.Session.SetString("CheckoutPayload", JsonConvert.SerializeObject(payload));
 
+            HttpContext.Session.SetString("CheckoutPayload", JsonConvert.SerializeObject(payload));
 
             /*            Train train = Train.GetTrainById(connStr, trainId, classId, journeyDate);*/
             var trains = Train.GetTrains(connStr, FromStationId, ToStationId, journeyDate);
@@ -897,7 +920,7 @@ namespace IRCTCClone.Controllers
 
         [EnableRateLimiting("BookingLimiter")]
         [HttpPost]
-        public IActionResult Confirm(
+        public async Task<IActionResult> Confirm(
             int trainId,
             int classId,
             string journeyDate,
@@ -1210,8 +1233,12 @@ namespace IRCTCClone.Controllers
                     seatsCapacity: availableCount,
                     raccount: seatStatus.RACCount,
                     racSeats: seatStatus.RACSeats// this will now be updated inside method,
-
                 );
+
+                // 🔴 ADD HERE — NOW BOOKING IS FINAL
+                await _hub.Clients
+                    .Group($"TRAIN_{trainId}")
+                    .SendAsync("SeatUpdated", trainId, classId);
 
                 // -------------------------------------------------------------------------------
 

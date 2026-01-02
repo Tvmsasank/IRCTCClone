@@ -17,6 +17,11 @@
 
     // TempData.Keep();
 
+    string rawSearchData =
+    $"{userfromid}|{usertoid}|{fromStation}|{toStation}|{journey}";
+
+    string encryptedToken = UrlEncryptionHelper.Encrypt(rawSearchData);
+
 }
 
 <section class="results-page fadeInUp">
@@ -53,7 +58,7 @@
 
                 <span class="day">@jd.ToString("dddd")</span>
 
-                <a href="/Train/TrainResults?
+@*                 <a href="/Train/TrainResults?
                     fromStationId=@userfromid
                     &toStationId=@usertoid
                     &FromStation=@fromStation
@@ -61,7 +66,13 @@
                     &journeyDateStr=@journey"
                    class="modify-btn"> 
                     Modify Search
+                </a> *@
+
+                <a href="/Train/TrainResults?t=@encryptedToken"
+                   class="modify-btn">
+                    Modify Search
                 </a>
+
             </div>
 
         </div>
@@ -139,6 +150,10 @@
                                         <input type="hidden" name="Duration" value="@t.Duration" />
                                         <input type="hidden" name="FSM" value="@t.FSM" />
                                         <input type="hidden" name="TSM" value="@t.TSM" />
+
+                                        <!-- Add class type info -->
+                                        <input type="hidden" name="classCode" value="@c.Code" /> <!-- EC, CC, AC, SL etc. -->
+                                        <input type="hidden" name="trainName" value="@t.Name" /> <!-- Vande Bharat or other -->
 
                                         @{
                                             string seatStatus;
@@ -284,18 +299,17 @@
             let fromNm = '@TempData.Peek("FromStation")';
             let toNm   = '@TempData.Peek("ToStation")';
 
-            let url = `/Train/TrainResults?
-                fromStationId=${fromId}
-                &toStationId=${toId}
-                &FromStation=${encodeURIComponent(fromNm)}
-                &ToStation=${encodeURIComponent(toNm)}
-                &journeyDateStr=${date}`;
+            // let url = `/Train/TrainResults?
+            //     fromStationId=${fromId}
+            //     &toStationId=${toId}
+            //     &FromStation=${encodeURIComponent(fromNm)}
+            //     &ToStation=${encodeURIComponent(toNm)}
+            //     &journeyDateStr=${date}`;
 
-            window.location.href = url;
+            window.location.href = `/Train/ChangeJourneyDate?date=${date}`;
+
+            // window.location.href = url;
         }
-
     </script>
-
-
 }
 

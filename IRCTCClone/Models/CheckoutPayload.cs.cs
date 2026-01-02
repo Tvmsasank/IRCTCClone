@@ -5,6 +5,8 @@
         public int TrainId { get; set; }
         public int ClassId { get; set; }
         public string JourneyDate { get; set; }
+        public string ClassCode { get; set; }
+        public string TrainName { get; set; }
         public int FromStationId { get; set; }
         public int userfromid { get; set; }
         public int usertoid { get; set; }

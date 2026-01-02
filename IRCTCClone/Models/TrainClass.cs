@@ -1,4 +1,5 @@
 ﻿using Microsoft.Data.SqlClient;
+using System.ComponentModel.DataAnnotations;
 using System.Data;
 
 namespace IRCTCClone.Models
@@ -9,7 +10,6 @@ namespace IRCTCClone.Models
 
         public int TrainId { get; set; }
         public Train? Train { get; set; }
-
         public string Code { get; set; } = null!;         // e.g., 1A, 2A, SL, CC
         public string SeatPrefix { get; set; } = null!;   // e.g., A, B, S, C — for seat numbering
 
