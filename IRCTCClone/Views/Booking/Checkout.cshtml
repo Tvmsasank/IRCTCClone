@@ -13,15 +13,10 @@
     var tost = ViewBag.ToStation;
     var FromStation1 = ViewBag.FromStation1;
     var ToStation1 = ViewBag.ToStation1;
-
-
     var Departure= ViewBag.Departure;
     var Arrival=ViewBag.Arrival;
     var Duration=ViewBag.Duration;
-
-
  }
-    
 
 <section class="checkout-page">
     <div class="checkout-card">
@@ -42,9 +37,10 @@
                     <strong>Duration:</strong> @Duration
                 </p>
             </div>
+
             <form method="post" action="/Booking/Confirm" class="checkout-form">
                 <!-- 🔐 ENCRYPTED BOOKING DATA -->
- @*               <input type="hidden" name="edata" value="@ViewBag.EncryptedData" />
+                <input type="hidden" name="edata" value="@ViewBag.EncryptedData" />
                 <input type="hidden" name="trainId" value="@train.Id" />
                 <input type="hidden" name="classId" value="@cls.Id" />
                 <input type="hidden" name="journeyDate" value="@journey" />
@@ -54,7 +50,7 @@
                 <input type="hidden" name="FromStationId" value="@ViewBag.FromStationId" />
                 <input type="hidden" name="ToStationId" value="@ViewBag.ToStationId" />
                 <input type="hidden" name="SeatStatuscount" value="@ViewBag.SeatStatusCount" />
-                <input type="hidden" name="BookingStatus" value="@ViewBag.BookingStatus" /> *@
+                <input type="hidden" name="BookingStatus" value="@ViewBag.BookingStatus" /> 
 
                 <input type="hidden" name="edata" value="@ViewBag.EncryptedData" />
 
@@ -124,7 +120,6 @@
                 </label>
                 <!-- ✅ CAPTCHA BLOCK END -->
 
-
                 <button type="button" id="payBookBtn" class="btn-primary">Pay & Book</button>
             </form>
 
@@ -152,7 +147,6 @@
 
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-
 <script> 
     $(function () {
         // --- Update Total Fare ---

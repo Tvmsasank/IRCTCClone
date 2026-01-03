@@ -3,15 +3,9 @@ using System;
 using Microsoft.Data.SqlClient;
 
 namespace IRCTCClone.Helpers
-{
-
-
-
-
+{ 
     public static class TrainRouteValidator
     {
-
-
         public static TrainRouteCheckResult Validate(int searchedFromId, int searchedToId, Train selectedTrain, string FromStationName1, string ToStationName1, string FromStation, string ToStation)
         {
             var result = new TrainRouteCheckResult
@@ -27,13 +21,13 @@ namespace IRCTCClone.Helpers
                 ActualTo = ToStationName1,
 
 
-            SearchedFrom = FromStation.Contains("(")
-            ? FromStation[(FromStation.IndexOf('(') + 1)..FromStation.IndexOf(')')]
-            : FromStation,
+                SearchedFrom = FromStation.Contains("(")
+                ? FromStation[(FromStation.IndexOf('(') + 1)..FromStation.IndexOf(')')]
+                : FromStation,
 
-            SearchedTo = ToStation.Contains("(")
-            ? ToStation[(ToStation.IndexOf('(') + 1)..ToStation.IndexOf(')')]
-            : ToStation,
+                SearchedTo = ToStation.Contains("(")
+                ? ToStation[(ToStation.IndexOf('(') + 1)..ToStation.IndexOf(')')]
+                : ToStation,
 
             };
 

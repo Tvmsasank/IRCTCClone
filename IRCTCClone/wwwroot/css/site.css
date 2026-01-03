@@ -153,7 +153,7 @@ body {
 }
 
 .auth-card {
-    margin-bottom: 50px;
+    margin-bottom: 1px;
     background-color: rgba(255, 255, 255, 0.94);
     padding: 5px 50px;
     border-radius: 12px;
@@ -166,8 +166,8 @@ body {
     .auth-card h2 {
         text-align: center;
         color: #0078D7;
-        margin-bottom: 20px; 
-        font-size: 1.9rem;
+        margin-bottom: 15px; 
+        font-size: 1.7rem;
         padding: 1px;
     }
 
@@ -176,18 +176,18 @@ body {
     display: block;
     color: #333;
     font-weight: 500;
-    margin-bottom: 7px;
+    margin-bottom: 5px;
     font-size: 15px;
 }
 
 .auth-form input {
     width: 100%;
-    padding: 9px;
-    margin-top: 1px;
-    margin-bottom: 1px;
+    padding: 7px;
+    margin-top: 0px;
+    margin-bottom: 0px;
     border: 1px solid #ccc;
     border-radius: 6px;
-    font-size: 15px;
+    font-size: 16px;
     transition: border-color 0.3s, box-shadow 0.3s;
 }
 
@@ -2476,4 +2476,123 @@ body.d-flex.align-items-center {
     background: #dc3545; /* red */
 }
 
+/* ADVANCE SEARCH FLOAT */
 
+/* Floating label container */
+.floating-group {
+    position: relative;
+}
+
+    /* Input */
+    .floating-group input[type="text"] {
+        width: 100%;
+        padding: 13px 10px;
+        font-size: 15px;
+        border: 1px solid #a8d7e9;
+        border-radius: 13px;
+        outline: none;
+        background: #fff;
+    }
+
+    /* Label */
+    .floating-group label {
+        position: absolute;
+        left: 10px;
+        top: 40%;
+        transform: translateY(-50%);
+        color: #777;
+        font-size: 14px;
+        pointer-events: none;
+        background: #fff;
+        transition: all 0.25s ease;
+    }
+
+    /* When focused OR value entered */
+    .floating-group input:focus + label,
+    .floating-group input:not(:placeholder-shown) + label {
+        top: -1px;
+        font-size: 12px;
+        color: #1a73e8; /* IRCTC blue */
+    }
+
+    /* Focus border */
+    .floating-group input:focus {
+        border-color: #1a73e8;
+    }
+
+
+
+
+/* INDIAN RAILWAYS HEADING IN THE HOME PAGE */
+
+/* ================================
+   HOME PAGE LAYOUT
+================================ */
+
+.home-page {
+    position: relative; /* REQUIRED for overlay */
+    width: 100%;
+    overflow: hidden;
+}
+
+/* Flex container */
+.home-layout {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+}
+
+/* LEFT SECTION (Train Image / Search Area) */
+.home-left {
+    width: 100%;
+}
+
+/* ================================
+   RIGHT OVERLAY (INDIAN RAILWAYS)
+================================ */
+
+.home-right {
+    position: absolute; /* KEY FIX */
+    top: 45px;
+    right: 60px;
+    text-align: center;
+    background: none; /* NO STRIP */
+    padding: 0;
+    margin: 15px;
+    pointer-events: none; /* behaves like IRCTC */
+    z-index: 10;
+}
+
+/* INDIAN RAILWAYS TEXT */
+.indian-railways-text {
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: 20px;
+    color: #0d2a52
+}
+
+
+
+/* TAGLINE */
+.railways-tagline {
+    margin-top: 6px;
+    font-size: 15px;
+    color: #0d2a52;
+}
+
+
+/* ================================
+   RESPONSIVE (MOBILE)
+================================ */
+
+@media (max-width: 768px) {
+    .home-layout {
+        flex-direction: column;
+    }
+
+    .home-right {
+        position: static; /* stack naturally on mobile */
+        margin-top: 16px;
+        pointer-events: auto;
+    }
+}

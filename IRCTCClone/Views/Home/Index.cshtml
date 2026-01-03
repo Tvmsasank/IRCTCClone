@@ -6,17 +6,42 @@
     var maxDate = DateTime.Today.AddMonths(2).ToString("yyyy-MM-dd");
 }
 
+<div class="home-layout">
+
+    <!-- LEFT SIDE (existing content stays here) -->
+    <div class="home-left">
+        <!-- your existing search form code -->
+    </div>
+
+    <!-- RIGHT SIDE (NEW) -->
+    <div class="home-right">
+        <h2 class="indian-railways-text">INDIAN RAILWAYS</h2>
+        <p class="railways-tagline">Safety | Security | Punctuality</p>
+    </div>
+
+</div>
+
+
 <div class="home-page">
     <div class="new-search-box">
         <h2>Search Trains</h2>
+
         <form method="post" action="/Train/TrainResults">
             <div class="new-search">
-            <div class="form-group position-relative">
-                    <input type="text" id="fromStation" placeholder="From Station" name="fromStation" autocomplete="off" required />
-                <input type="hidden" id="fromStationId" name="fromStationId" />  <!-- hidden -->
-                               
-                <div id="fromStationList" class="autocomplete-list"></div>
-            </div>
+                <div class="form-group position-relative floating-group">
+                    <input type="text"
+                           id="fromStation"
+                           name="fromStation"
+                           placeholder=" "
+                           autocomplete="off"
+                           required />
+
+                    <label for="fromStation">📍 From</label>
+
+                    <input type="hidden" id="fromStationId" name="fromStationId" />
+                    <div id="fromStationList" class="autocomplete-list"></div>
+                </div>
+
             </div>
 
             <div class="swapStations">
@@ -24,11 +49,20 @@
             </div>
 
             <div class="new-search">
-            <div class="form-group position-relative">
-                    <input type="text" id="toStation" placeholder="To Station" name="toStation" autocomplete="off" required />
-                <input type="hidden" id="toStationId" name="toStationId" />  <!-- hidden -->
-                <div id="toStationList" class="autocomplete-list"></div>
-            </div>
+                <div class="form-group position-relative floating-group">
+                    <input type="text"
+                           id="toStation"
+                           name="toStation"
+                           placeholder=" "
+                           autocomplete="off"
+                           required />
+
+                    <label for="toStation">📍 To</label>
+
+                    <input type="hidden" id="toStationId" name="toStationId" />
+                    <div id="toStationList" class="autocomplete-list"></div>
+                </div>
+
             </div>
 
 

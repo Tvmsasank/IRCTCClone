@@ -920,7 +920,7 @@ namespace IRCTCClone.Controllers
 
         [EnableRateLimiting("BookingLimiter")]
         [HttpPost]
-        public async Task<IActionResult> Confirm(
+        public IActionResult Confirm(
             int trainId,
             int classId,
             string journeyDate,
@@ -1236,9 +1236,9 @@ namespace IRCTCClone.Controllers
                 );
 
                 // 🔴 ADD HERE — NOW BOOKING IS FINAL
-                await _hub.Clients
-                    .Group($"TRAIN_{trainId}")
-                    .SendAsync("SeatUpdated", trainId, classId);
+                //await _hub.Clients
+                //    .Group($"TRAIN_{trainId}")
+                //    .SendAsync("SeatUpdated", trainId, classId);
 
                 // -------------------------------------------------------------------------------
 
@@ -1285,6 +1285,7 @@ namespace IRCTCClone.Controllers
                             <li><strong>PNR:</strong> {pnrLocal}</li>
                             <li><strong>Train:</strong> {trainName} ({trainNumber})</li>
                             <li><strong>Quota:</strong> {quota}</li>
+                            <li><strong>Class:</strong> {Class}</li>
                             <li><strong>From:</strong> {fromStation?.Name}</li>
                             <li><strong>To:</strong> {toStation?.Name}</li>
                             <li><strong>Date:</strong> {DateTime.Parse(journeyDate):dd-MMM-yyyy}</li>
