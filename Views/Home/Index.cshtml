@@ -1,0 +1,926 @@
+@using IrctcClone.Helpers
+@model List<IRCTCClone.Models.Station>
+
+@{
+    ViewData["Title"] = "Search Trains";
+    var minDate = DateTime.Today.ToString("yyyy-MM-dd");
+    var maxDate = DateTime.Today.AddMonths(2).ToString("yyyy-MM-dd");
+    ViewBag.ForceLogin = TatkalHelper.ShouldForceLogin();
+    ViewBag.AutoTatkal = TatkalHelper.ShouldAutoSelectTatkal();
+    ViewBag.IsLoggedIn = User.Identity.IsAuthenticated;
+    ViewBag.TatkalExclusive = TatkalHelper.IsTatkalExclusiveWindow();
+}
+
+@* <div class="home-layout">
+
+    <!-- LEFT SIDE (existing content stays here) -->
+    <div class="home-left">
+        <!-- your existing search form code -->
+    </div>
+
+    <!-- RIGHT SIDE (NEW) -->
+    <!-- RIGHT SIDE (NEW) -->
+    <div class="home-right">
+        <h2 class="indian-railways-text">INDIAN RAILWAYS</h2>
+        <p class="railways-tagline">Safety | Security | Punctuality</p>
+    </div>
+
+</div>
+ *@
+
+<div class="home-page">
+    <div class="search-card">
+        <!-- Header -->
+        <div class="search-card-header">
+            <h1 class="search-title" data-translate="bookticket">BOOK TICKET</h1>
+        </div>
+
+        <form method="post" action="/Train/TrainResults" id="homeSearchForm" novalidate>
+
+            <!-- From Station -->
+            <div class="field-group grid-from">
+                <label class="field-label" data-translate="from">From*</label>
+                <div class="station-input-wrapper">
+                    <div class="floating-group">
+                        <input type="text"
+                               id="fromStation"
+                               name="fromStation"
+                               placeholder=" "
+                               autocomplete="off"
+                               required />
+                        <label for="fromStation" data-translate="from_placeholder">Enter source station</label>
+                        <input type="hidden" id="fromStationId" name="fromStationId" />
+                        <div id="fromStationList" class="autocomplete-list"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Swap Button -->
+            <div class="swap-row">
+                <div class="swap-line"></div>
+                <button type="button" class="swap-btn" id="swapStations">⇄</button>
+                <div class="swap-line"></div>
+            </div>
+
+            <!-- To Station -->
+            <div class="field-group grid-to">
+                <label class="field-label" data-translate="to">To*</label>
+                <div class="station-input-wrapper">
+                    <div class="floating-group">
+                        <input type="text"
+                               id="toStation"
+                               name="toStation"
+                               placeholder=" "
+                               autocomplete="off"
+                               required />
+                        <label for="toStation" data-translate="to_placeholder">Enter destination station</label>
+                        <input type="hidden" id="toStationId" name="toStationId" />
+                        <div id="toStationList" class="autocomplete-list"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Date -->
+            <div class="field-group grid-date">
+                <label class="field-label" data-translate="date">DD/MM/YYYY *</label>
+                <input type="text"
+                       id="journeyDate"
+                       name="journeyDate"
+                       class="date-input"
+                       placeholder="Select Journey Date"
+                       data-translate="date_placeholder"
+                       required />
+            </div>
+
+            <!-- Classes -->
+            <div class="field-group grid-class">
+                <label class="field-label" data-translate="classes">Classes</label>
+                <select id="classFilterDropdown" name="classCode" class="form-control">
+                    <option value="ALL" selected="@(ViewBag.classCode == null || ViewBag.classCode == "ALL")">All Classes</option>
+                    <option value="EA" selected="@(ViewBag.classCode == "EA")">Anubhuti Class (EA)</option>
+                    <option value="1A" selected="@(ViewBag.classCode == "1A")">AC First Class (1A)</option>
+                    <option value="EV" selected="@(ViewBag.classCode == "EC")">Vistadome AC (EV)</option>
+                    <option value="EC" selected="@(ViewBag.classCode == "EC")">Exec. Chair Car (EC)</option>
+                    <option value="2A" selected="@(ViewBag.classCode == "2A")">AC 2 Tier (2A)</option>
+                    <option value="FC" selected="@(ViewBag.classCode == "FC")">First Class (FC)</option>
+                    <option value="3A" selected="@(ViewBag.classCode == "3A")">AC 3 Tier (3A)</option>
+                    <option value="3E" selected="@(ViewBag.classCode == "3E")">AC 3 Economy (3E)</option>
+                    <option value="VS" selected="@(ViewBag.classCode == "VS")">Vistadome Non AC (VS)</option>
+                    <option value="2S" selected="@(ViewBag.classCode == "2S")">Second Sitting (2S)</option>
+                </select>
+            </div>
+
+            <!-- Quota -->
+            <div class="field-group grid-quota">
+                <label class="field-label" data-translate="quota">Quota</label>
+                <select id="quota" name="quota" class="form-control" style="cursor: pointer">
+
+                    @if (ViewBag.TatkalExclusive == true && ViewBag.IsLoggedIn == true)
+                    {
+                        <option value="TATKAL" id="tatkalOption">TATKAL</option>
+                        <option value="PT" id="premiumTatkalOption">PREMIUM TATKAL</option>
+                    }
+
+                    else
+                    {
+                        <option value="GENERAL">GENERAL</option>
+                        <option value="LADIES">LADIES</option>
+                        <option value="SENIOR">LOWER BERTH/SENIOR CITIZEN</option>
+                        <option value="PwD">PERSON WITH DISABILITY</option>
+                        <option value="DP">DUTY PASS</option>
+                        <option value="TATKAL" id="tatkalOption">TATKAL</option>
+                        <option value="PT" id="premiumTatkalOption">PREMIUM TATKAL</option>
+                    }
+                </select>
+            </div>
+
+            <!-- Search Button -->
+            <button type="submit" class="mainpageloginbtn" data-translate="searchtrains">Search Trains</button>
+
+            <!-- Links -->
+            <div class="text-center grid-pnr">
+                <a asp-controller="Booking" asp-action="CheckPNR" data-translate="checkpnr">
+                    🔍 Check PNR Status
+                </a>
+            </div>
+
+            <div class="text-center memu-link grid-memu">
+                <button type="button" class="memu-btn" onclick="openMemuModal()" data-translate="searchmemu">
+                    🔍 Search MEMU/DEMU/MMTS Trains
+                </button>
+            </div>
+
+            <div class="text-center grid-chart">
+                <a href="https://www.irctc.co.in/online-charts/" target="_blank" data-translate="chartvacancy">
+                    Chart Vacancy
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ✅ ADD MEMU MODAL HERE -->
+<div id="memuModal" class="modal-overlay" style="display:none;">
+    <div class="modal-content">
+
+        <span class="modal-close" onclick="closeMemu()">✖</span>
+
+        <h4>MEMU / DEMU / MMTS Trains</h4>
+
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Train</th>
+                    <th>Type</th>
+                    <th>Departure</th>
+                    <th>Arrival</th>
+                    <th>Duration</th>
+                    <th>RunsOn</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+
+            <tbody id="memuBody"></tbody>
+        </table>
+
+    </div>
+</div>
+
+<!-- ✅ TRAIN SCHEDULE MODAL -->
+<div id="scheduleModal" class="modal-overlay" style="display:none;">
+    <div class="modal-content schedule-modal">
+
+        <span class="modal-close" onclick="closeSchedule()">✖</span>
+
+        <h4>Train Schedule</h4>
+
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Stop</th>
+                    <th>Station</th>
+                    <th>Arrival</th>
+                    <th>Departure</th>
+                    <th>Distance</th>
+                    <th>Day</th>
+                </tr>
+            </thead>
+
+            <tbody id="scheduleBody"></tbody>
+        </table>
+
+    </div>
+</div>
+
+<!-- Background Overlay -->
+<div id="sidebar-overlay" class="sidebar-overlay"></div>
+
+<div id="smartBubble" onclick="openSmartSearch()">
+    🤖
+    <span class="smart-label">Smart Search</span>
+</div>
+
+<div id="smartOverlay">
+    <div id="smartBox">
+
+        <span class="close-btn" onclick="closeSmartSearch()">✖</span>
+
+        <h3>🚀 Smart Search</h3>
+
+        <form method="POST" action="/Train/SmartSearch">
+            <input type="text"
+                   id="smartInput"
+                   name="query"
+                   placeholder="e.g. Hyderabad to Chennai tomorrow AC" />
+
+            <button type="submit" id="smartSearchBtn">
+                Search
+            </button>
+        </form>
+
+    </div>
+</div>
+
+<!-- ==== IRCTC Announcement Modal ==== -->
+@* <div id="irctc-warning-overlay" class="irctc-overlay">
+    <div class="irctc-modal">
+        <h3 class="title">Alert</h3>
+        <br />
+        <p class="msg">
+            <strong></strong>
+            w.e.f <b>12 January 2026</b>, only Aadhaar-authenticated users are allowed to book general reserved tickets on the opening day of <b>Advance Reservation Period (ARP)</b>.
+        </p>
+
+        <p class="msg">
+            <strong></strong>
+            <b>12 जनवरी 2026</b> से <b>अग्रिम आरक्षण अवधि (ARP)</b> के आरंभिक दिन सामान्य आरक्षित टिकटों की बुकिंग केवल आधार-प्रमाणित उपयोगकर्ताओं को ही करने की अनुमति है।
+        </p>
+
+        <button id="close-warning" class="warning-close-btn">OK</button>
+    </div>
+</div>
+ *@
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<script src="~/js/site.js" asp-append-version="true"></script>
+
+<script>
+    // 🌍 GLOBAL FLAGS (accessible everywhere)
+    window.isLoggedIn =
+        '@ViewBag.IsLoggedIn'.toLowerCase() === 'true';
+
+    window.forceLogin =
+        '@ViewBag.ForceLogin'.toLowerCase() === 'true';
+
+    document.addEventListener("DOMContentLoaded", function () {
+
+        // ONLY during 07:30 → 08:15
+        // AND only for logged out users
+        if (window.forceLogin && !window.isLoggedIn) {
+
+            function redirectToLogin() {
+                window.location.href = '/Account/Login';
+            }
+
+            // Station inputs
+            document.getElementById("fromStation")
+                ?.addEventListener("focus", redirectToLogin);
+
+            document.getElementById("toStation")
+                ?.addEventListener("focus", redirectToLogin);
+
+            // Date
+            document.getElementById("journeyDate")
+                ?.addEventListener("focus", redirectToLogin);
+
+            // Class dropdown
+            document.getElementById("classFilterDropdown")
+                ?.addEventListener("click", redirectToLogin);
+
+            // Quota dropdown
+            document.getElementById("quota")
+                ?.addEventListener("click", redirectToLogin);
+
+            // Search button
+            document.querySelector(".mainpageloginbtn")
+                ?.addEventListener("click", function (e) {
+
+                    e.preventDefault();
+
+                    redirectToLogin();
+                });
+        }
+
+        // Prevents double submits on homepage Search
+        let searchSubmitted = false;
+        $("#homeSearchForm").on("submit", function (e) {
+            // 🚫 Do not show loader or disable button if form validation fails
+            const form = this;
+            if (!form.checkValidity()) {
+                return;
+            }
+            if (!$('#fromStationId').val() || !$('#toStationId').val()) {
+                return;
+            }
+            if ($('#fromStationId').val() === $('#toStationId').val()) {
+                return;
+            }
+
+            if (searchSubmitted) {
+                e.preventDefault();
+                return false;
+            }
+            searchSubmitted = true;
+            const btn = $(this).find(".mainpageloginbtn");
+            btn.prop("disabled", true);
+            btn.text("Searching...");
+            showLoader();
+        });
+
+    });
+
+    //SEARCH TRAINS FOR MEMU AND DEMU
+    function openMemuModal() {
+
+        const from = document.getElementById("fromStationId").value;
+        const to = document.getElementById("toStationId").value;
+        const dateInput = document.getElementById("journeyDate").value;
+        const trainType = document.getElementById("trainTypeFilter")?.value || "";
+
+        if (!from || !to) {
+            showToast("Please enter the required inputs");
+            return;
+        }
+
+        // Convert dd/MM/yyyy to yyyy-MM-dd for standard API binding
+        let journeyDate = dateInput;
+        const parts = dateInput.split("/");
+        if (parts.length === 3) {
+            journeyDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+
+        fetch(`/GetMemuDemu/GetMD?fromId=${from}&toId=${to}&journeyDate=${journeyDate}&trainType=${trainType}`)
+            .then(res => res.json())
+            .then(data => {
+
+                let html = "";
+
+                if (!data || !Array.isArray(data) || data.length === 0) {
+                    let msg = "No MEMU/DEMU/MMTS trains found";
+                    if (data && data.success === false && data.message) {
+                        msg = data.message;
+                    }
+                    html = `<tr><td colspan="7">${msg}</td></tr>`;
+                } else {
+
+                    data.forEach(t => {
+                        html += `
+                        <tr>
+                            <td>${t.number} - ${t.name}</td>
+                            <td>${t.trainType}</td>
+                            <td>${t.departure}</td>
+                            <td>${t.arrival}</td>
+                            <td>${t.duration}</td>
+                            <td>${formatRunsOn(t)}</td>
+                            <td class="memu-actions">
+                                <button onclick="viewSchedule(${t.id}, '${t.trainType}')">📍</button>
+                                <button onclick="viewRoute(${t.id})">🗺</button>
+                                <button onclick="viewLive(${t.id})">🔴</button>
+                            </td>
+                        </tr>`;
+                    });
+                }
+
+                document.getElementById("memuBody").innerHTML = html;
+                document.getElementById("memuModal").style.display = "flex";
+            });
+    }
+
+    function formatRunsOn(t) {
+        const days = [
+            t.runMon == 1 ? "M" : "-",
+            t.runTue == 1 ? "T" : "-",
+            t.runWed == 1 ? "W" : "-",
+            t.runThu == 1 ? "T" : "-",
+            t.runFri == 1 ? "F" : "-",
+            t.runSat == 1 ? "S" : "-",
+            t.runSun == 1 ? "S" : "-"
+        ];
+
+        // ✅ If all 1 → Daily
+        if (days.every(d => d !== "-")) {
+            return "Daily";
+        }
+
+        return days.join(" ");
+    }
+
+    function viewSchedule(id, trainType) {
+
+        fetch(`/GetMemuDemu/GetSchedule?trainId=${id}&trainType=${trainType}`)
+            .then(res => res.json())
+            .then(data => {
+
+                let html = "";
+
+                if (!data || data.length === 0) {
+                    html = `<tr><td colspan="4">No schedule found</td></tr>`;
+                } else {
+                data.forEach((s, i) => {
+                    html += `
+                    <tr>
+                        <td>${i + 1}</td>
+                        <td>${s.stationName} (${s.stationCode})</td>
+                        <td>${formatTime(s.arrivalTime)}</td>
+                        <td>${formatTime(s.departureTime)}</td>
+                        <td>${s.distance ?? '-'}</td>
+                        <td>${s.day ?? '-'}</td>
+                    </tr>`;
+                });
+                }
+
+                document.getElementById("scheduleBody").innerHTML = html;
+                document.getElementById("scheduleModal").style.display = "flex";
+            });
+    }
+
+    // function viewRoute(id) {
+    //     fetch(`/GetMemuDemu/GetSchedule?trainId=${id}&trainType=${trainType}`)
+    //         .then(res => res.json())
+    //         .then(data => {
+
+    //             let html = "";
+
+    //             if (!data || data.length === 0) {
+    //                 html =`<tr><td colspan="4">No routes found for the selected train</td></td>`;
+    //             } else {
+    //                 data.forEach((s, i => {
+    //                     html += `
+    //                     `
+    //                 }
+    //             }
+    //         }
+    // }
+
+    function formatTime(t) {
+        if (!t || t === "NULL") return "--";
+
+        // Convert to string (safe)
+        let time = t.toString();
+
+        // Remove milliseconds if present
+        if (time.includes(".")) {
+            time = time.split(".")[0];
+        }
+
+        // Remove seconds → HH:mm
+        let parts = time.split(":");
+
+        if (parts.length >= 2) {
+            return parts[0] + ":" + parts[1];
+        }
+
+        return time;
+    }
+
+    function closeSchedule() {
+        document.getElementById("scheduleModal").style.display = "none";
+    }
+
+    function viewRoute(id) {
+        alert("Route Map: " + id);
+    }
+
+    function viewLive(id) {
+        alert("Live Status: " + id);
+    }
+
+    function closeMemu() {
+        document.getElementById("memuModal").style.display = "none";
+    }
+
+    function openSmartSearch() {
+        document.getElementById("smartOverlay").style.display = "flex";
+
+        // hide main results
+        document.querySelector(".train-results-container")?.classList.add("blur-bg");
+    }
+
+    function closeSmartSearch() {
+        document.getElementById("smartOverlay").style.display = "none";
+
+        document.querySelector(".train-results-container")?.classList.remove("blur-bg");
+    }
+
+    const bubble = document.getElementById("smartBubble");
+
+    let isDragging = false;
+    let startX, startY;
+    let moved = false;
+
+    const DRAG_THRESHOLD = 5; // 🔥 adjust sensitivity
+
+    // DESKTOP EVENTS
+    bubble.addEventListener("mousedown", (e) => {
+        isDragging = true;
+    });
+
+    document.addEventListener("mousemove", (e) => {
+        if (!isDragging) return;
+        moveBubble(e.clientX, e.clientY);
+    });
+
+    document.addEventListener("mouseup", () => {
+        isDragging = false;
+    });
+
+    // 📱 MOBILE TOUCH EVENTS (THIS IS YOUR MISSING PART)
+    bubble.addEventListener("touchstart", () => {
+        isDragging = true;
+    });
+
+    document.addEventListener("touchmove", (e) => {
+        if (!isDragging) return;
+
+        const touch = e.touches[0];
+        moveBubble(touch.clientX, touch.clientY);
+    });
+
+    document.addEventListener("touchend", () => {
+        isDragging = false;
+    });
+
+    // COMMON MOVE FUNCTION
+    function moveBubble(x, y) {
+        bubble.style.left = (x - 30) + "px";
+        bubble.style.top = (y - 30) + "px";
+    }
+
+    bubble.addEventListener("mousedown", (e) => {
+        isDragging = true;
+        moved = false;
+
+        startX = e.clientX;
+        startY = e.clientY;
+
+        bubble.style.transition = "none";
+    });
+
+    document.addEventListener("mousemove", (e) => {
+        if (!isDragging) return;
+
+        let dx = e.clientX - startX;
+        let dy = e.clientY - startY;
+
+        // 🔥 detect real drag
+        if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) {
+            moved = true;
+        }
+
+        let x = bubble.offsetLeft + dx;
+        let y = bubble.offsetTop + dy;
+
+        x = Math.max(0, Math.min(window.innerWidth - bubble.offsetWidth, x));
+        y = Math.max(0, Math.min(window.innerHeight - bubble.offsetHeight, y));
+
+        bubble.style.left = x + "px";
+        bubble.style.top = y + "px";
+        bubble.style.right = "auto";
+        bubble.style.bottom = "auto";
+        bubble.style.position = "fixed";
+
+        // reset start for smooth dragging
+        startX = e.clientX;
+        startY = e.clientY;
+    });
+
+    document.addEventListener("mouseup", () => {
+        isDragging = false;
+
+        // 🔥 delay reset (IMPORTANT)
+        setTimeout(() => {
+            moved = false;
+        }, 50);
+
+        bubble.style.transition = "0.3s";
+    });
+
+    // 🔥 CLICK HANDLER
+    bubble.onclick = function (e) {
+        if (moved) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }
+
+        openSmartSearch();
+    };
+
+        document.addEventListener("DOMContentLoaded", function () {
+
+        flatpickr("#journeyDate", {
+            dateFormat: "d/m/Y",        // UI format like IRCTC
+            defaultDate: "today",       // auto select today
+            minDate: "today",
+            maxDate: new Date().fp_incr(63), // 63 days limit
+
+            showMonths: 1,
+            disableMobile: true,        // force desktop style
+
+            onChange: function(selectedDates, dateStr, instance) {
+
+                updateQuotaOptions();
+            }
+        });
+
+    });
+
+    // automatic tatkal selection in the dropdown
+    document.getElementById("homeSearchForm").addEventListener("submit", function (e) {
+
+        // 🔴 LOGIN BLOCK (YOUR 09:45 / 10:45 LOGIC)
+        if (window.forceLogin === true && window.isLoggedIn === false) {
+            // ❌ DO NOT BLOCK
+            // let request go to server
+            return;
+        }
+
+        // existing logic
+        const fromText = document.getElementById("fromStation").value;
+        const toText = document.getElementById("toStation").value;
+
+        const fromId = document.getElementById("fromStationId").value;
+        const toId = document.getElementById("toStationId").value;
+
+        saveRecentSearch(fromText, toText, fromId, toId);
+
+        let input = document.getElementById("journeyDate");
+        let parts = input.value.split("/");
+
+        if (parts.length === 3) {
+            let formatted = `${parts[2]}-${parts[1]}-${parts[0]}`;
+            input.value = formatted;
+        }
+    });
+
+    document.addEventListener("DOMContentLoaded", function () {
+
+        if (window.autoTatkal === true) {
+            const quotaDropdown = document.querySelector('select[name="quota"]');
+            if (quotaDropdown) {
+                quotaDropdown.value = "TATKAL";
+            }
+        }
+
+    });
+
+    //automatic tatkal date added on select from dropdown
+    document.addEventListener("DOMContentLoaded", function () {
+
+        let fp = flatpickr("#journeyDate", {
+            dateFormat: "d/m/Y",
+            defaultDate: "today",
+            minDate: "today",
+            maxDate: new Date().fp_incr(63),   // ✅ FINAL FIX
+            disableMobile: true
+        });
+
+        const quotaDropdown = document.getElementById("quota");
+
+        quotaDropdown.addEventListener("change", function () {
+
+            const today = new Date();
+            today.setHours(0,0,0,0);
+
+            const tomorrow = new Date(today);
+            tomorrow.setDate(today.getDate() + 1);
+
+            const next7Days = new Date(today);
+            next7Days.setDate(today.getDate() + 6);
+
+            if (this.value === "TATKAL" || this.value === "PT") {
+
+                fp.set("minDate", today);
+                fp.set("maxDate", next7Days);
+
+                fp.set("disable", [
+                    function (date) {
+                        date.setHours(0,0,0,0);
+                        return date < today || date > next7Days;
+                    }
+                ]);
+
+                fp.setDate(tomorrow);
+
+            } else {
+
+                fp.set("minDate", today);
+                fp.set("maxDate", new Date().fp_incr(63));  // ✅ FIXED
+                fp.set("disable", []);
+                fp.setDate(today);
+            }
+
+        });
+
+    });
+
+    function updateQuotaOptions() {
+
+        const dateInput = document.getElementById("journeyDate");
+
+        if (!dateInput) return;
+
+        let selectedDate = flatpickr.parseDate(
+            dateInput.value,
+            "d/m/Y"
+        );
+
+        if (!selectedDate) return;
+
+        const today = new Date();
+        today.setHours(0,0,0,0);
+
+        const lastTatkalDate = new Date(today);
+        lastTatkalDate.setDate(today.getDate() + 6);
+
+        const tatkal =
+            document.getElementById("tatkalOption");
+
+        const premium =
+            document.getElementById("premiumTatkalOption");
+
+        if (tatkal) {
+            tatkal.hidden = (selectedDate > lastTatkalDate);
+        }
+        if (premium) {
+            premium.hidden = (selectedDate > lastTatkalDate);
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+
+        document.getElementById("journeyDate")
+            .addEventListener("change", updateQuotaOptions);
+
+        updateQuotaOptions();
+    });
+
+</script>
+
+<style>
+    .date-input {
+        width: 100%;
+        padding: 11.5px;
+        border-radius: 6px;
+        border: 1px solid #cbd8ea !important;
+        background-color: #fff;
+    }
+
+        /* REMOVE BLACK BORDER ON CLICK */
+        .date-input:focus {
+            border: 1px solid #cbd8ea !important;
+            outline: none !important;
+            box-shadow: none !important;
+        }
+
+    /* Calendar popup */
+    .flatpickr-calendar {
+        border-radius: 10px;
+    }
+
+    /* Selected date */
+    .flatpickr-day.selected {
+        background: #2b4dbb;
+        border-color: #2b4dbb;
+    }
+
+    /* Hover */
+    .flatpickr-day:hover {
+        background: #e6ecff;
+    }
+
+    /* ALSO HANDLE FLATPICKR ACTIVE STATE */
+    .flatpickr-input:focus {
+        border: 1px solid #cbd8ea !important;
+        outline: none !important;
+        box-shadow: none !important;
+    }
+
+    /* Overlay */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.6);
+        display: none; /* ✅ default hidden */
+        justify-content: center;
+        align-items: flex-start;
+        overflow-y: auto;
+        padding: 80px 10px;
+        z-index: 20000;
+    }
+
+    .modal-content {
+        background: white;
+        width: 70%;
+        max-width: 800px;
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        position: relative;
+    }
+
+    /* Close button */
+    .modal-close {
+        position: absolute;
+        top: 10px;
+        right: 15px;
+        font-size: 22px;
+        font-weight: bold;
+        color: #666;
+        cursor: pointer;
+    }
+
+        .modal-close:hover {
+            color: red;
+        }
+
+    .modal-content h4 {
+        text-align: center;
+        margin-bottom: 20px;
+        color: #2b4dbb;
+        font-size: 20px;
+        font-weight: 600;
+    }
+
+    .modal-content {
+        background: white;
+        width: 90%; /* 🔥 increase width */
+        max-width: 1100px; /* 🔥 bigger container */
+        height: auto;
+        max-height: 80vh; /* 🔥 allow scrolling */
+        overflow-y: auto;
+        border-radius: 12px;
+        padding: 25px 30px;
+        box-shadow: 0 15px 40px rgba(0,0,0,0.35);
+        position: relative;
+    }
+
+    .memu-actions button {
+        margin: 3px;
+        padding: 6px 10px;
+        border: none;
+        background: #2b4dbb;
+        color: white;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 13px;
+        transition: 0.2s;
+    }
+
+        .memu-actions button:hover {
+            background: #1d3ca5;
+            transform: scale(1.05);
+        }
+
+    .modal-content table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+    }
+
+    .modal-content th {
+        background: #2b4dbb;
+        color: white;
+        padding: 12px;
+        font-size: 14px;
+        text-align: center;
+    }
+
+    .modal-content td {
+        padding: 12px;
+        text-align: center;
+        border-bottom: 1px solid #eee;
+        font-size: 18px;
+    }
+
+    .modal-content tr:hover {
+        background: #f5f8ff;
+    }
+
+    .schedule-modal {
+        width: 80%;
+        max-width: 900px;
+    }
+
+        .schedule-modal table th {
+            background: #1f3c88;
+        }
+
+        .schedule-modal table td {
+            font-size: 18px;
+        }
+
+</style>

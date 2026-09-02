@@ -1,0 +1,39 @@
+﻿@* @model IRCTCClone.Models.Booking
+
+<div class="container py-4">
+
+    <h2 class="mb-3">Scan & Pay</h2>
+
+    <div class="card shadow p-4">
+
+        <h4 class="mb-3">Scan This QR to Pay</h4>
+        <p>Use Google Pay / PhonePe / Paytm / BHIM to complete your payment.</p>
+
+        <div class="text-center mb-4">
+            <img src="/images/dummyqr.png" style="width:260px;height:260px;border-radius:10px;box-shadow:0 4px 15px rgba(0,0,0,0.3);" />
+        </div>
+
+        <div class="text-center mb-3">
+            <h5>Your UPI ID</h5>
+            <h4 class="text-primary fw-bold">yourupiid@bank</h4>
+        </div>
+
+        <hr />
+
+        <h4>Total Fare: <span class="text-success">₹@Model.TotalFare</span></h4>
+
+        <form method="post" asp-action="Confirm">
+            <input type="hidden" name="TrainId" value="@Model.TrainId" />
+            <input type="hidden" name="ClassId" value="@Model.ClassId" />
+            <input type="hidden" name="JourneyDate" value="@Model.JourneyDate" />
+            <input type="hidden" name="TotalFare" value="@Model.TotalFare" />
+
+            <button type="submit" class="btn btn-success btn-lg mt-3 w-100">
+                ✅ I Have Made the Payment
+            </button>
+        </form>
+
+
+    </div>
+</div>
+ *@

@@ -1,0 +1,39 @@
+﻿@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Critical Alert - NexusRail Portal";
+}
+
+<div class="error-wrapper">
+    <div class="error-box-glass">
+        <div class="error-icon-glow">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+
+        <h2>DIAGNOSTICS: TERMINAL ALERT</h2>
+
+        <p class="error-message">
+            @ViewBag.ErrorMessage
+        </p>
+
+        <div class="error-divider"></div>
+
+        <div class="error-info-section">
+            <h4>POSSIBLE PROTOCOL BREACHES:</h4>
+            <ul class="error-reasons">
+                <li><i class="fa-solid fa-circle-chevron-right text-orange"></i> Session Timeout / Inactivity beyond limit.</li>
+                <li><i class="fa-solid fa-circle-chevron-right text-orange"></i> Navigation breach (Back / Forward / Page Refresh).</li>
+                <li><i class="fa-solid fa-circle-chevron-right text-orange"></i> Multiple rapid booking attempts (Double Submission).</li>
+                <li><i class="fa-solid fa-circle-chevron-right text-orange"></i> Direct page URL access without active search query.</li>
+            </ul>
+        </div>
+
+        <div class="error-actions">
+            <a href="/" class="mainpageloginbtn error-btn-reset">
+                <i class="fa-solid fa-house"></i> Return to Main Terminal
+            </a>
+            <a href="/Account/Login" class="hud-link-btn error-btn-login">
+                <i class="fa-solid fa-lock"></i> Re-authenticate Access
+            </a>
+        </div>
+    </div>
+</div>

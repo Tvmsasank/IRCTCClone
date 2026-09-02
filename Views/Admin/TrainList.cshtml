@@ -1,0 +1,278 @@
+﻿@model IEnumerable<IRCTCClone.Models.Train>
+
+@{
+    ViewData["Title"] = "Train List";
+}
+
+@* If your _Layout already includes Bootstrap, remove the link/script below. They are included here to make this view self-contained for testing. *@
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<div class="container-fluid py-5">
+    <h2 class="mb-3">Train List</h2>
+
+    <a asp-action="Dashboard" class="btn btn-home mb-3">Back to DashBoard</a>
+
+    <div class="train-search-bar d-flex gap-2 mb-3">
+
+        <input type="text"
+               id="trainSearch"
+               placeholder="Search Train Number or Name..."
+               class="form-control train-filter" />
+
+        <input type="text"
+               id="routeSearch"
+               placeholder="Search From → To station..."
+               class="form-control route-filter" />
+
+        <button class="btn btn-secondary" onclick="clearTrainSearch()">
+            Clear
+        </button>
+
+    </div>
+
+    <div id="noTrainMessage"
+         style="display:none; margin:10px 0; font-weight:600; color:#dc3545;">
+        No trains found.
+    </div>
+
+    @if (!Model.Any())
+{
+    <div class="alert alert-info text-center">
+        No trains available at the moment.
+    </div>
+}
+else 
+{
+
+    <table class="table table-bordered table-hover train-table">
+        <thead class="table-light">
+            <tr>
+                <th class="d-none">id</th>
+                <th class="d-none">type</th>
+                <th>Number</th>
+                <th>Name</th>
+                <th>From</th>
+                <th>To</th>
+                <th>Departure</th>
+                <th>Arrival</th>
+                <th>Duration</th>
+                <th class="text-center">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var train in Model)
+            {
+                <tr class="train-row"
+                    data-train-number="@train.Number"
+                    data-train-name="@train.Name"
+                    data-from="@train.FromStation?.Name"
+                    data-to="@train.ToStation?.Name"
+                    data-train-id="@train.Id"
+                    data-train-type="@train.TrainType">
+                    <td class="d-none" id="traintype" data-train-type="@train.TrainType"></td>
+
+                <td>@train.Number.ToString().PadLeft(5,'0')</td>
+                    <td>
+                        <a href="#" class="train-link" data-train-id="@train.Id"> 
+                        @train.Name
+                        </a>
+                    </td>
+                <td>@train.FromStation?.Name ( @train.FromStation?.Code )</td>
+                <td>@train.ToStation?.Name ( @train.ToStation?.Code )</td>
+                <td>@train.Departure</td>
+                <td>@train.Arrival</td>
+                <td>@train.Duration</td>
+                <td class="">
+                    <a asp-controller="Admin" asp-action="EditTrain" asp-route-id="@train.Id" class="btn btn-sm btn-warning me-1">Edit Train</a>
+                    <!-- Delete = only opens modal (no immediate navigation) -->
+                    <button type="button" class="btn btn-sm btn-danger"
+                            data-bs-toggle="modal"
+                            data-bs-target="#deleteModal"
+                            data-train-id="@train.Id"
+                            data-train-name="@train.Name"
+                            data-train-type="@train.TrainType">
+                        <i class="bi bi-trash"></i> Delete
+                    </button>
+                        <a asp-controller="Admin" asp-action="AddRoute" asp-route-id="@train.Id" asp-route-trainType="@train.TrainType" class="btn btn-sm btn-info ms-1">Add/Edit Routes</a>
+                </td>
+            </tr>
+
+                <!-- Add/Edit Routes --> 
+
+                <tr id="route-row-@train.Id" class="route-row" style="display:none;">
+                    <td colspan="8" class="p-0">
+                        <div id="route-container-@train.Id" class="p-2"></div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    }
+</div>
+
+@* Small centered confirmation modal (single instance) *@
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-danger text-white">
+                <div class="d-flex align-items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-exclamation-triangle-fill" viewBox="0 0 16 16">
+                        <path d="M8.982 1.566a1.13 1.13 0 0 0-1.964 0L.165 13.233c-.457.778.091 1.767.982 1.767h13.706c.89 0 1.438-.99.982-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 7a1 1 0 1 1-2 0 1 1 0 0 1 2 0z" />
+                    </svg>
+                    <h5 class="modal-title mb-0" id="deleteModalLabel">Confirm Deletion</h5>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body text-center">
+                <p class="mb-1">Are you sure you want to delete train</p>
+                <p class="h6 fw-bold mb-2" id="trainName"></p>
+                <p class="text-warning small mb-0">This action cannot be undone!</p>
+            </div>
+
+            <div class="modal-footer justify-content-center">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+
+                @* Use GET or POST to your Delete action. Prefer POST for destructive ops; using GET here to match your existing DeleteTrain GET. *@
+                <a id="confirmDeleteBtn" class="btn btn-danger btn-sm" href="#">Delete</a>
+            </div>
+        </div> 
+    </div>
+</div>
+
+@* Bootstrap JS (bundle) - ensure this is present and loaded BEFORE the script below.
+   If your _Layout already loads bootstrap.bundle, remove this line. *@
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+@section Scripts {
+    <script>
+        // This script uses bootstrap's modal 'show.bs.modal' event.
+        // Make sure bootstrap.bundle is loaded (above or in layout) or this won't fire.
+        document.addEventListener("DOMContentLoaded", function () {
+            var deleteModalEl = document.getElementById('deleteModal');
+            if (!deleteModalEl) return;
+
+            var trainNameSpan = document.getElementById('trainName');
+            var confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+
+            // Listen for the bootstrap show event
+            deleteModalEl.addEventListener('show.bs.modal', function (event) {
+                var button = event.relatedTarget; // button that triggered the modal
+                var trainId = button.getAttribute('data-train-id');
+                var trainType = button.getAttribute('data-train-type');
+
+                // fallback
+                if (!trainType) {
+                    trainType = "NORMAL";
+                }
+
+                var trainName = button.getAttribute('data-train-name');
+
+                // populate modal fields
+                trainNameSpan.textContent = trainName || '';
+                //confirmDeleteBtn.setAttribute('href', '/Admin/DeleteTrain/' + trainId + trainType);
+                confirmDeleteBtn.setAttribute('href', '/Admin/DeleteTrain/' + trainId + '/' + trainType);
+
+            });
+        });
+    </script>
+
+    <script>
+        $(document).on("click", ".train-link", function (e) {
+            e.preventDefault();
+
+            var $row = $(this).closest("tr");
+
+            var trainId = $(this).data("train-id");
+            var trainType = $row.data("train-type");
+            var $routeRow = $("#route-row-" + trainId);
+            var $container = $("#route-container-" + trainId);
+
+            if ($routeRow.is(":visible")) {
+                $routeRow.hide();
+                $container.html(""); // 🔥 clear current
+                return;
+            }
+
+            // Hide and clear others
+            $(".route-row").hide();
+            $(".route-container").html("");
+
+            $.get("/Admin/GetTrainRoute", { trainId: trainId, trainType: trainType }, function (html) {
+                $container.html(html);
+                $routeRow.show();
+            });
+        });
+    </script>
+
+    <script>
+        document.getElementById("trainSearch").addEventListener("keyup", filterTrains);
+        document.getElementById("routeSearch").addEventListener("keyup", filterTrains);
+
+        function filterTrains() {
+
+            let trainValue = document.getElementById("trainSearch").value.toLowerCase();
+            let routeValue = document.getElementById("routeSearch").value.toLowerCase();
+
+            let trains = document.querySelectorAll(".train-row");
+
+            let visibleCount = 0;
+
+            trains.forEach(train => {
+
+                let trainNumber = train.dataset.trainNumber.toLowerCase();
+                let trainName = train.dataset.trainName.toLowerCase();
+                let from = train.dataset.from.toLowerCase();
+                let to = train.dataset.to.toLowerCase();
+
+                let trainMatch =
+                    trainNumber.includes(trainValue) ||
+                    trainName.includes(trainValue);
+
+                let routeMatch =
+                    from.includes(routeValue) ||
+                    to.includes(routeValue);
+
+                if (trainMatch && routeMatch) {
+
+                    train.style.display = "";
+                    visibleCount++;
+
+                } else {
+                    train.style.display = "none";
+                }
+
+            });
+
+            // Show "No trains found"
+            const msg = document.getElementById("noTrainMessage");
+
+            if (msg) {
+                if (visibleCount === 0) {
+                    msg.style.display = "block";
+                } else {
+                    msg.style.display = "none";
+                }
+            }
+        }    
+
+        function clearTrainSearch() {
+            document.getElementById("trainSearch").value = "";
+            document.getElementById("routeSearch").value = "";
+
+            filterTrains();
+        }
+
+                // 🔥 Keep admin session alive
+        setInterval(() => {
+            fetch('/Admin/KeepAlive', {
+                method: 'GET',
+                credentials: 'include'
+            });
+        }, 60000); // every 1 minute
+
+
+    </script>
+
+}

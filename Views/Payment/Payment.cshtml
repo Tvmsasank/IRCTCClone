@@ -1,0 +1,309 @@
+﻿@* @model IRCTCClone.Models.Booking
+
+@{
+    ViewData["Title"] = "Payment";
+}
+
+@{
+    var payload = ViewBag.Payload;
+}
+
+@if (TempData["PaymentSuccess"] != null)
+{
+    <div class="payment-success">
+        Payment Successful ✔
+    </div>
+}
+
+<div class="payment-container">
+
+    <div class="payment-card">
+
+        <h2>Complete Your Payment</h2>
+
+@*         <p class="payment-note">
+            Scan QR or choose a payment option
+        </p>
+
+        <!-- QR SECTION -->
+        <div class="qr-section">
+
+            <img src="~/images/payments/upi-qr.png" class="qr-image" />
+
+            <p class="upi-id">
+                UPI ID: <b>irctcclone@upi</b>
+            </p>
+
+        </div>
+ *@
+        <!-- UPI APPS -->
+@*         <h3 class="section-title">Pay using UPI Apps</h3>
+
+        <div class="upi-apps">
+
+            <button class="upi-btn">
+                <img src="~/images/payments/gpay.png" />
+                Google Pay
+            </button>
+
+            <button class="upi-btn">
+                <img src="~/images/payments/phonepe.png" />
+                PhonePe
+            </button>
+
+            <button class="upi-btn">
+                <img src="~/images/payments/paytm.png" />
+                Paytm
+            </button>
+
+        </div>
+
+        <!-- PAYMENT FORM -->
+        <form method="post" action="/Booking/Confirm" class="checkout-form">
+
+            @Html.AntiForgeryToken()
+
+            <!-- KEEP BOOKING DATA -->
+            <input type="hidden" name="trainId" value="@ViewBag.TrainId" />
+            <input type="hidden" name="classId" value="@ViewBag.ClassId" />
+            <input type="hidden" name="journeyDate" value="@ViewBag.JourneyDate" />
+            <input type="hidden" name="trainName" value="@ViewBag.TrainName" />
+            <input type="hidden" name="trainNumber" value="@ViewBag.TrainNumber" />
+            <input type="hidden" name="Class" value="@ViewBag.ClassCode" />
+            <input type="hidden" name="FromStationId" value="@ViewBag.FromStationId" />
+            <input type="hidden" name="ToStationId" value="@ViewBag.ToStationId" />
+            <input type="hidden" name="SeatStatuscount" value="@ViewBag.SeatStatusCount" />
+            <input type="hidden" name="BookingStatus" value="@ViewBag.BookingStatus" />
+
+            @for (int i = 0; i < payload.passengerNames.Length; i++)
+            {
+                <input type="hidden" name="passengerNames" value="@payload.passengerNames[i]" />
+                <input type="hidden" name="passengerAges" value="@payload.passengerAges[i]" />
+                <input type="hidden" name="passengerGenders" value="@payload.passengerGenders[i]" />
+                <input type="hidden" name="passengerBerths" value="@payload.passengerBerths[i]" />
+            }
+
+            <h3 class="section-title">Other Payment Options</h3>
+
+            <select name="paymentMode" class="payment-select" required>
+                <option value="">Select Payment Method</option>
+                <option value="UPI">UPI</option>
+                <option value="CARD">Debit / Credit Card</option>
+                <option value="NETBANKING">Net Banking</option>
+                <option value="WALLET">Wallet</option>
+            </select>
+
+            <button type="button" class="pay-button" id="payBtn">
+                Pay Now
+            </button>
+
+        </form>
+    </div>
+
+    <!-- OTP MODAL -->
+    <div id="otpOverlay" class="otp-overlay" style="display:none">
+
+        <div class="otp-modal">
+
+            <h3>Enter OTP</h3>
+
+            <p>
+                OTP sent to your registered email / mobile
+            </p>
+
+            <input type="text"
+                   id="otpInput"
+                   maxlength="6"
+                   placeholder="Enter 6 digit OTP"
+                   class="otp-input" />
+
+            <div class="otp-timer">
+                <span id="otpPrefix">Expires in:</span>
+                <span id="otpTimer">--:--</span>
+            </div>
+
+            <div class="otp-error"></div>
+
+            <div class="otp-actions">
+
+                <button type="button" id="verifyOtpBtn" class="otp-btn confirm">
+                    Verify OTP
+                </button>
+
+                <button type="button" id="resendOtpBtn" class="otp-btn resend">
+                    Resend OTP
+                </button>
+
+                <button type="button" id="cancelOtpBtn" class="otp-btn cancel">
+                    Cancel
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<style>
+    .payment-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-top: 40px;
+    }
+
+    .payment-card {
+        width: 450px;
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        text-align: center;
+    }
+
+    .payment-note {
+        color: #666;
+        margin-bottom: 20px;
+    }
+
+    .qr-image {
+        width: 220px;
+        margin: 10px 0;
+    }
+
+    .upi-id {
+        font-size: 14px;
+        color: #333;
+    }
+
+    .section-title {
+        margin-top: 20px;
+        font-size: 18px;
+    }
+
+    .upi-apps {
+        display: flex;
+        justify-content: space-around;
+        margin: 15px 0;
+    }
+
+    .upi-btn {
+        border: 1px solid #ddd;
+        padding: 8px 12px;
+        border-radius: 6px;
+        background: white;
+        cursor: pointer;
+    }
+
+        .upi-btn img {
+            width: 20px;
+            margin-right: 5px;
+        }
+
+    .payment-select {
+        width: 100%;
+        padding: 10px;
+        margin-top: 10px;
+        border-radius: 6px;
+    }
+
+    .pay-button {
+        width: 100%;
+        margin-top: 20px;
+        padding: 12px;
+        background: #fb792b;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 16px;
+        cursor: pointer;
+    }
+
+        .pay-button:hover {
+            background: #e5671f;
+        }
+</style> *@
+ 
+@* @section Scripts{
+
+    <script>
+        let timeLeft = 180; // 5 minutes
+
+        function startPaymentTimer() {
+
+            const timerElement = document.getElementById("paymentTimer");
+
+            if (!timerElement) return;
+
+            const timer = setInterval(function () {
+
+                let minutes = Math.floor(timeLeft / 60);
+                let seconds = timeLeft % 60;
+
+                timerElement.innerText =
+                    String(minutes).padStart(2,'0') + ":" +
+                    String(seconds).padStart(2,'0');
+
+                timeLeft--;
+
+                if (timeLeft < 0) {
+
+                    clearInterval(timer);
+
+                    alert("Payment time expired. Please search train again.");
+
+                    window.location.href = "/Train/TrainResults";
+                }
+
+            },1000);
+
+        }
+
+        startPaymentTimer();
+
+        $("#payBtn").on("click", function () {
+
+            $.ajax({
+                url: "/Booking/RequestOtp",
+                type: "POST",
+
+                success: function (res) {
+
+                    if (res.success) {
+
+                        $("#otpOverlay").css("display", "flex");
+
+                        startOtpTimer(res.otpExpiryUtc);
+
+                    } else {
+                        alert("Failed to send OTP");
+                    }
+
+                }
+            });
+
+        });
+
+        $("#verifyOtpBtn").on("click", function () {
+
+            let otp = $("#otpInput").val();
+
+            if (otp.length !== 6) {
+                $(".otp-error").text("Enter valid OTP");
+                return;
+            }
+
+            $("<input>").attr({
+                type: "hidden",
+                name: "otp",
+                value: otp
+            }).appendTo(".checkout-form");
+
+            $(".checkout-form").submit();
+
+        });
+    </script>
+
+} *@

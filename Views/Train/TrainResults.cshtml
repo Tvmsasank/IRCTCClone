@@ -1,0 +1,1935 @@
+@model IEnumerable<IRCTCClone.Models.Train>
+@using IRCTCClone.E_D
+@using IRCTCClone.Helpers
+@using IRCTCClone.Models
+@using IrctcClone.Helpers
+
+<link rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+
+@{
+    ViewData["Title"] = "Train Results";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+
+    var journey = TempData.Peek("JourneyDate")?.ToString()
+                  ?? DateTime.Today.ToString("yyyy-MM-dd");
+
+    var journeyDateRaw = TempData.Peek("JourneyDate");
+
+    DateTime journeyDate = DateTime.Today;
+
+    if (journeyDateRaw != null && DateTime.TryParse(journeyDateRaw.ToString(), out journeyDate))
+    {
+        journey = journeyDate.ToString("yyyy-MM-dd");
+    }
+    else
+    {
+        journey = DateTime.Today.ToString("yyyy-MM-dd");
+    }
+
+    //var minDate = DateTime.Today.ToString("yyyy-MM-dd");
+
+    var indiaTime = TimeZoneInfo.ConvertTimeBySystemTimeZoneId(
+        DateTime.UtcNow,
+        "India Standard Time"
+    );
+
+    // var maxDate = indiaTime.TimeOfDay < new TimeSpan(8,0,0)
+    //     ? indiaTime.Date.AddDays(59)
+    //     : indiaTime.Date.AddDays(63);
+
+    var window = ReservationHelper.GetReservationWindow();
+
+    var minDate = window.min.ToString("yyyy-MM-dd");
+    var maxDate = window.max.ToString("yyyy-MM-dd");
+
+    var fromStation = TempData.Peek("FromStation")?.ToString();
+    var toStation = TempData.Peek("ToStation")?.ToString();
+
+    var userfromid = TempData.Peek("fromStationId");
+    var usertoid = TempData.Peek("toStationId");
+
+    var trainscount = ViewBag.ResultCount;
+
+    var routeMismatch = TempData["RouteMismatch"];
+    var searchedFrom = TempData["SearchedFrom"];
+    var searchedTo = TempData["SearchedTo"];
+    var actualFrom = TempData["ActualFrom"];
+    var actualTo = TempData["ActualTo"];
+    var trainId = TempData["trainId"];
+    var classId = TempData["classId"];
+    var classCode = TempData["classCode"];
+    var actualFromId = TempData["ActualFromId"];
+    var actualToId = TempData["ActualToId"];
+    var routeJourneyDate = TempData["journeyDate"];
+
+    TempData.Remove("RouteMismatch");
+}
+
+<section class="results-page fadeInUp">
+    <div class="results-container">
+
+         <!-- ✅ SEARCH SUMMARY BAR (ADD HERE) -->
+        @{
+            DateTime jd = DateTime.Today;
+
+            if (ViewBag.JourneyDate != null)
+            {
+                DateTime.TryParse(ViewBag.JourneyDate.ToString(), out jd);
+            }
+        }
+
+        <!-- ✅ END SEARCH SUMMARY BAR --> 
+
+        @{
+            string CleanStation(string s)
+            {
+                if (string.IsNullOrEmpty(s)) return s;
+                var idx = s.IndexOf(" - ");
+                return idx > 0 ? s.Substring(0, idx) : s;
+            }
+
+            var cleanFrom = CleanStation(fromStation);
+            var cleanTo = CleanStation(toStation);
+        }
+
+        @{
+            string sortLabel = "None";
+
+            switch (ViewBag.CurrentSort as string)
+            {
+                case "DEP_EARLY":
+                    sortLabel = "Departure – Early First";
+                    break;
+                case "DEP_LATE":
+                    sortLabel = "Departure – Late First";
+                    break;
+                case "ARR_EARLY":
+                    sortLabel = "Arrival – Early First";
+                    break;
+                case "ARR_LATE":
+                    sortLabel = "Arrival – Late First";
+                    break;
+                case "DUR_SHORT":
+                    sortLabel = "Duration – Shortest First";
+                    break;
+                case "DUR_LONG":
+                    sortLabel = "Duration – Longest First";
+                    break;
+                default:
+                    sortLabel = "Departure - Early First";
+                    break;
+            }
+        }
+
+        <!-- ✅ STICKY RESULTS HEADER -->
+        <div class="sticky-top-block">
+
+            <!-- 1️⃣ Route / Date selector -->
+            <div class="route-search-bar">
+                <div class="search-summary">
+
+@*                     <form method="post" action="/Train/SmartSearch">
+                        <input type="text"
+                               name="query"
+                               placeholder="Try: Hyderabad to Chennai tomorrow AC"
+                               class="form-control"
+                               style="margin-bottom:10px;" />
+
+                        <button type="submit" class="btn btn-primary">
+                            🔍 Smart Search
+                        </button>
+
+                                            <form method="get" action="/Train/SmartSearch" style="margin-bottom:10px;">
+                            <input type="text" name="query" placeholder="Try: Hyderabad to Chennai tomorrow AC"
+                                    style="padding:10px; width:300px; border-radius:6px;" />
+    
+                            <button type="submit" class="btn btn-primary">Smart Search</button>
+                        </form>
+
+                    </form>
+
+ *@                    
+                    <form id="modifySearchForm" method="post" action="/Train/TrainResults" novalidate>
+
+
+                        <div style="display:flex; align-items:center; gap:10px;">
+
+                            <!-- FROM STATION -->
+                            <div class="station-box1">
+                                <input type="text"
+                                       id="fromStation"
+                                       name="fromStation"
+                                       value="@fromStation"
+                                       autocomplete="off"
+                                       required />
+
+                                <input type="hidden"
+                                       id="fromStationId"
+                                       name="fromStationId"
+                                       value="@userfromid" />
+
+                                <div id="fromStationList" class="autocomplete-list-trainresults-page"></div>
+                            </div>
+
+                            <span class="arrow" id="swapStationsNew" style="cursor: pointer;">⇄</span>
+
+                            <!-- TO STATION -->
+                            <div class="station-box2">
+                                <input type="text"
+                                       id="toStation"
+                                       name="toStation"
+                                       value="@toStation"
+                                       autocomplete="off"
+                                       required />
+
+                                <input type="hidden"
+                                       id="toStationId"
+                                       name="toStationId"
+                                       value="@usertoid" />
+
+                                <div id="toStationList" class="autocomplete-list-trainresults-page"></div>
+                            </div>
+
+                            <!-- DATE -->
+                            <input type="date"
+                                   id="journeyDatePicker"
+                                   name="journeyDate"
+                                   value="@journey"
+                                   min="@minDate"
+                                   max="@maxDate" />
+
+                            <!-- CLASSES DROPDOWN-->
+                            <div class="quota-wrapper">
+                                <label class="quota-label"></label>
+                                <select id="classFilterDropdown" name="classCode" class="quota-dropdown">
+                                    <option value="ALL" selected="@(ViewBag.classCode == null || ViewBag.classCode == "ALL")">All Classes</option>
+                                    <option value="EA" selected="@(ViewBag.classCode == "EA")">Anubhuti Class (EA)</option>
+                                    <option value="1A" selected="@(ViewBag.classCode == "1A")">AC First Class (1A)</option>
+                                    <option value="EV" selected="@(ViewBag.classCode == "EC")">Vistadome AC (EV)</option>
+                                    <option value="EC" selected="@(ViewBag.classCode == "EC")">Exec. Chair Car (EC)</option>
+                                    <option value="2A" selected="@(ViewBag.classCode == "2A")">AC 2 Tier (2A)</option>
+                                    <option value="FC" selected="@(ViewBag.classCode == "FC")">First Class (FC)</option>
+                                    <option value="3A" selected="@(ViewBag.classCode == "3A")">AC 3 Tier (3A)</option>
+                                    <option value="3E" selected="@(ViewBag.classCode == "3E")">AC 3 Economy (3E)</option>
+                                    <option value="VS" selected="@(ViewBag.classCode == "VS")">Vistadome Non AC (VS)</option>
+                                    <option value="2S" selected="@(ViewBag.classCode == "2S")">Second Sitting (2S)</option>
+                                </select>
+                            </div>
+
+                            <!-- QUOTA -->
+                            <div class="quota-wrapper">
+                                <label class="quota-label"></label>
+                                <select name="quota" class="quota-dropdown">
+                                    <option value="GENERAL" selected="@(ViewBag.Quota?.ToString() == "GENERAL")">GENERAL</option>
+                                    <option value="LADIES" selected="@(ViewBag.Quota?.ToString() == "LADIES")">LADIES</option>
+                                    <option value="SENIOR" selected="@(ViewBag.Quota?.ToString() == "SENIOR")">LOWER BERTH/SENIOR CITIZEN</option>
+                                    <option value="PwD" selected="@(ViewBag.Quota?.ToString() == "PwD")">PERSON WITH DISABILITY</option>
+                                    <option value="DP" selected="@(ViewBag.Quota?.ToString() == "DP")">DUTY PASS</option>
+                                    <option value="TATKAL" selected="@(ViewBag.Quota?.ToString() == "TATKAL")">TATKAL</option>
+                                    <option value="PT" selected="@(ViewBag.Quota?.ToString() == "PT")">PREMIUM TATKAL</option>
+                                </select>
+                            </div>
+
+                            <!-- MODIFY BUTTON -->
+                            <button type="submit" class="modify-btn">
+                                Modify Search
+                            </button>
+
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="results-main-layout">
+            <!-- Left Column: Refine Results Sidebar -->
+            <aside class="refine-sidebar">
+                <div class="sidebar-filter-card">
+                    <div class="filter-header">
+                        <h3>Refine Results</h3>
+                        <button type="button" class="clear-filter-btn" onclick="resetAllFilters()">Reset All</button>
+                    </div>
+                    
+                    <!-- Journey Class Filters -->
+                    <div class="filter-section">
+                        <h4>JOURNEY CLASS</h4>
+                        <div class="filter-options-grid">
+                            <label class="filter-checkbox-label">
+                                <input type="checkbox" class="class-filter-cb" value="1A" checked /> AC First Class (1A)
+                            </label>
+                            <label class="filter-checkbox-label">
+                                <input type="checkbox" class="class-filter-cb" value="2A" checked /> AC 2 Tier (2A)
+                            </label>
+                            <label class="filter-checkbox-label">
+                                <input type="checkbox" class="class-filter-cb" value="3A" checked /> AC 3 Tier (3A)
+                            </label>
+                            <label class="filter-checkbox-label">
+                                <input type="checkbox" class="class-filter-cb" value="3E" checked /> AC 3 Economy (3E)
+                            </label>
+                            <label class="filter-checkbox-label">
+                                <input type="checkbox" class="class-filter-cb" value="CC" checked /> AC Chair car (CC)
+                            </label>
+                            <label class="filter-checkbox-label">
+                                <input type="checkbox" class="class-filter-cb" value="EC" checked /> Exec. Chair Car (EC)
+                            </label>
+                            <label class="filter-checkbox-label">
+                                <input type="checkbox" class="class-filter-cb" value="SL" checked /> Sleeper (SL)
+                            </label>
+                            <label class="filter-checkbox-label">
+                                <input type="checkbox" class="class-filter-cb" value="2S" checked /> Second Sitting (2S)
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Train Type Filters -->
+                    <div class="filter-section">
+                        <h4>TRAIN TYPE</h4>
+                        <div class="filter-options-list">
+                            <label class="filter-checkbox-label">
+                                <input type="checkbox" class="type-filter-cb" value="vande-bharat" checked />
+                                <span class="legend-color-dot vande"></span> Vande Bharat
+                            </label>
+                            <label class="filter-checkbox-label">
+                                <input type="checkbox" class="type-filter-cb" value="amrit-bharat" checked />
+                                <span class="legend-color-dot amrit"></span> Amrit Bharat
+                            </label>
+                            <label class="filter-checkbox-label">
+                                <input type="checkbox" class="type-filter-cb" value="rajdhani" checked />
+                                <span class="legend-color-dot rajdhani"></span> Rajdhani
+                            </label>
+                            <label class="filter-checkbox-label">
+                                <input type="checkbox" class="type-filter-cb" value="shatabdi" checked />
+                                <span class="legend-color-dot shatabdi"></span> Shatabdi
+                            </label>
+                            <label class="filter-checkbox-label">
+                                <input type="checkbox" class="type-filter-cb" value="garib-rath" checked />
+                                <span class="legend-color-dot garib"></span> Garib Rath
+                            </label>
+                            <label class="filter-checkbox-label">
+                                <input type="checkbox" class="type-filter-cb" value="duronto" checked />
+                                <span class="legend-color-dot duronto"></span> Duronto
+                            </label>
+                            <label class="filter-checkbox-label">
+                                <input type="checkbox" class="type-filter-cb" value="special" checked />
+                                <span class="legend-color-dot special"></span> Special
+                            </label>
+                            <label class="filter-checkbox-label">
+                                <input type="checkbox" class="type-filter-cb" value="normal" checked />
+                                <span class="legend-color-dot normal"></span> Other Trains
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Right Column: Train list and headers -->
+            <main class="train-results-column">
+                <!-- Results count -->
+                <div class="search-summary" style="margin-bottom: 10px;">
+                        @trainscount Results for
+                        <strong>@cleanFrom → @cleanTo</strong> | @journey
+                </div>
+
+                <!-- SORT BY BAR -->
+                <div class="sort-bar">
+
+                    <span class="sort-label">Sort By:</span>
+
+                    <div class="sort-dropdown">
+
+                        <!-- BUTTON -->
+                        <button type="button"
+                                id="sortBtn"
+                                class="sort-btn"
+                                onclick="toggleSortMenu()">
+                                @sortLabel
+                        </button>
+
+                        <!-- DROPDOWN -->
+                        <div id="sortMenu" class="sort-menu">
+
+                            <div class="sort-item @(ViewBag.CurrentSort == "DUR_SHORT" ? "selected" : "")"
+                                 onclick="applySort('DUR_SHORT')">
+                                Duration <small>Shortest First</small>
+                            </div>
+
+                            <div class="sort-item @(ViewBag.CurrentSort == "DUR_LONG" ? "selected" : "")"
+                                 onclick="applySort('DUR_LONG')">
+                                Duration <small>Longest First</small>
+                            </div>
+
+                            <div class="sort-item @(ViewBag.CurrentSort == "DEP_EARLY" ? "selected" : "")"
+                                 onclick="applySort('DEP_EARLY')">
+                                Departure <small>Early First</small>
+                            </div>
+
+                            <div class="sort-item @(ViewBag.CurrentSort == "DEP_LATE" ? "selected" : "")"
+                                 onclick="applySort('DEP_LATE')">
+                                Departure <small>Late First</small>
+                            </div>
+
+                            <div class="sort-item @(ViewBag.CurrentSort == "ARR_EARLY" ? "selected" : "")"
+                                 onclick="applySort('ARR_EARLY')">
+                                Arrival <small>Early First</small>
+                            </div>
+
+                            <div class="sort-item @(ViewBag.CurrentSort == "ARR_LATE" ? "selected" : "")"
+                                 onclick="applySort('ARR_LATE')">
+                                Arrival <small>Late First</small>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+        <div id="noTrainMessage"
+             style="display:none; margin:15px 0; font-weight:600; color:#d9534f; text-align: center">
+        </div>
+
+        <div class="table-wrapper">
+            <!-- RIGHT: Train Results -->
+            <div class="train-results">
+                <div class="train-card-list">
+
+                    @if (!Model.Any())
+                    {
+                        <div id="noTrainMessageServer" class="no-trains-available">
+
+                            @if (ViewBag.IsFilterApplied == true)
+                            {
+                                <text>
+                                    No trains are available for the filter(s) you have selected.
+                                </text>
+                            }
+                            else
+                            {
+                                <text>
+                                    No Trains available for <strong>@cleanFrom -> @cleanTo</strong> on <strong>@journey</strong>
+                                </text>
+                            }
+
+                        </div>
+                    }
+
+                    else{
+                        @foreach (var t in Model)
+                        {
+
+@*                             @if (t.Score > 5)
+                            {
+                                <span class="ai-badge">⭐ Recommended</span>
+                            }
+ *@                            
+                            DateTime JD = t.NextRunDate;
+
+                            // 1️⃣ Full departure datetime
+                            DateTime departureDateTime = JD.Add(t.Departure);
+
+                            // ✅ Convert string duration to TimeSpan
+                            var parts = t.Duration.Split(":");   //"39:40" -> ["39","40"]
+                            int hours = int.Parse(parts[0]);
+                            int minutes = int.Parse(parts[1]);
+
+                            TimeSpan duration = new TimeSpan(hours, minutes, 0);
+
+                            // 2️⃣ Arrival = departure + duration (CORRECT)
+                            DateTime arrivalDateTime = departureDateTime.Add(duration);
+
+                            // 3️⃣ Train type color logic
+                        string trainClass;
+                        string trainType;   // 🔥 NEW (for filtering)
+
+                        var trainName = t.Name.ToUpper();
+
+                        if (trainName.Contains("VANDE BHARAT SL"))
+                        {
+                            trainClass = "train-rajdhani";
+                            trainType = "rajdhani";
+                        }
+
+                        else if (trainName.Contains("VANDE BHARAT") || trainName.Contains("VANDEBHARAT"))
+                        {
+                            trainClass = "train-vande-bharat";
+                            trainType = "vande-bharat";
+                        }
+                        else if (trainName.Contains("AMRITBHARAT") || trainName.Contains("AMRIT BHARAT"))
+                        {
+                            trainClass = "train-amrit-bharat";
+                            trainType = "amrit-bharat";
+                        }
+                        else if (trainName.Contains("RAJDHANI") || trainName.Contains("RAJ"))
+                        {
+                            trainClass = "train-rajdhani";
+                            trainType = "rajdhani";
+                        }
+                        else if (trainName.Contains("SHATABDI"))
+                        {
+                            trainClass = "train-shatabdi";
+                            trainType = "shatabdi";
+                        }
+                        else if (trainName.Contains("GARIBRATH") || trainName.Contains("GARIB RATH"))
+                        {
+                            trainClass = "train-garib-rath";
+                            trainType = "garib-rath";
+                        }
+                        else if (trainName.Contains("DURONTO"))
+                        {
+                            trainClass = "train-duronto";
+                            trainType = "duronto";
+                        }
+                        else if (trainName.Contains("SPL") || trainName.Contains("SPECIAL"))
+                        {
+                            trainClass = "train-special";
+                            trainType = "special";
+                        }
+                        else
+                        {
+                            // ✅ THIS IS THE FIX
+                            trainClass = "train-normal";
+                            trainType = "normal";
+                        }
+
+
+                        <div class="train-card @trainClass" 
+                                data-train-type="@trainType"
+                                data-classes="@string.Join(",", t.Classes.Select(c => 
+                                    c.Code.Contains("(") 
+                                        ? c.Code.Substring(c.Code.IndexOf("(")+1, c.Code.IndexOf(")") - c.Code.IndexOf("(") - 1) 
+                                        : c.Code
+                                ))">
+
+                            <!-- Header -->
+                            <div class="train-card-header">
+
+                                <div>
+                                    <strong>@t.Number.ToString("D5") - @t.Name</strong><br />
+
+                                    @if (t.NextRunDate.Date != journeyDate.Date)
+                                    {
+                                        <span class="next-run-badge">
+                                            Next available: @t.NextRunDate.ToString("ddd, dd MMM")
+                                        </span>
+                                    }
+                                </div>
+
+                                @{
+                                    int shift = t.RouteDay - 1;
+
+                                    bool[] runDays = new bool[]
+                                    {
+                                        t.RunSun,
+                                        t.RunMon,
+                                        t.RunTue,
+                                        t.RunWed,
+                                        t.RunThu,
+                                        t.RunFri,
+                                        t.RunSat
+                                    };
+
+                                    bool[] shifted = new bool[7];
+
+                                    for(int i=0;i<7;i++)
+                                    {
+                                        shifted[(i + shift) % 7] = runDays[i];
+                                    }
+                                }
+
+                                <div class="runs-on">
+                                Runs On :
+
+                                <span class="@(shifted[1] ? "day-active" : "day-off")">M</span>
+                                <span class="@(shifted[2] ? "day-active" : "day-off")">T</span>
+                                <span class="@(shifted[3] ? "day-active" : "day-off")">W</span>
+                                <span class="@(shifted[4] ? "day-active" : "day-off")">T</span>
+                                <span class="@(shifted[5] ? "day-active" : "day-off")">F</span>
+                                <span class="@(shifted[6] ? "day-active" : "day-off")">S</span>
+                                <span class="@(shifted[0] ? "day-active" : "day-off")">S</span>
+                                </div>
+
+                                <div class="train-actions">
+
+                                    <!-- ⚠ ALERT ICON -->
+                                    @if (t.HasAlerts)
+                                    {
+                                        <span class="alert-icon"
+                                                onclick="loadTrainAlerts(@t.Id)"
+                                                style="cursor:pointer; color:red; margin-left:8px;">
+                                            ⚠️
+                                        </span>
+                                    }
+
+                                    <!-- Train Schedule -->
+                                    <a href="#"
+                                        class="train-link view-route"
+                                        data-train-id="@t.Id"
+                                        data-train-name="@t.Name"
+                                        data-train-number="@t.Number"
+                                        data-from="@t.FSM"
+                                        data-to="@t.TSM">
+
+                                        <span class="route-text">Train Schedule</span>
+                                        <i class="bi bi-geo-alt route-icon"></i>
+                                    </a>
+
+                                </div>
+                            </div>
+
+                            <!-- ARR/DEP Body -->
+                                <div class="train-card-body">
+
+                                    <!-- DEPARTURE -->
+                                    <div class="time-block">
+                                        <div class="time">@departureDateTime.ToString("HH:mm") | <span style="font-weight: bold">@t.FSM</span> | @departureDateTime.ToString("ddd, dd MMM")</div>
+                                        <div class="station"></div>
+                                        <div class="date"></div>
+                                    </div>
+
+                                    <!-- DURATION -->
+                                    <div class="duration-block">
+                                        <span>--- @t.Duration ---</span>
+                                    </div>
+
+                                    <!-- ARRIVAL -->
+                                    <div class="time-block arrival">
+                                        <div class="time">@arrivalDateTime.ToString("HH:mm") | <span style="font-weight: bold">@t.TSM</span> | @arrivalDateTime.ToString("ddd, dd MMM")</div>
+                                        <div class="station"></div>
+                                        <div class="date"></div>
+                                    </div>
+
+                                </div>                            
+
+                                <!------------------- CLASSES --------------------->
+
+                                <div class="class-compact">
+
+                                    @foreach (var c in t.Classes)
+                                    {
+
+                                        var demandText = DemandPredictionHelper.GetDemandTag(c.SeatsAvailable);
+                                        var demandClass = DemandPredictionHelper.GetDemandClass(c.SeatsAvailable);
+
+                                        <div class="class-box"
+                                             data-class="@c.Id"
+                                             onclick="openAvailability('@c.Id','@t.Id','@t.FromStationId','@t.ToStationId','@ViewBag.Quota')">
+
+                                            <div class="class-title">@c.Code</div>
+
+                                            <div class="class-refresh">
+                                                Refresh <i class="bi bi-arrow-repeat"></i>
+                                            </div>
+
+                                        </div>
+                                    }
+
+                                </div>
+
+                                <div class="availability-panel" id="panel-@t.Id">
+
+                                    <!-- YOUR EXISTING CODE (UNCHANGED) -->
+
+                                    <div class="train-card-classes">
+
+                                        @if (t.IsDeparted)
+                                        {
+                                            <div class="departed-box departed-hidden">
+                                                <strong>TRAIN DEPARTED</strong><br />
+                                                <small>Please check availability for next dates</small>
+                                            </div>
+
+                                        }
+
+                                        else
+                                        {
+                                            <!-- CLASS PANELS -->
+                                            <div class="class-panels">
+
+                                                @foreach (var c in t.Classes.Select((value, index) => new { value, index }))
+                                                {
+                                                    <!-- YOUR FULL ORIGINAL FORM -->
+                                                    <form method="get"
+                                                          action="/Booking/PrepareCheckout"
+                                                          class="class-card @(c.index == 0 ? "active" : "")"
+                                                          data-class="@c.value.Id" 
+                                                          data-train="@t.Id">
+
+                                                        <!-- ALL YOUR HIDDEN INPUTS REMAIN SAME -->
+
+                                                        <input type="hidden" name="trainId" value="@t.Id" />
+                                                        <input type="hidden" name="trainName" value="@t.Name" />
+                                                        <input type="hidden" name="classId" value="@c.value.Id" />
+                                                        <input type="hidden" name="classCode" value="@c.value.Code" />
+                                                        <input type="hidden" name="fare" value="@((int)c.value.TotalFare)" />
+
+                                                        <input type="hidden" id="quota" name="quota" value="@ViewBag.Quota" />
+
+                                                        <input type="hidden" name="journeyDate" value="@t.NextRunDate.ToString("yyyy-MM-dd")" />
+
+                                                        <input type="hidden" name="Departure" value="@departureDateTime.ToString("HH:mm")" />
+                                                        <input type="hidden" name="Arrival" value="@arrivalDateTime.ToString("HH:mm")" />
+                                                        <input type="hidden" name="Duration" value="@t.Duration" />
+
+                                                        <input type="hidden" name="FromStationId" value="@userfromid" />
+                                                        <input type="hidden" name="ToStationId" value="@usertoid" />
+
+                                                        <input type="hidden" name="FSM" value="@t.FSM" />
+                                                        <input type="hidden" name="TSM" value="@t.TSM" />
+
+                                                        <input type="hidden" name="FromStation" value="@fromStation" />
+                                                        <input type="hidden" name="ToStation" value="@toStation" />
+
+                                                        <input type="hidden" name="userfromid" value="@userfromid" />
+                                                        <input type="hidden" name="usertoid" value="@usertoid" />
+
+                                                        <input type="hidden" name="numPassengers" value="1" />
+
+                                                        <!-- Seat -->
+                                                        <!-- hidden inputs unchanged -->
+                                                        @{
+                                                            decimal reservationCharge = 0;
+                                                            decimal trainCharge = 0;
+                                                            decimal GST = 0;
+                                                            decimal tatkalCharge = 0;
+                                                            decimal finalFare = 0;
+
+                                                            string quota = (ViewBag.Quota as string ?? "GENERAL").ToUpper();
+
+                                                            string classCode = "";
+
+                                                            if (c.value.Code.Contains("(") && c.value.Code.Contains(")"))
+                                                            {
+                                                                int start = c.value.Code.IndexOf("(") + 1;
+                                                                int end = c.value.Code.IndexOf(")");
+                                                                classCode = c.value.Code.Substring(start, end - start).Trim().ToUpper();
+                                                            }
+
+                                                            // Reservation logic
+                                                            switch (classCode)
+                                                            {
+                                                                case "2S":
+                                                                    reservationCharge = 15;
+                                                                    break;
+
+                                                                case "SL":
+                                                                    reservationCharge = 20;
+                                                                    break;
+
+                                                                case "CC":
+                                                                    reservationCharge = 40;
+                                                                    break;
+
+                                                                case "3A":
+                                                                case "3E":
+                                                                    reservationCharge = 40;
+                                                                    break;
+
+                                                                case "2A":
+                                                                    reservationCharge = 50;
+                                                                    break;
+
+                                                                case "1A":
+                                                                case "EC":
+                                                                    reservationCharge = 60;
+                                                                    break;
+                                                            }
+
+                                                            //Train type detection
+                                                            string trainName = t.Name.ToUpper();
+
+                                                            if (trainName.Contains("SF") || trainName.Contains("SF EX") || trainName.Contains("VANDEBHARAT"))
+                                                            {
+                                                                trainCharge = 30;
+                                                            }
+                                                            else if (trainName.Contains("EXP") || trainName.Contains("EX") || trainName.Contains("EXPRESS"))
+                                                            {
+                                                                trainCharge = 0;
+                                                            }
+                                                            else if (trainName.Contains("DURONTO"))
+                                                            {
+                                                                trainCharge = 45;
+                                                            }
+                                                            else if (trainName.Contains("SPL"))
+                                                            {
+                                                                trainCharge = 30;
+                                                            }
+                                                            else if (trainName.Contains("INTERCITY"))
+                                                            {
+                                                                trainCharge = 15;
+                                                            }
+
+                                                            // Tatkal logic
+                                                            if (quota == "TATKAL")
+                                                            {
+                                                                switch (classCode)
+                                                                {
+                                                                    case "2S":
+                                                                        tatkalCharge = Math.Min(Math.Max(c.value.BasicFare * 0.10m, 10), 15);
+                                                                        break;
+
+                                                                    case "SL":
+                                                                        tatkalCharge = Math.Min(Math.Max(c.value.BasicFare * 0.30m, 100), 200);
+                                                                        break;
+
+                                                                    case "CC":
+                                                                        tatkalCharge = Math.Min(Math.Max(c.value.BasicFare * 0.30m, 125), 225);
+                                                                        break;
+
+                                                                    case "3A":
+                                                                    case "3E":
+                                                                        tatkalCharge = Math.Min(Math.Max(c.value.BasicFare * 0.30m, 300), 400);
+                                                                        break;
+
+                                                                    case "2A":
+                                                                    case "EC":
+                                                                        tatkalCharge = Math.Min(Math.Max(c.value.BasicFare * 0.30m, 400), 500);
+                                                                        break;
+                                                                }
+                                                            }
+
+                                                            finalFare = c.value.TotalFare + tatkalCharge;
+
+                                                            decimal baseFare = c.value.BaseFare - (reservationCharge + trainCharge + GST);
+                                                        }
+
+                                                        <div class="class-code">@c.value.Code</div>
+
+                                                        <div class="class-fare">
+                                                        ₹@(quota == "TATKAL" ? (int)finalFare : (int)c.value.TotalFare)
+
+                                                            <span class="fare-info">
+                                                                <i class="bi bi-info-circle fare-toggle"></i>
+
+                                                                <div class="fare-modal">
+                                                                    <div class="fare-modal-body">
+
+                                                                        <strong>Base Fare</strong> : ₹@c.value.BasicFare <br />
+                                                                        Reservation Charge : ₹@c.value.ReservationCharge <br />
+                                                                        Superfast Charge : ₹@c.value.SuperfastCharge <br />
+                                                                        GST : ₹@c.value.GSTAmount <br />
+
+                                                                        @if (quota == "TATKAL")
+                                                                        {
+                                                                            <span style="color:#d97706; font-weight:600;">
+                                                                                Tatkal Charge : ₹@tatkalCharge
+                                                                            </span>
+                                                                        }
+
+                                                                        <hr />
+
+                                                                        <strong>Total Fare</strong> : ₹@(quota == "TATKAL" ? finalFare : c.value.TotalFare)
+
+                                                                    </div>
+                                                                </div>                                                        
+                                                            </span>
+                                                        </div>
+
+
+                                                        @{
+                                                            bool isTatkal = quota == "TATKAL";
+                                                            bool isTatkalOpen = TatkalHelper.IsTatkalOpen(classCode);
+
+                                                            int remaining = 0;
+                                                            int rac = 0;
+                                                            int wl = 0;
+
+                                                            remaining = c.value.SeatsAvailable;
+                                                            rac = c.value.RACSeats;
+                                                            wl = c.value.WLSeats;
+
+                                                            string seatStatus;
+                                                            string seatColor;
+
+                                                            if (t.IsDeparted)
+                                                            {
+                                                                seatStatus = "TRAIN DEPARTED";
+                                                                seatColor = "#dc2626";
+                                                            }
+                                                            else if (t.IsChartPrepared)
+                                                            {
+                                                                seatStatus = "CHART PREPARED";
+                                                                seatColor = "#ea580c";
+                                                            }
+                                                            else if (remaining > 0)
+                                                            {
+                                                                seatStatus = "AVAILABLE - " + remaining;
+                                                                seatColor = "green";
+                                                            }
+                                                            else if (rac > 0)
+                                                            {
+                                                                seatStatus = "RAC - " + rac;
+                                                                seatColor = "orange";
+                                                            }
+                                                            else if (wl > 0)
+                                                            {
+                                                                seatStatus = "WL - " + wl;
+                                                                seatColor = "red";
+                                                            }
+                                                            else
+                                                            {
+                                                                seatStatus = "NOT AVAILABLE";
+                                                                seatColor = "gray";
+                                                            }
+
+                                                            if (isTatkal && !isTatkalOpen && !t.IsDeparted && !t.IsChartPrepared)
+                                                            {
+                                                                seatStatus += "#";
+                                                            }
+                                                        }
+
+                                                        <div class="class-status" style="color:@seatColor; font-weight:700;">
+                                                            @seatStatus
+                                                        </div>
+
+                                                        <input type="hidden" name="seatStatus" value="@seatStatus" />
+
+                                                        @if (!t.IsDeparted && !t.IsChartPrepared)
+                                                        {
+                                                            <button type="submit" class="book-btn">
+                                                                Book
+                                                            </button>
+                                                        }
+                                                        else
+                                                        {
+                                                            <button type="button" class="book-btn" style="display:none;" disabled>
+                                                                Book
+                                                            </button>
+                                                            <div class="chart-prepared-badge" style="display:inline-block; padding: 4px 10px; background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; border-radius:6px; font-size:12px; font-weight:700; margin-top:6px;">
+                                                                <i class="fa-solid fa-lock"></i> @(t.IsDeparted ? "Train Departed" : "Charting Done")
+                                                            </div>
+                                                        }
+
+                                                            <!-- 🔴 OVERLAY -->
+                                                        <div class="chart-overlay" style="display:none;">
+                                                            CHART PREPARED
+                                                        </div>
+
+                                                        <div class="last-updated" style="font-size:12px; color:#666; margin-top:4px;">
+                                                            Updated just now
+                                                        </div>
+
+                                                    </form>
+                                                }
+
+                                            </div>
+                                        }
+
+                                    </div>
+
+                                </div>
+
+                                <!-- Classes -->
+    @*                         <div class="train-card-classes">
+
+                                @if (t.IsDeparted)
+                                {
+                                    <!-- 🔴 IRCTC-style departed message -->
+                                    <div class="departed-box">
+                                        <strong>TRAIN DEPARTED</strong><br />
+                                        <small>Please check availability for next dates</small>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var c in t.Classes)
+                                    {
+                                            <form method="get"
+                                            action="/Booking/PrepareCheckout"
+                                            class="class-card">
+                                                <!-- TRAIN -->
+                                                <input type="hidden" name="trainId" value="@t.Id" />
+                                                <input type="hidden" name="trainName" value="@t.Name" />
+
+                                                <!-- CLASS -->
+                                                <input type="hidden" name="classId" value="@c.Id" />
+                                                <input type="hidden" name="classCode" value="@c.Code" />
+
+                                                <!-- JOURNEY -->
+                                                <input type="hidden" name="journeyDate" value="@journey" />
+                                                <input type="hidden" name="Departure" value="@departureDateTime.ToString("HH:mm")" />
+                                                <input type="hidden" name="Arrival" value="@arrivalDateTime.ToString("HH:mm")" />
+                                                <input type="hidden" name="Duration" value="@t.Duration" />
+
+                                                <!-- ROUTE -->
+                                                <input type="hidden" name="FromStationId" value="@userfromid" />
+                                                <input type="hidden" name="ToStationId" value="@usertoid" />
+                                                <input type="hidden" name="FSM" value="@t.FSM" />
+                                                <input type="hidden" name="TSM" value="@t.TSM" />
+                                                <input type="hidden" name="FromStation" value="@fromStation" />
+                                                <input type="hidden" name="ToStation" value="@toStation" />
+
+                                                <!-- user search ids -->
+                                                <input type="hidden" name="userfromid" value="@userfromid" />
+                                                <input type="hidden" name="usertoid" value="@usertoid" />
+
+                                                <input type="hidden" name="numPassengers" value="1" />
+
+                                                <!-- Seat -->
+
+
+                                                <!-- hidden inputs unchanged -->
+                                                @{
+                                                    decimal reservationCharge = 0;
+                                                    decimal trainCharge = 0;
+
+                                                    string classCode = "";
+
+                                                    if (c.Code.Contains("(") && c.Code.Contains(")"))
+                                                    {
+                                                        int start = c.Code.IndexOf("(") + 1;
+                                                        int end = c.Code.IndexOf(")");
+                                                        classCode = c.Code.Substring(start, end - start).Trim().ToUpper();
+                                                    }
+
+                                                    switch (classCode)
+                                                    {
+                                                        case "2S":
+                                                            reservationCharge = 15;
+                                                            break;
+
+                                                        case "SL":
+                                                            reservationCharge = 20;
+                                                            break;
+
+                                                        case "CC":
+                                                            reservationCharge = 40;
+                                                            break;
+
+                                                        case "3A":
+                                                        case "3E":
+                                                            reservationCharge = 40;
+                                                            break;
+
+                                                        case "2A":
+                                                            reservationCharge = 50;
+                                                            break;
+
+                                                        case "1A":
+                                                        case "EC":
+                                                            reservationCharge = 60;
+                                                            break;
+                                                    }
+
+                                                    //Train type detection
+                                                    string trainName = t.Name.ToUpper();
+
+                                                    if (trainName.Contains("SF") || trainName.Contains("SF EX") || trainName.Contains("VANDEBHARAT"))
+                                                    {
+                                                        trainCharge = 30;
+                                                    }
+                                                    else if (trainName.Contains("EXP") || trainName.Contains("EX") ||trainName.Contains("EXPRESS"))
+                                                    {
+                                                        trainCharge = 20;
+                                                    }
+                                                    else if (trainName.Contains("DURONTO"))
+                                                    {
+                                                        trainCharge = 45;
+                                                    }
+                                                    else if (trainName.Contains("SPL"))
+                                                    {
+                                                        trainCharge = 30;
+                                                    }
+                                                    else if (trainName.Contains("INTERCITY"))
+                                                    {
+                                                        trainCharge = 15;
+                                                    }
+
+                                                    decimal baseFare = c.BaseFare - (reservationCharge + trainCharge);
+                                                }
+
+                                                <div class="class-code">@c.Code</div>
+
+                                                <div class="class-fare">
+                                                    ₹@c.BaseFare
+
+                                                    <span class="fare-info">
+                                                        <i class="bi bi-info-circle"></i>
+
+                                                        <div class="fare-modal">
+                                                            <div class="fare-modal-body">
+                                                                <strong>Base Fare</strong> : ₹@baseFare <br />
+                                                                Reservation Charge : ₹@reservationCharge <br />
+                                                                Superfast Charge : ₹@trainCharge <br />
+                                                                <hr />
+                                                                <strong>Total Fare</strong> : ₹@c.BaseFare
+                                                            </div>
+                                                        </div>
+                                                    </span>
+                                                </div>
+
+                                             @{
+                                                int remaining = c.SeatsAvailable;
+
+                                                string seatStatus;
+                                                string seatColor;
+
+                                                if (remaining > 0)
+                                                {
+                                                    seatStatus = "AVAILABLE - " + remaining;
+                                                    seatColor = "green";
+                                                }
+                                                else if (c.RACSeats > 0)
+                                                {
+                                                    seatStatus = "RAC - " + c.RACSeats;
+                                                    seatColor = "orange";
+                                                }
+                                                else if (c.WLSeats > 0)
+                                                {
+                                                    seatStatus = "WL - " + c.WLSeats;
+                                                    seatColor = "red";
+                                                }
+                                                else
+                                                {
+                                                    seatStatus = "NOT AVAILABLE";
+                                                    seatColor = "gray";
+                                                }
+                                            }
+
+                                            <div class="class-status" style="color:@seatColor">
+                                                @seatStatus
+                                            </div>
+                                            <input type="hidden" name="seatStatus" value="@seatStatus" />
+                                            <button type="submit" class="book-btn">Book</button>
+                                        </form>
+                                    }
+                                }
+
+                            </div>
+     *@
+
+                                <button class="map-btn" onclick="openMap('@t.MapUrl')">
+                                    🗺 Route Map
+                                </button>
+
+                                <div class="live-status-container">
+                                    <a href="#"
+                                       class="live-status-btn"
+                                       onclick="handleLiveStatus(event, '@t.Number')">
+                                       Live Status
+                                    </a>                                
+                                </div>
+
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+            </main>
+        </div>
+     
+    </div>
+
+
+    <div id="loadingModal" class="loading-modal">
+        <div class="loading-box">
+            <div class="loader"></div>
+            <div class="loading-text">Fetching Availability...</div>
+        </div>
+    </div>
+
+
+    @if (routeMismatch != null)
+    {
+        <div class="modal-overlay">
+            <div class="modal-box">
+
+                <h3 class="modal-title">Confirmation</h3>
+
+                <div class="popmodal">
+                    You searched trains from
+                    <strong>@searchedFrom</strong> to
+                    <strong>@searchedTo</strong>,<br />
+                    but the selected train runs from
+                    <strong>@actualFrom</strong> to
+                    <strong>@actualTo</strong>.<br /><br />
+                    Do you want to continue booking with the actual route?
+                </div>
+
+                <div class="modalbutton">
+                    <a href="@Url.Action("Checkout", "Booking", new {
+                        trainId = trainId,
+                        classId = classId,
+                        classCode = classCode,
+                        FromStationId = actualFromId,
+                        ToStationId = actualToId,
+                        journeyDate = routeJourneyDate
+                        })"
+                        class="btnmodal yes">✔ Yes</a>
+                    <a href="#" class="btnmodal no" id="closeRouteMismatch"><strong>X</strong> No</a>
+                </div>
+
+            </div>
+        </div>
+    }
+
+    <!-- 🚨 Train Alert Modal -->
+<div id="alertModal" class="custom-modal">
+    <div class="custom-modal-box">
+
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h5>Train Updates</h5>
+            <span onclick="closeAlertModal()" style="cursor:pointer;">✖</span>
+        </div>
+
+        <div class="modal-body-scroll">
+            <table class="alert-table" style="width:100%; margin-top:10px;">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody id="alertBody">
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+</div>
+
+<!-- ✅ Right Side Drawer -->
+    <div id="route-sidebar" class="route-sidebar">
+        <div class="sidebar-header">
+            <h4 class="sidebar-title">Train Route</h4>
+            <button class="sidebar-close" id="close-sidebar">&times;</button>
+        </div>
+
+        <div id="sidebar-content" class="sidebar-content">
+            <!-- AJAX Loaded Route -->
+        </div>
+    </div>
+
+    <!-- Background Overlay -->
+    <div id="sidebar-overlay" class="sidebar-overlay"></div>
+
+    <div id="smartBubble" onclick="openSmartSearch()">
+    🤖
+        <span class="smart-label">Smart Search</span>
+    </div>
+
+    <div id="smartOverlay">
+        <div id="smartBox">
+
+            <span class="close-btn" onclick="closeSmartSearch()">✖</span>
+
+            <h3>🚀 Smart Search</h3>
+
+            <form method="POST" action="/Train/SmartSearch">
+                <input type="text"
+                       id="smartInput"
+                       name="query"
+                       placeholder="e.g. Hyderabad to Chennai tomorrow AC" />
+
+                <button type="submit" id="smartSearchBtn">
+                    Search
+                </button>
+            </form>
+
+        </div>
+    </div>
+
+</section> 
+
+
+@section Scripts {
+
+    <!-- Bootstrap JS REQUIRED for modal -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+
+        function openTrainAlertModal(id, number, name) {
+
+            document.getElementById("alertTrainTitle").innerText =
+                number + " - " + name + " Updates";
+
+            document.getElementById("trainAlertModal").style.display = "flex";
+        }
+
+        function closeTrainAlertModal() {
+            document.getElementById("trainAlertModal").style.display = "none";
+        }
+
+        $(document).on("click", ".train-link", function (e) {
+
+            e.preventDefault();
+            e.stopImmediatePropagation();  // ⛔ prevents global loader trigger
+
+            var trainId = $(this).data("train-id");
+            var trainName = $(this).data("train-name");
+            var trainNumber = $(this).data("train-number");
+            var fromStation = $(this).data("from");
+            var toStation = $(this).data("to");
+
+            var headerHtml = `
+                <div class="mobile-train-header">
+                    <strong>${trainNumber} - (${trainName})</strong>
+                    <div class="mobile-route">
+                        ${fromStation} → ${toStation}
+                    </div>
+                 </div>
+                 `;
+
+            $(".sidebar-title").html(headerHtml);
+
+            // $(".sidebar-title").text(`Train Route of ${trainNumber} - ${trainName}`);
+
+            // // ⛔ prevents global loader trigger
+            // if (typeof hideLoader === "function") {
+            //     hideLoader();
+            // }
+
+            // ✅ GET DATE FROM INPUT
+            var journeyDate = $("#journeyDatePicker").val();
+
+            $.get("/Admin/GetTrainRoute", { trainId: trainId, journeyDate: journeyDate }, function (html) {
+
+                $("#sidebar-content").html(html);
+
+                $("#sidebar-overlay").addClass("show");
+                $("#route-sidebar").addClass("open");
+
+                // $("#sidebar-overlay").fadeIn(200);
+                // $("#route-sidebar").css("right", "0");
+            }).fail(function (xhr) {
+                if (xhr.status === 401) {
+                    showToast("Login required to view schedule during Tatkal timings", "warning");
+                    setTimeout(function() {
+                        window.location.href = "/Account/Login?returnUrl=" + encodeURIComponent(window.location.pathname + window.location.search);
+                    }, 1500);
+                } else {
+                    showToast("Failed to fetch train route details.", "error");
+                }
+            });
+        });
+
+        $(document).on("click", "#close-sidebar, #sidebar-overlay", function () {
+
+            $("#route-sidebar").removeClass("open");
+            $("#sidebar-overlay").removeClass("show");
+
+            // $("#route-sidebar").css("right", "-700px");
+            // $("#sidebar-overlay").fadeOut(200);
+        });
+
+        function changeDate(offset) {
+            let dateInput = document.getElementById("journeyDatePicker");
+            let date = new Date(dateInput.value);
+            date.setDate(date.getDate() + offset);
+            dateInput.valueAsDate = date;
+            submitDateChange();
+        }
+
+        function submitDateChange() {
+            let date = document.getElementById("journeyDatePicker").value;
+
+            let fromId = '@TempData.Peek("fromStationId")';
+            let toId   = '@TempData.Peek("toStationId")';
+            let fromNm = '@TempData.Peek("FromStation")';
+            let toNm   = '@TempData.Peek("ToStation")';
+
+            window.location.href = `/Train/ChangeJourneyDate?date=${date}`;
+        }
+
+        function cleanStationName(station) {
+            if (!station) return '';
+
+            // Remove everything from " (" onwards
+            return station.split(' (')[0].trim();
+        }
+
+
+        function filterTrains() {
+            // Get all checked classes
+            const checkedClasses = [];
+            document.querySelectorAll('.class-filter-cb:checked').forEach(cb => {
+                checkedClasses.push(cb.value);
+            });
+
+            // Get all checked types
+            const checkedTypes = [];
+            document.querySelectorAll('.type-filter-cb:checked').forEach(cb => {
+                checkedTypes.push(cb.value);
+            });
+
+            const trains = document.querySelectorAll('.train-card');
+            let visibleCount = 0;
+
+            trains.forEach(train => {
+                const trainType = train.dataset.trainType;
+                
+                // Parse classes from train card (split by comma, clean whitespace)
+                let trainClassesStr = train.dataset.classes || '';
+                trainClassesStr = trainClassesStr.replace(/\s+/g, ''); // Remove spaces
+                const trainClasses = trainClassesStr.split(',').filter(c => c.length > 0);
+
+                // A train is shown if:
+                // 1. Its trainType is checked AND
+                // 2. At least one of its classes is checked
+                const typeMatches = checkedTypes.includes(trainType);
+                const classMatches = trainClasses.some(c => checkedClasses.includes(c));
+
+                if (typeMatches && classMatches) {
+                    train.style.display = '';
+                    visibleCount++;
+                } else {
+                    train.style.display = 'none';
+                }
+            });
+
+            // Show/Hide "no trains available" messages
+            const msgBox = document.getElementById('noTrainMessage');
+            const serverMsg = document.getElementById('noTrainMessageServer');
+
+            if (visibleCount === 0) {
+                if (serverMsg) {
+                    serverMsg.style.display = 'none';
+                }
+                
+                const fromStationRaw = '@TempData.Peek("FromStation")';
+                const toStationRaw   = '@TempData.Peek("ToStation")';
+                const journeyDate    = '@journey';
+
+                const route =
+                    cleanStationName(fromStationRaw) +
+                    ' → ' +
+                    cleanStationName(toStationRaw);
+
+                msgBox.innerHTML = `No trains available matching your selected filters for <strong>${route}</strong> on <strong>${journeyDate}</strong>`;
+                msgBox.style.display = 'block';
+            } else {
+                msgBox.style.display = 'none';
+                if (serverMsg) {
+                    serverMsg.style.display = 'none';
+                }
+            }
+        }
+
+        // Setup event listeners for checkboxes
+        document.querySelectorAll('.class-filter-cb, .type-filter-cb').forEach(cb => {
+            cb.addEventListener('change', filterTrains);
+        });
+
+        function resetAllFilters() {
+            document.querySelectorAll('.class-filter-cb, .type-filter-cb').forEach(cb => {
+                cb.checked = true;
+            });
+            filterTrains();
+        }
+
+        // Run once on load to ensure filters match checkbox state
+        document.addEventListener('DOMContentLoaded', filterTrains);
+
+        // document.getElementById("classFilterDropdown")
+        // .addEventListener("change", function (e) {
+
+        //     e.preventDefault();   // 🔥 ADD THIS
+        //     e.stopPropagation();  // 🔥 ADD THIS
+
+        //     const selected = this.value;
+        //     const trains = document.querySelectorAll(".train-card");
+
+        //     let visibleCount = 0;
+
+        //     trains.forEach(train => {
+
+        //         let classes = train.dataset.classes;
+
+        //         // 🔥 FIX 2 (IMPORTANT - BELOW)
+        //         classes = classes.replace(/\s+/g, ''); // remove spaces
+        //         classes = classes.split(",");
+
+        //         if (selected === "ALL") {
+        //             train.style.display = "";
+        //             visibleCount++;
+        //             return;
+        //         }
+
+        //         if (classes.includes(selected)) {
+        //             train.style.display = "";
+        //             visibleCount++;
+        //         } else {
+        //             train.style.display = "none";
+        //         }
+        //     });
+
+        //     const msgBox = document.getElementById('noTrainMessage');
+        //     const serverMsg = document.getElementById('noTrainMessageServer');
+
+        //     if (visibleCount === 0) {
+
+        //         if(serverMsg) serverMsg.style.display = "none";
+
+        //         msgBox.innerHTML =
+        //             "No trains are available for the filter(s) you have selected.";
+
+        //         msgBox.style.display = "block";
+
+        //     } else {
+
+        //         msgBox.style.display = "none";
+
+        //         if(serverMsg) serverMsg.style.display = "none";
+        //     }
+        // });
+
+        // function applySort(sortType) {
+        //     const url = new URL(window.location.href);
+        //     url.searchParams.set('sortBy', sortType);
+        //     window.location.href = url.toString();
+        // }
+
+        function applySort(sortType) {
+            fetch('/Train/SetSort?value=' + sortType)
+                .then(() => window.location.href = '/Train/TrainResults');
+        }
+
+        function toggleSortMenu() {
+            const menu = document.getElementById("sortMenu");
+            menu.style.display = menu.style.display === "block" ? "none" : "block";
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener("click", function (e) {
+            const btn = document.getElementById("sortBtn");
+            const menu = document.getElementById("sortMenu");
+
+            if (!btn.contains(e.target) && !menu.contains(e.target)) {
+                menu.style.display = "none";
+            }
+        });
+
+        function toggleFareModal(el){
+
+            // close other modals
+            document.querySelectorAll(".fare-modal")
+                .forEach(m => m.style.display="none");
+
+            const modal = el.querySelector(".fare-modal");
+
+            modal.style.display = "block";
+
+            // click outside closes it
+            document.addEventListener("click", function handler(e){
+                if(!el.contains(e.target)){
+                    modal.style.display="none";
+                    document.removeEventListener("click", handler);
+                }
+            });
+        }
+
+        function handleLiveStatus(event, trainNo) {
+
+            event.preventDefault();
+            event.stopPropagation();
+
+            navigator.clipboard.writeText(trainNo)
+                .then(() => {
+                    alert("Train number " + trainNo + " copied!");
+
+                    // Open after successful copy
+                    window.open("https://enquiry.indianrail.gov.in/mntes/", "_blank");
+                })
+                .catch(() => {
+                    alert("Copy failed. Please copy manually: " + trainNo);
+
+                    // Still open site
+                    window.open("https://enquiry.indianrail.gov.in/mntes/", "_blank");
+                });
+        }
+
+        document.addEventListener("click", function (e) {
+            if (e.target && e.target.id === "closeRouteMismatch") {
+                e.preventDefault();
+
+                fetch('/Train/ClearRouteMismatch', {
+                    method: 'POST'
+                })
+                .then(res => {
+                    if (res.ok) {
+                        document.querySelector(".modal-overlay").style.display = "none";
+                    }
+                })
+                .catch(err => console.error(err));
+            }
+        });
+
+        function openSmartSearch() {
+            document.getElementById("smartOverlay").style.display = "flex";
+
+            // hide main results
+            document.querySelector(".train-results-container")?.classList.add("blur-bg");
+        }
+
+            function closeSmartSearch() {
+                document.getElementById("smartOverlay").style.display = "none";
+
+                document.querySelector(".train-results-container")?.classList.remove("blur-bg");
+            }
+
+        const bubble = document.getElementById("smartBubble");
+
+        let isDragging = false;
+        let startX, startY;
+        let moved = false;
+
+        const DRAG_THRESHOLD = 5; // 🔥 adjust sensitivity
+
+        bubble.addEventListener("mousedown", (e) => {
+            isDragging = true;
+            moved = false;
+
+            startX = e.clientX;
+            startY = e.clientY;
+
+            bubble.style.transition = "none";
+        });
+
+        document.addEventListener("mousemove", (e) => {
+            if (!isDragging) return;
+
+            let dx = e.clientX - startX;
+            let dy = e.clientY - startY;
+
+            // 🔥 detect real drag
+            if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) {
+                moved = true;
+            }
+
+            let x = bubble.offsetLeft + dx;
+            let y = bubble.offsetTop + dy;
+
+            x = Math.max(0, Math.min(window.innerWidth - bubble.offsetWidth, x));
+            y = Math.max(0, Math.min(window.innerHeight - bubble.offsetHeight, y));
+
+            bubble.style.left = x + "px";
+            bubble.style.top = y + "px";
+            bubble.style.right = "auto";
+            bubble.style.bottom = "auto";
+            bubble.style.position = "fixed";
+
+            // reset start for smooth dragging
+            startX = e.clientX;
+            startY = e.clientY;
+        });
+
+        document.addEventListener("mouseup", () => {
+            isDragging = false;
+
+            // 🔥 delay reset (IMPORTANT)
+            setTimeout(() => {
+                moved = false;
+            }, 50);
+
+            bubble.style.transition = "0.3s";
+        });
+
+        // 🔥 CLICK HANDLER
+        bubble.onclick = function (e) {
+            if (moved) {
+                e.preventDefault();
+                e.stopPropagation();
+                return false;
+            }
+
+            openSmartSearch();
+        };
+
+        function openMap(url) {
+            if (!url) {
+                showToast("Route not available");
+                return;
+            }
+
+            window.open(url, "_blank");
+        }
+
+        function loadTrainAlerts(trainId) {
+
+            fetch('/Train/GetTrainAlerts?trainId=' + trainId)
+                .then(res => res.json())
+                .then(data => {
+
+                    let html = "";
+
+                    if (!data || data.length === 0) {
+                        html = `<tr><td colspan="2">No updates available</td></tr>`;
+                    } else {
+
+                        data.forEach(a => {
+
+                            let color = "black";
+
+                            if (a.type === "Cancelled") color = "red";
+                            else if (a.type === "Skipped") color = "orange";
+                            else if (a.type === "Diverted") color = "blue";
+                            else if (a.type === "Temporary Stop") color = "green";
+
+                            html += `
+                                <tr>
+                                    <td style="color:${color}; font-weight:600;">
+                                        ${a.type}
+                                    </td>
+                                    <td>${a.message}</td>
+                                </tr>
+                            `;
+                        });
+                    }
+
+                    document.getElementById("alertBody").innerHTML = html;
+
+                    // 🔥 OPEN MODAL
+                    document.getElementById("alertModal").style.display = "flex";
+                })
+                .catch(err => {
+                    console.error("Error:", err);
+                });
+        }
+
+        function closeAlertModal() {
+            document.getElementById("alertModal").style.display = "none";
+        }
+
+</script>
+
+    <style>
+
+        .train-card-classes .class-code {
+            display: none !important;
+        }
+
+        .class-compact {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .class-box {
+            border: 1px solid #ddd;
+            padding: 10px 15px;
+            border-radius: 6px;
+            background: #f7f7f7;
+            cursor: pointer;
+        }
+
+            .class-box:hover {
+                border-color: #fb792b;
+            }
+             
+            .class-box.active {
+                border-color: #FF5E24;
+            }
+
+        .class-title {
+            font-weight: 600;
+        }
+
+        .class-refresh {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        .class-card {
+            display: none;
+            width: 200px;
+        }
+
+            .class-card.active {
+                display: inline-block;
+                margin-top: 10px;
+            }
+
+        .class-panels {
+            margin-top: 12px;
+        }
+
+        .class-tabs {
+            display: flex;
+            gap: 20px;
+            margin-top: 10px;
+        }
+
+        .availability-panel {
+            display: none;
+        }
+
+        .arrival{
+            text-align:right;
+        }
+
+        .duration-block{
+            display:flex;
+            justify-content:center;
+            align-items:center;
+        }
+
+        .duration-block{
+            font-weight:600;
+            color:#1a4fa3;
+            font-size:14px;
+        }
+
+        /* 🚨 ICON */
+        .train-alert {
+            margin-left: 100px;
+        }
+
+        .alert-icon {
+            color: #ff3b3b;
+            font-size: 18px;
+            cursor: pointer;
+        }
+
+        .alert-icon:hover {
+            transform: scale(1.2);
+        }
+
+        /* 🚨 MODAL */
+        .alert-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .alert-modal-box {
+            background: #fff;
+            width: 400px;
+            border-radius: 10px;
+            padding: 15px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .alert-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .alert-close {
+            cursor: pointer;
+            font-size: 20px;
+        }
+
+        /* 🚨 ROWS */
+        .alert-row {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            font-size: 14px;
+        }
+
+        .alert-row.cancelled {
+            color: red;
+        }
+
+        .alert-row.diverted {
+            color: orange;
+        }
+
+        .alert-row.platform {
+            color: #007bff;
+        }
+
+        .alert-row.partial {
+            color: #cc5500;
+        }
+
+        .alert-row.stoppage {
+            color: green;
+        }
+
+        .train-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        /* alert icon */
+        .alert-icon {
+            color: #ff3b3b;
+            font-size: 16px;
+            cursor: pointer;
+            transition: 0.2s;
+            margin-right: 6px;   /* small spacing only */
+        }
+
+        .alert-icon:hover {
+            transform: scale(1.2);
+        }
+
+        /* keep schedule button intact */
+        .view-route {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .custom-modal {
+            display: none;          /* ✅ ONLY THIS */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 10008;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .custom-close {
+            float: right;
+            cursor: pointer;
+            font-size: 18px;
+        }
+
+        .custom-modal-box {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+
+            width: 600px;           /* 🔥 increased */
+            max-width: 90%;
+
+            max-height: 500px;
+
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+        }
+
+        .alert-table th {
+            background: #1f6fd1;
+            color: white;
+            padding: 10px;
+        }
+
+        .alert-table td {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .modal-body-scroll {
+            overflow-y: auto;
+            max-height: 350px;   /* 🔥 controls scroll area */
+            margin-top: 10px;
+        }
+
+        /* Smooth scroll look */
+        .modal-body-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .modal-body-scroll::-webkit-scrollbar-thumb {
+            background: #ccc;
+            border-radius: 10px;
+        }
+
+    </style>
+}

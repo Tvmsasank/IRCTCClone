@@ -1,0 +1,746 @@
+@model IRCTCClone.Models.Booking
+
+@{
+    ViewData["Title"] = "PNR Enquiry";
+}
+
+<style>
+    /* PNR Page Specific Design System */
+    .pnr-enq-wrapper {
+        background-color: #f4f6f9;
+        min-height: calc(100vh - 120px);
+        padding: 30px 15px;
+        font-family: 'Outfit', sans-serif;
+    }
+
+    .pnr-enq-container {
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+
+    /* Form Card styling */
+    .pnr-form-card {
+        background: #ffffff;
+        border: 1px solid #e1e5eb;
+        border-radius: 8px;
+        padding: 25px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        margin-bottom: 25px;
+    }
+
+    .pnr-form-title {
+        color: #0f2954;
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin-bottom: 15px;
+        text-align: center;
+    }
+
+    .pnr-input-group {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        max-width: 480px;
+        margin: 0 auto;
+    }
+
+    .pnr-text-input {
+        width: 100%;
+        padding: 10px 15px;
+        font-size: 1.1rem;
+        border: 1px solid #c3cad4;
+        border-radius: 4px;
+        text-align: center;
+        letter-spacing: 3px;
+        color: #333;
+        font-weight: bold;
+        transition: border-color 0.2s;
+    }
+
+    .pnr-text-input:focus {
+        border-color: #fb792b;
+        outline: none;
+    }
+
+    .pnr-submit-btn {
+        background-color: #fb792b;
+        color: white;
+        border: none;
+        padding: 10px 30px;
+        font-size: 1rem;
+        font-weight: 600;
+        border-radius: 4px;
+        margin-top: 15px;
+        cursor: pointer;
+        transition: background-color 0.2s, transform 0.1s;
+    }
+
+    .pnr-submit-btn:hover {
+        background-color: #e0641b;
+    }
+
+    .pnr-submit-btn:active {
+        transform: scale(0.98);
+    }
+
+    /* Cards Grid (Upcoming & Recent) */
+    .pnr-cards-section {
+        margin-bottom: 25px;
+    }
+
+    .section-header {
+        font-size: 1rem;
+        color: #0f2954;
+        font-weight: 600;
+        margin-bottom: 12px;
+        border-bottom: 2px solid #0f2954;
+        padding-bottom: 5px;
+    }
+
+    .pnr-cards-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 15px;
+    }
+
+    .pnr-info-card {
+        background: #ffffff;
+        border: 1px solid #dcdfe6;
+        border-radius: 6px;
+        padding: 12px 15px;
+        position: relative;
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+    }
+
+    .pnr-info-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    }
+
+    .pnr-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px dashed #e2e4ea;
+        padding-bottom: 6px;
+        margin-bottom: 8px;
+    }
+
+    .pnr-card-title {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #0f2954;
+    }
+
+    .pnr-card-meta {
+        font-size: 0.8rem;
+        color: #606266;
+        font-weight: 600;
+        margin-right: 25px; /* Spacing for delete button if needed */
+    }
+
+    .pnr-card-train {
+        font-size: 0.85rem;
+        color: #fb792b;
+        font-weight: 600;
+        margin-bottom: 4px;
+    }
+
+    .pnr-card-route {
+        display: flex;
+        align-items: center;
+        font-size: 0.82rem;
+        color: #303133;
+        font-weight: 600;
+    }
+
+    .pnr-card-route span.arrow {
+        color: #909399;
+        margin: 0 6px;
+    }
+
+    .btn-delete-recent {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        background: transparent;
+        border: none;
+        color: #f56c6c;
+        font-size: 0.9rem;
+        cursor: pointer;
+        padding: 4px;
+        border-radius: 50%;
+        transition: background-color 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+    }
+
+    .btn-delete-recent:hover {
+        background-color: #fee8e8;
+    }
+
+    /* PNR Status Detail Box */
+    .pnr-detail-section {
+        background: #ffffff;
+        border: 1px solid #dcdfe6;
+        border-radius: 6px;
+        overflow: hidden;
+        margin-bottom: 25px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.04);
+    }
+
+    .detail-section-title {
+        background-color: #0f2954;
+        color: white;
+        padding: 10px 15px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        margin: 0;
+    }
+
+    .pnr-grid-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .pnr-grid-table td {
+        padding: 10px 15px;
+        border-bottom: 1px solid #ebeef5;
+        font-size: 0.88rem;
+        width: 25%;
+    }
+
+    .pnr-grid-table td.lbl {
+        font-weight: bold;
+        color: #48505e;
+        background-color: #fcfdfe;
+        border-right: 1px solid #ebeef5;
+    }
+
+    .pnr-grid-table td.val {
+        color: #303133;
+        font-weight: 600;
+    }
+
+    .pnr-grid-table td.val.pnr-bold {
+        color: #0f2954;
+        font-weight: 700;
+    }
+
+    /* Status Report Table */
+    .status-report-section {
+        background: #ffffff;
+        border: 1px solid #dcdfe6;
+        border-radius: 6px;
+        overflow: hidden;
+        margin-bottom: 25px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.04);
+    }
+
+    .passenger-table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: center;
+    }
+
+    .passenger-table th {
+        background-color: #0f2954;
+        color: white;
+        padding: 10px;
+        font-size: 0.88rem;
+        font-weight: 600;
+        border: 1px solid #0f2954;
+    }
+
+    .passenger-table td {
+        padding: 12px 10px;
+        border-bottom: 1px solid #ebeef5;
+        border-right: 1px solid #ebeef5;
+        font-size: 0.88rem;
+        color: #333;
+        font-weight: 600;
+    }
+
+    .passenger-table tr:last-child td {
+        border-bottom: none;
+    }
+
+    .passenger-table td:last-child {
+        border-right: none;
+    }
+
+    /* Alert and Note section */
+    .recovery-banner {
+        color: #333;
+        font-size: 0.9rem;
+        font-weight: 700;
+        margin-bottom: 15px;
+        padding-left: 5px;
+    }
+
+    .pnr-note-box {
+        background-color: #fdf6ec;
+        border: 1px solid #f5dab1;
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 25px;
+    }
+
+    .pnr-note-box h5 {
+        color: #b88230;
+        font-size: 0.95rem;
+        font-weight: 600;
+        margin-top: 0;
+        margin-bottom: 8px;
+    }
+
+    .pnr-note-box ol {
+        margin: 0;
+        padding-left: 18px;
+        font-size: 0.82rem;
+        color: #606266;
+        line-height: 1.5;
+    }
+
+    .pnr-note-box li {
+        margin-bottom: 6px;
+    }
+
+    /* Acronyms Guide */
+    .acronyms-section {
+        background: #ffffff;
+        border: 1px solid #dcdfe6;
+        border-radius: 6px;
+        overflow: hidden;
+        margin-bottom: 25px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.04);
+    }
+
+    .acronyms-list {
+        padding: 15px;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 10px;
+        font-size: 0.8rem;
+        color: #606266;
+        font-weight: 600;
+    }
+
+    .acronym-item {
+        border-bottom: 1px solid #f2f6fc;
+        padding-bottom: 6px;
+    }
+
+    .acronym-item strong {
+        color: #0f2954;
+    }
+
+    /* Ad Banner */
+    .ad-banner-container {
+        margin: 20px 0;
+        text-align: center;
+    }
+
+    .ad-banner-img {
+        max-width: 100%;
+        border-radius: 4px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    /* Responsive Queries */
+    @@media (max-width: 768px) {
+        .pnr-grid-table, .pnr-grid-table tbody, .pnr-grid-table tr, .pnr-grid-table td {
+            display: block;
+            width: 100% !important;
+            border-right: none !important;
+        }
+
+        .pnr-grid-table td.lbl {
+            background-color: #f7f9fc;
+            padding-bottom: 2px;
+            border-bottom: none;
+        }
+
+        .pnr-grid-table td.val {
+            padding-top: 2px;
+            margin-bottom: 6px;
+        }
+        
+        .pnr-cards-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="pnr-enq-wrapper">
+    <div class="pnr-enq-container">
+        
+        <!-- PNR Search Box Card -->
+        <div class="pnr-form-card">
+            <h3 class="pnr-form-title">Enquire PNR Status</h3>
+            <form id="pnrSearchForm" asp-action="CheckPNR" method="post">
+                <div class="pnr-input-group">
+                    <input type="text" id="pnrInput" name="pnr" maxlength="10" 
+                           placeholder="Enter PNR number" 
+                           value="@Model?.PNR"
+                           class="pnr-text-input" required autocomplete="off" />
+                    <button type="submit" class="pnr-submit-btn">Get Status</button>
+                </div>
+            </form>
+
+            @if (ViewBag.Error != null)
+            {
+                <div class="alert alert-danger text-center mt-3" style="max-width: 480px; margin: 15px auto 0 auto; padding: 8px;">
+                    <strong>@ViewBag.Error</strong>
+                </div>
+            }
+        </div>
+
+        <!-- PNR Query Details (Show if model is present) -->
+        @if (Model != null)
+        {
+            <!-- Recovery Warning banner -->
+            <div class="recovery-banner">
+                IR recovers only 57% of cost of travel on an average.
+            </div>
+
+            <!-- PNR Status Detail Table -->
+            <div class="pnr-detail-section">
+                <h4 class="detail-section-title">PNR Status Detail</h4>
+                <table class="pnr-grid-table">
+                    <tbody>
+                        <tr>
+                            <td class="lbl">PNR Number</td>
+                            <td class="val pnr-bold">@Model.PNR</td>
+                            <td class="lbl">Date of Journey</td>
+                            <td class="val">@Model.JourneyDate.ToString("dd MMM yyyy")</td>
+                        </tr>
+                        <tr>
+                            <td class="lbl">Train Number</td>
+                            <td class="val">@Model.TrainNumber</td>
+                            <td class="lbl">Train Name</td>
+                            <td class="val">@Model.TrainName</td>
+                        </tr>
+                        <tr>
+                            <td class="lbl">From Station</td>
+                            <td class="val">@(Model.Frmst) @(string.IsNullOrEmpty(Model.FromStationCode) ? "" : $"({Model.FromStationCode})")</td>
+                            <td class="lbl">To Station</td>
+                            <td class="val">@(Model.Tost) @(string.IsNullOrEmpty(Model.ToStationCode) ? "" : $"({Model.ToStationCode})")</td>
+                        </tr>
+                        <tr>
+                            <td class="lbl">Boarding point</td>
+                            <td class="val">@(Model.Frmst) @(string.IsNullOrEmpty(Model.FromStationCode) ? "" : $"({Model.FromStationCode})")</td>
+                            <td class="lbl">Reservation upto</td>
+                            <td class="val">@(Model.Tost) @(string.IsNullOrEmpty(Model.ToStationCode) ? "" : $"({Model.ToStationCode})")</td>
+                        </tr>
+                        <tr>
+                            <td class="lbl">Class</td>
+                            <td class="val">@(string.IsNullOrEmpty(Model.ClassCode) ? "Sleeper (SL)" : Model.ClassCode)</td>
+                            <td class="lbl">No of passengers</td>
+                            <td class="val">@(Model.Passengers?.Count ?? 0)</td>
+                        </tr>
+                        <tr>
+                            <td class="lbl">Charting Status</td>
+                            <td class="val">@(string.IsNullOrEmpty(Model.Status) ? "Chart Not Prepared" : Model.Status)</td>
+                            <td class="lbl">Upgraded Class</td>
+                            <td class="val">--</td>
+                        </tr>
+                        <tr>
+                            <td class="lbl">Booking Fare</td>
+                            <td class="val">₹@(Model.BaseFare.ToString("F2"))</td>
+                            <td class="lbl">Ticket Fare:</td>
+                            <td class="val">₹@(Model.BaseFare.ToString("F2"))</td>
+                        </tr>
+                        <tr>
+                            <td class="lbl">Quota</td>
+                            <td class="val">@(string.IsNullOrEmpty(Model.Quota) ? "SS (LOWER BERTH/SR.CITIZEN)" : Model.Quota)</td>
+                            <td class="lbl">Delay</td>
+                            <td class="val">00:00 Hrs</td>
+                        </tr>
+                        <tr>
+                            <td class="lbl">Remarks</td>
+                            <td class="val" colspan="3">--</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Status Report Section -->
+            <div class="status-report-section">
+                <table class="passenger-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 20%;">Age</th>
+                            <th style="width: 40%;">Booking Status</th>
+                            <th style="width: 40%;">Current Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Passengers != null && Model.Passengers.Count > 0)
+                        {
+                            @foreach (var p in Model.Passengers)
+                            {
+                                string seatNumberClean = p.SeatNumber;
+                                if (!string.IsNullOrEmpty(seatNumberClean) && seatNumberClean.Contains("-"))
+                                {
+                                    // Strip coach prefix if already in seatNumber to display nicely
+                                    var parts = seatNumberClean.Split('-');
+                                    if (parts.Length > 1) { seatNumberClean = parts[1]; }
+                                }
+
+                                string coach = !string.IsNullOrEmpty(p.SeatPrefix) ? p.SeatPrefix : "S3";
+                                string bookingStatusDisplay = p.BookingStatus;
+                                if (p.BookingStatus == "CNF" && !string.IsNullOrEmpty(seatNumberClean))
+                                {
+                                    bookingStatusDisplay = $"CNF/{coach}/{seatNumberClean}/{p.Berth}";
+                                }
+                                
+                                string currentStatusDisplay = p.CurrentStatus;
+                                if (string.IsNullOrEmpty(currentStatusDisplay))
+                                {
+                                    currentStatusDisplay = p.BookingStatus == "CNF" ? "CNF" : p.BookingStatus;
+                                }
+
+                                <tr>
+                                    <td>@p.Age</td>
+                                    <td>@bookingStatusDisplay</td>
+                                    <td>@currentStatusDisplay</td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="3">No Passenger Records Found</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Refund Rules Notes Section -->
+            <div class="pnr-note-box">
+                <h5>Note:</h5>
+                <ol>
+                    <li>No refund shall be granted on the confirmed ticket after four hours before the scheduled departure of the train.</li>
+                    <li>No refund shall be granted on the RAC or Waitlisted ticket after thirty minutes before the scheduled departure of the train.</li>
+                    <li>In case, on a party e-ticket or a family e-ticket issued for travel of more than one passenger, some passengers have confirmed reservation and others are on RAC or waiting list, full refund of fare , less clerkage, shall be admissible for confirmed passengers also subject to the condition that the ticket shall be cancelled online or online TDR shall be filed for all the passengers upto thirty minutes before the scheduled departure of the train.</li>
+                    <li>Before Cancellation, please refer New Refund Rule 2015 w.e.f 12-Nov-2015.</li>
+                </ol>
+            </div>
+
+            <!-- Acronyms List Box -->
+            <div class="acronyms-section">
+                <h4 class="detail-section-title">Acronyms</h4>
+                <div class="acronyms-list">
+                    <div class="acronym-item"><strong>CAN :</strong> CANCELLED</div>
+                    <div class="acronym-item"><strong>CNF :</strong> CONFIRM</div>
+                    <div class="acronym-item"><strong>RAC :</strong> RESERVATION AGAINST CANCELLATION</div>
+                    <div class="acronym-item"><strong>WL :</strong> WAITLIST</div>
+                    <div class="acronym-item"><strong>RLWL :</strong> REMOTE LOCATION WAITLIST</div>
+                    <div class="acronym-item"><strong>PQWL :</strong> POOLED QUOTA WAITLIST</div>
+                    <div class="acronym-item"><strong>RSWL :</strong> ROAD-SIDE WAITLIST</div>
+                    <div class="acronym-item"><strong>REL :</strong> RELEASED</div>
+                    <div class="acronym-item"><strong>NR :</strong> NOROOM</div>
+                    <div class="acronym-item"><strong>NOSB :</strong> NO SEAT BERTH</div>
+                    <div class="acronym-item"><strong>WEBCAN :</strong> Railway Counter Ticket: Cancelled over internet, refund pending.</div>
+                    <div class="acronym-item"><strong>WEBCANRF :</strong> Railway Counter Ticket: Cancelled over internet, refund collected.</div>
+                    <div class="acronym-item"><strong>GNWL :</strong> General Waitlist</div>
+                    <div class="acronym-item"><strong>TQWL :</strong> Tatkal Waitlist</div>
+                    <div class="acronym-item"><strong>FBKG :</strong> Ticket Booked Outside ARP.</div>
+                    <div class="acronym-item"><strong>NT :</strong> Passenger Not Turned Up.</div>
+                    <div class="acronym-item"><strong>TDR :</strong> Passenger has filed TDR</div>
+                </div>
+            </div>
+        }
+
+        <!-- Upcoming Journeys Section (Database-driven, for Logged In users) -->
+        @if (ViewBag.UpcomingJourneys != null && ((List<IRCTCClone.Models.Booking>)ViewBag.UpcomingJourneys).Count > 0)
+        {
+            <div class="pnr-cards-section">
+                <h4 class="section-header"><i class="fa fa-train"></i> Upcoming Journeys</h4>
+                <div class="pnr-cards-grid">
+                    @foreach (var b in (List<IRCTCClone.Models.Booking>)ViewBag.UpcomingJourneys)
+                    {
+                        <div class="pnr-info-card db-upcoming-card" data-pnr="@b.PNR">
+                            <div class="pnr-card-header">
+                                <span class="pnr-card-title">PNR: @b.PNR</span>
+                                <span class="pnr-card-meta">@(string.IsNullOrEmpty(b.ClassCode) ? "SL" : b.ClassCode) | @b.JourneyDate.ToString("ddd, dd MMM")</span>
+                            </div>
+                            <div class="pnr-card-train">@b.TrainNumber - @b.TrainName</div>
+                            <div class="pnr-card-route">
+                                <span>@b.FromStation</span>
+                                <span class="arrow">&rarr;</span>
+                                <span>@b.ToStation</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <!-- Recent Searches Section (Client-side localStorage) -->
+        <div class="pnr-cards-section" id="recentSearchesSection" style="display: none;">
+            <h4 class="section-header"><i class="fa fa-history"></i> Recent Searches</h4>
+            <div class="pnr-cards-grid" id="recentSearchesGrid">
+                <!-- Javascript will inject cards here -->
+            </div>
+        </div>
+
+        <!-- Ad Banner/Instruction Banner at the bottom -->
+        <div class="ad-banner-container">
+            <img src="/images/banner_ads.png" alt="IRCTC iPay Banner" class="ad-banner-img" onerror="this.style.display='none';" />
+        </div>
+
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            // Load and render client-side recent PNRs
+            renderRecentSearches();
+
+            // Click handler for upcoming and recent cards to trigger PNR search
+            $(document).on('click', '.pnr-info-card', function (e) {
+                // If they clicked the delete trash button, stop propagation
+                if ($(e.target).closest('.btn-delete-recent').length > 0) {
+                    return;
+                }
+                const pnr = $(this).attr('data-pnr');
+                if (pnr) {
+                    $('#pnrInput').val(pnr);
+                    $('#pnrSearchForm').submit();
+                }
+            });
+
+            // Delete click handler for recent searches
+            $(document).on('click', '.btn-delete-recent', function (e) {
+                e.stopPropagation();
+                const pnr = $(this).attr('data-pnr');
+                deleteFromRecent(pnr);
+            });
+        });
+
+        // Key name for local storage
+        const STORAGE_KEY = "recent_pnrs";
+
+        // Save successfully loaded PNR to localStorage
+        function saveToRecent(cardData) {
+            let list = getRecentList();
+            // Filter out if already exists
+            list = list.filter(item => item.pnr !== cardData.pnr);
+            // Insert at the beginning
+            list.unshift(cardData);
+            // Cap at 4 recent searches
+            if (list.length > 4) {
+                list = list.slice(0, 4);
+            }
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+        }
+
+        // Get list from localStorage
+        function getRecentList() {
+            let val = localStorage.getItem(STORAGE_KEY);
+            if (!val) {
+                // Pre-populate with default mock searches from screenshots so the page isn't blank initially
+                const defaults = [
+                    {
+                        pnr: "4758973261",
+                        classCode: "SL",
+                        journeyDate: "Fri, 31 Jul",
+                        trainNumber: "12797",
+                        trainName: "VENKATADRI SF",
+                        from: "KACHEGUDA",
+                        to: "RENIGUNTA JN"
+                    },
+                    {
+                        pnr: "4551299941",
+                        classCode: "SL",
+                        journeyDate: "Sun, 02 Aug",
+                        trainNumber: "12798",
+                        trainName: "VENKATADRI SF",
+                        from: "RENIGUNTA JN",
+                        to: "KACHEGUDA"
+                    }
+                ];
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(defaults));
+                return defaults;
+            }
+            try {
+                return JSON.parse(val);
+            } catch (e) {
+                return [];
+            }
+        }
+
+        // Delete item from local storage
+        function deleteFromRecent(pnr) {
+            let list = getRecentList();
+            list = list.filter(item => item.pnr !== pnr);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+            renderRecentSearches();
+        }
+
+        // Render recent searches cards
+        function renderRecentSearches() {
+            const list = getRecentList();
+            const grid = $('#recentSearchesGrid');
+            const section = $('#recentSearchesSection');
+
+            grid.empty();
+
+            if (list.length === 0) {
+                section.hide();
+                return;
+            }
+
+            section.show();
+
+            list.forEach(function (item) {
+                const cardHtml = `
+                    <div class="pnr-info-card" data-pnr="${item.pnr}">
+                        <button class="btn-delete-recent" data-pnr="${item.pnr}" title="Remove from history">
+                            <i class="fa fa-trash-alt"></i>
+                        </button>
+                        <div class="pnr-card-header">
+                            <span class="pnr-card-title">PNR: ${item.pnr}</span>
+                            <span class="pnr-card-meta">${item.classCode} | ${item.journeyDate}</span>
+                        </div>
+                        <div class="pnr-card-train">${item.trainNumber} - ${item.trainName}</div>
+                        <div class="pnr-card-route">
+                            <span>${item.from}</span>
+                            <span class="arrow">&rarr;</span>
+                            <span>${item.to}</span>
+                        </div>
+                    </div>
+                `;
+                grid.append(cardHtml);
+            });
+        }
+    </script>
+
+    @if (Model != null)
+    {
+        <script>
+            // Automatically save successful search details to local storage
+            $(document).ready(function() {
+                saveToRecent({
+                    pnr: "@Model.PNR",
+                    classCode: "@(string.IsNullOrEmpty(Model.ClassCode) ? "SL" : Model.ClassCode)",
+                    journeyDate: "@Model.JourneyDate.ToString("ddd, dd MMM")",
+                    trainNumber: "@Model.TrainNumber",
+                    trainName: "@Model.TrainName",
+                    from: "@Model.Frmst",
+                    to: "@Model.Tost"
+                });
+                renderRecentSearches(); // Re-render to show updated list
+            });
+        </script>
+    }
+}

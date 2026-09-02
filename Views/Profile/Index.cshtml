@@ -1,0 +1,964 @@
+@model IRCTCClone.Models.ProfileViewModel
+
+@{
+    ViewData["Title"] = "My Profile - IRCTC";
+    var profile = Model.Profile;
+    var initials = "TV";
+    if (!string.IsNullOrWhiteSpace(profile.FullName))
+    {
+        var parts = profile.FullName.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2)
+            initials = $"{parts[0][0]}{parts[parts.Length - 1][0]}".ToUpper();
+        else if (parts.Length == 1 && parts[0].Length >= 2)
+            initials = parts[0].Substring(0, 2).ToUpper();
+        else if (parts.Length == 1)
+            initials = parts[0].ToUpper();
+    }
+}
+
+<div class="profile-page-wrapper">
+    <div class="profile-layout-container">
+        
+        <!-- ================= LEFT SIDEBAR ================= -->
+        <aside class="profile-sidebar">
+            <nav class="profile-nav-menu">
+                <button class="profile-nav-item @(Model.ActiveTab == "profile" ? "active" : "")" onclick="switchProfileTab('profile', this)">
+                    <i class="fa-solid fa-user"></i>
+                    <span>My profile</span>
+                </button>
+                
+                <button class="profile-nav-item @(Model.ActiveTab == "master-list" ? "active" : "")" onclick="switchProfileTab('master-list', this)">
+                    <i class="fa-solid fa-pen-to-square"></i>
+                    <span>Modify master list</span>
+                </button>
+                
+                <button class="profile-nav-item @(Model.ActiveTab == "favorite-journey" ? "active" : "")" onclick="switchProfileTab('favorite-journey', this)">
+                    <i class="fa-solid fa-briefcase"></i>
+                    <span>Modify favorite journey</span>
+                </button>
+            </nav>
+
+            <!-- Need Help Box -->
+            <div class="profile-help-box">
+                <div class="help-icon"><i class="fa-solid fa-headset"></i></div>
+                <div class="help-content">
+                    <h4>Need help?</h4>
+                    <p>We are here to help with your account</p>
+                    <a href="/Home/Contact" class="btn-contact-support">Contact support</a>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ================= MAIN CONTENT AREA ================= -->
+        <main class="profile-main-content">
+            
+            <!-- ---------------- TAB 1: MY PROFILE ---------------- -->
+            <section id="tab-profile" class="profile-tab-section @(Model.ActiveTab == "profile" ? "active" : "")">
+                <div class="profile-tab-header">
+                    <h2 class="section-title">My profile</h2>
+                    <button class="btn-edit-profile-action" onclick="openEditProfileModal()">
+                        <i class="fa-solid fa-pen"></i> Edit profile
+                    </button>
+                </div>
+
+                <!-- Hero Profile Card -->
+                <div class="profile-hero-card">
+                    <div class="user-avatar-circle">@initials</div>
+                    <div class="user-hero-details">
+                        <div class="user-name-row">
+                            <h3 class="user-full-name" id="displayFullName">@profile.FullName</h3>
+                            @if (profile.IsAadhaarVerified)
+                            {
+                                <span class="verified-badge"><i class="fa-solid fa-circle-check"></i> Aadhaar verified</span>
+                            }
+                        </div>
+                        <p class="user-irctc-handle">IRCTC Username : <strong id="displayUsername">@profile.Username</strong></p>
+                    </div>
+                </div>
+
+                <!-- User Details Grid -->
+                <div class="profile-details-grid">
+                    <div class="detail-cell-card">
+                        <div class="cell-icon"><i class="fa-regular fa-user"></i></div>
+                        <div class="cell-data">
+                            <span class="cell-label">Full name as per Govt. ID</span>
+                            <span class="cell-value" id="gridFullName">@profile.FullName</span>
+                        </div>
+                    </div>
+
+                    <div class="detail-cell-card">
+                        <div class="cell-icon"><i class="fa-regular fa-calendar"></i></div>
+                        <div class="cell-data">
+                            <span class="cell-label">Date Of Birth</span>
+                            <span class="cell-value" id="gridDOB">@(profile.DateOfBirth.HasValue ? profile.DateOfBirth.Value.ToString("dd-MM-yyyy") : "--")</span>
+                        </div>
+                    </div>
+
+                    <div class="detail-cell-card">
+                        <div class="cell-icon"><i class="fa-solid fa-venus-mars"></i></div>
+                        <div class="cell-data">
+                            <span class="cell-label">Gender</span>
+                            <span class="cell-value" id="gridGender">@(string.IsNullOrEmpty(profile.Gender) ? "--" : profile.Gender)</span>
+                        </div>
+                    </div>
+
+                    <div class="detail-cell-card">
+                        <div class="cell-icon"><i class="fa-solid fa-mobile-screen-button"></i></div>
+                        <div class="cell-data">
+                            <span class="cell-label">ISD-Mobile</span>
+                            <span class="cell-value" id="gridMobile">@(string.IsNullOrEmpty(profile.MobileNumber) ? "--" : profile.MobileNumber)</span>
+                        </div>
+                    </div>
+
+                    <div class="detail-cell-card">
+                        <div class="cell-icon"><i class="fa-regular fa-envelope"></i></div>
+                        <div class="cell-data">
+                            <span class="cell-label">Email</span>
+                            <span class="cell-value" id="gridEmail">@(string.IsNullOrEmpty(profile.Email) ? "--" : profile.Email)</span>
+                        </div>
+                    </div>
+
+                    <div class="detail-cell-card">
+                        <div class="cell-icon"><i class="fa-solid fa-globe"></i></div>
+                        <div class="cell-data">
+                            <span class="cell-label">Country</span>
+                            <span class="cell-value" id="gridCountry">@(string.IsNullOrEmpty(profile.Country) ? "India" : profile.Country)</span>
+                        </div>
+                    </div>
+
+                    <!-- Address spans full row -->
+                    <div class="detail-cell-card address-full-span">
+                        <div class="cell-icon"><i class="fa-solid fa-location-dot"></i></div>
+                        <div class="cell-data">
+                            <span class="cell-label">Address</span>
+                            <span class="cell-value" id="gridAddress">@(string.IsNullOrEmpty(profile.Address) ? "--" : profile.Address)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom Widgets Row -->
+                <div class="profile-widgets-row">
+                    
+                    <!-- Password & Security Card -->
+                    <div class="widget-card security-card">
+                        <div class="widget-content">
+                            <h4>Password & security</h4>
+                            <p class="widget-subtitle">Last updated @(profile.LastPasswordUpdate.HasValue ? profile.LastPasswordUpdate.Value.ToString("dd MMMM yyyy") : "--")</p>
+                            <a href="/Account/ChangePassword" class="btn-widget-action">Edit password</a>
+                        </div>
+                        <div class="widget-illus">
+                            <div class="security-shield-icon"><i class="fa-solid fa-shield-halved"></i></div>
+                        </div>
+                    </div>
+
+                    <!-- IRCTC e-Wallet Card -->
+                    <div class="widget-card wallet-card">
+                        <div class="widget-content">
+                            <h4>IRCTC e-Wallet</h4>
+                            <div class="wallet-balance-badge">
+                                Balance: <strong id="walletBalanceDisplay">₹@profile.WalletBalance.ToString("F2")</strong>
+                            </div>
+                            <button type="button" class="btn-widget-action" onclick="openAddWalletModal()">Add money</button>
+                        </div>
+                        <div class="widget-illus">
+                            <div class="wallet-art-icon"><i class="fa-solid fa-wallet"></i></div>
+                        </div>
+                    </div>
+
+                    <!-- Co-branded Cards -->
+                    <div class="widget-card cards-promo-card">
+                        <div class="widget-header-flex">
+                            <h4>My IRCTC co-branded cards</h4>
+                            <button type="button" class="btn-compare-apply" onclick="alert('IRCTC Co-Branded Cards: Enjoy 10% value back reward points on train bookings!')">Compare and apply</button>
+                        </div>
+                        <div class="cobranded-cards-preview">
+                            <div class="card-mini sbi-card">
+                                <span class="card-tag">IRCTC SBI Card</span>
+                                <span class="card-rew">Reward balance: <strong>₹0</strong></span>
+                            </div>
+                            <div class="card-mini bob-card">
+                                <span class="card-tag">IRCTC BOB Card</span>
+                                <span class="card-rew">Reward balance: <strong>₹0</strong></span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- ---------------- TAB 2: MODIFY MASTER LIST ---------------- -->
+            <section id="tab-master-list" class="profile-tab-section @(Model.ActiveTab == "master-list" ? "active" : "")">
+                <div class="profile-tab-header">
+                    <h2 class="section-title">Modify master list</h2>
+                </div>
+
+                <!-- Add Passenger Form Card -->
+                <div class="form-container-card">
+                    <form id="addPassengerForm" onsubmit="submitMasterPassenger(event)">
+                        <div class="form-grid-3">
+                            <div class="form-group-item">
+                                <label>Concession*</label>
+                                <select id="passConcession" class="form-select-ctrl">
+                                    <option value="Normal User">Normal User</option>
+                                    <option value="Senior Citizen">Senior Citizen</option>
+                                    <option value="Divyangjan">Divyangjan</option>
+                                    <option value="Student">Student</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group-item">
+                                <label>Full name as per Govt. ID*</label>
+                                <input type="text" id="passFullName" class="form-input-ctrl" placeholder="Enter full name" required />
+                            </div>
+
+                            <div class="form-group-item">
+                                <label>Date Of Birth*</label>
+                                <input type="date" id="passDOB" class="form-input-ctrl" required />
+                            </div>
+
+                            <div class="form-group-item">
+                                <label>Nationality</label>
+                                <input type="text" id="passNationality" class="form-input-ctrl" value="Indian" />
+                            </div>
+
+                            <div class="form-group-item">
+                                <label>Gender*</label>
+                                <select id="passGender" class="form-select-ctrl" required>
+                                    <option value="">Select Gender</option>
+                                    <option value="Male">Male</option>
+                                    <option value="Female">Female</option>
+                                    <option value="Transgender">Transgender</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group-item">
+                                <label>Berth Preference*</label>
+                                <select id="passBerth" class="form-select-ctrl">
+                                    <option value="No Preference">Select Berth Preference</option>
+                                    <option value="Lower">Lower</option>
+                                    <option value="Middle">Middle</option>
+                                    <option value="Upper">Upper</option>
+                                    <option value="Side Lower">Side Lower</option>
+                                    <option value="Side Upper">Side Upper</option>
+                                    <option value="Window Side">Window Side</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group-item">
+                                <label>Catering Service Option*</label>
+                                <select id="passFood" class="form-select-ctrl">
+                                    <option value="Veg">Veg</option>
+                                    <option value="Non-Veg">Non-Veg</option>
+                                    <option value="No Food">No Food/Beverages</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group-item">
+                                <label>ID Card Type</label>
+                                <select id="passIdType" class="form-select-ctrl">
+                                    <option value="AADHAAR">AADHAAR ID/VIRTUAL ID</option>
+                                    <option value="VOTER_ID">VOTER ID CARD</option>
+                                    <option value="PASSPORT">PASSPORT</option>
+                                    <option value="DRIVING_LICENCE">DRIVING LICENCE</option>
+                                    <option value="PAN_CARD">PAN CARD</option>
+                                    <option value="STUDENT_ID">STUDENT ID CARD</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group-item">
+                                <label>ID Card Number</label>
+                                <input type="text" id="passIdNumber" class="form-input-ctrl" placeholder="Enter ID number" />
+                            </div>
+                        </div>
+
+                        <div class="form-buttons-row">
+                            <button type="submit" class="btn-primary-action"><i class="fa-solid fa-plus"></i> Add</button>
+                            <button type="reset" class="btn-outline-action">Reset</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Passengers Added List Header -->
+                <div class="list-section-header">
+                    <div class="list-title-left">
+                        <h3>Passengers added <i class="fa-solid fa-circle-info info-tip" title="Passengers saved for one-click quick booking"></i></h3>
+                    </div>
+                    <button class="btn-aadhaar-status-check" onclick="alert('All Aadhaar verified passenger profiles are active and eligible for priority booking.')">
+                        <i class="fa-solid fa-shield-halved"></i> Aadhaar verification status
+                    </button>
+                </div>
+
+                <!-- Advisory Notice Box -->
+                <div class="advisory-alert-box">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                    <span>User can book upto 24 tickets in a month, if IRCTC User ID has been verified with Aadhaar and at least one of the passengers is Aadhaar verified in ticket.</span>
+                </div>
+
+                <!-- Passenger List Cards -->
+                <div class="master-passengers-container" id="masterPassengerListContainer">
+                    @if (Model.MasterPassengers.Any())
+                    {
+                        foreach (var p in Model.MasterPassengers)
+                        {
+                            <div class="passenger-master-card" id="pass-card-@p.Id">
+                                <div class="pass-card-left">
+                                    <div class="pass-name-line">
+                                        <strong>@p.FullName</strong>
+                                        @if (p.VerificationStatus == "Verified")
+                                        {
+                                            <i class="fa-solid fa-circle-check text-green"></i>
+                                        }
+                                    </div>
+                                    <div class="pass-specs-line">
+                                        <span>Age @(p.Age.HasValue ? p.Age.Value.ToString() : "--")</span>
+                                        <span class="dot-sep">•</span>
+                                        <span>@(p.DateOfBirth.HasValue ? p.DateOfBirth.Value.ToString("dd/MM/yyyy") : "--")</span>
+                                        <span class="dot-sep">•</span>
+                                        <span>@(string.IsNullOrEmpty(p.Nationality) ? "Indian" : p.Nationality)</span>
+                                        <span class="dot-sep">•</span>
+                                        <span>@p.Gender</span>
+                                        <span class="dot-sep">•</span>
+                                        <span>@(string.IsNullOrEmpty(p.BerthPreference) ? "No Preference" : p.BerthPreference)</span>
+                                        <span class="dot-sep">•</span>
+                                        <span>@(string.IsNullOrEmpty(p.FoodChoice) ? "--" : p.FoodChoice)</span>
+                                    </div>
+                                    <div class="pass-id-line">
+                                        ID Card Type: <strong>@(string.IsNullOrEmpty(p.IdCardType) ? "--" : p.IdCardType)</strong>
+                                    </div>
+                                </div>
+
+                                <div class="pass-card-right">
+                                    @if (p.VerificationStatus == "Verified")
+                                    {
+                                        <span class="status-pill status-verified">Verified</span>
+                                    }
+                                    else if (p.VerificationStatus == "Re-Verify")
+                                    {
+                                        <span class="status-pill status-reverify">Re-Verify</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="status-pill status-notverified">Not Verified</span>
+                                    }
+
+                                    <button type="button" class="btn-icon-action btn-edit-passenger" onclick="openEditPassengerModal(@p.Id)" title="Edit Passenger">
+                                        <i class="fa-solid fa-pen"></i>
+                                    </button>
+
+                                    <button type="button" class="btn-icon-action btn-delete-passenger" onclick="deleteMasterPassenger(@p.Id)" title="Delete Passenger">
+                                        <i class="fa-regular fa-trash-can"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="empty-state-notice">
+                            <i class="fa-regular fa-address-book"></i>
+                            <p>No master passengers added yet. Add family or co-travelers above for instant 1-click booking!</p>
+                        </div>
+                    }
+                </div>
+            </section>
+
+            <!-- ---------------- TAB 3: MODIFY FAVORITE JOURNEY ---------------- -->
+            <section id="tab-favorite-journey" class="profile-tab-section @(Model.ActiveTab == "favorite-journey" ? "active" : "")">
+                <div class="profile-tab-header">
+                    <h2 class="section-title">Modify favorite journey</h2>
+                </div>
+
+                <!-- Add Favorite Journey Form Card -->
+                <div class="form-container-card">
+                    <form id="addFavoriteJourneyForm" onsubmit="submitFavoriteJourney(event)">
+                        <div class="form-grid-3">
+                            <div class="form-group-item">
+                                <label>Train Number / Name*</label>
+                                <input type="text" id="favTrainNumber" class="form-input-ctrl" placeholder="e.g. 12797 / VENKATADRI SF" required />
+                            </div>
+
+                            <div class="form-group-item">
+                                <label>Class*</label>
+                                <select id="favClass" class="form-select-ctrl">
+                                    <option value="3A" data-name="AC 3 Tier (3A)">AC 3 Tier (3A)</option>
+                                    <option value="2A" data-name="AC 2 Tier (2A)">AC 2 Tier (2A)</option>
+                                    <option value="1A" data-name="AC First Class (1A)">AC First Class (1A)</option>
+                                    <option value="SL" data-name="Sleeper (SL)">Sleeper (SL)</option>
+                                    <option value="CC" data-name="AC Chair Car (CC)">AC Chair Car (CC)</option>
+                                    <option value="2S" data-name="Second Sitting (2S)">Second Sitting (2S)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group-item">
+                                <label>From Station*</label>
+                                <input type="text" id="favFromStation" class="form-input-ctrl" placeholder="e.g. Kacheguda (KCG)" required />
+                            </div>
+
+                            <div class="form-group-item">
+                                <label>To Station*</label>
+                                <input type="text" id="favToStation" class="form-input-ctrl" placeholder="e.g. Renigunta (RU)" required />
+                            </div>
+
+                            <div class="form-group-item">
+                                <label>Quota*</label>
+                                <select id="favQuota" class="form-select-ctrl">
+                                    <option value="GENERAL">GENERAL</option>
+                                    <option value="TATKAL">TATKAL</option>
+                                    <option value="LADIES">LADIES</option>
+                                    <option value="LOWER BERTH/SR.CITIZEN">LOWER BERTH/SR.CITIZEN</option>
+                                    <option value="PREMIUM TATKAL">PREMIUM TATKAL</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-buttons-row">
+                            <button type="submit" class="btn-primary-action"><i class="fa-solid fa-plus"></i> Add</button>
+                            <button type="reset" class="btn-outline-action">Reset</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Favorite Journey Grid Header -->
+                <div class="list-section-header">
+                    <div class="list-title-left">
+                        <h3>Favorite Journey list</h3>
+                    </div>
+                </div>
+
+                <!-- Grid of Favorite Journeys -->
+                <div class="favorite-journeys-grid" id="favoriteJourneysContainer">
+                    @if (Model.FavoriteJourneys.Any())
+                    {
+                        foreach (var j in Model.FavoriteJourneys)
+                        {
+                            <div class="fav-journey-card" id="fav-card-@j.Id">
+                                <div class="fav-card-header">
+                                    <div class="fav-train-title">
+                                        <i class="fa-solid fa-train text-blue"></i>
+                                        <strong>@j.TrainNumber | @(j.ClassName ?? j.ClassCode)</strong>
+                                    </div>
+                                    <div class="fav-actions">
+                                        <a href="/Train/SearchTrains?from=@j.FromStation&to=@j.ToStation" class="btn-icon-action" title="Quick Search / Book">
+                                            <i class="fa-solid fa-magnifying-glass"></i>
+                                        </a>
+                                        <button class="btn-icon-action btn-delete-fav" onclick="deleteFavoriteJourney(@j.Id)" title="Delete Route">
+                                            <i class="fa-regular fa-trash-can"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="fav-card-route">
+                                    <span class="route-stn">@j.FromStation</span>
+                                    <i class="fa-solid fa-arrow-right-long route-arrow"></i>
+                                    <span class="route-stn">@j.ToStation</span>
+                                    <span class="quota-tag">| @j.Quota</span>
+                                </div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="empty-state-notice" style="grid-column: 1 / -1;">
+                            <i class="fa-solid fa-route"></i>
+                            <p>No favorite journeys added yet. Save your frequent routes above for fast booking with one click!</p>
+                        </div>
+                    }
+                </div>
+            </section>
+
+        </main>
+    </div>
+</div>
+
+<!-- ================= EDIT PROFILE MODAL (OPAQUE, CRISP WHITE) ================= -->
+<div id="editProfileModal" class="irctc-profile-modal-overlay">
+    <div class="irctc-profile-modal-card">
+        <div class="irctc-profile-modal-header">
+            <h3><i class="fa-solid fa-user-pen"></i> Edit Profile Details</h3>
+            <button type="button" class="irctc-profile-modal-close" onclick="closeEditProfileModal()">&times;</button>
+        </div>
+
+        <form id="editProfileForm" onsubmit="saveProfileDetails(event)">
+            <div class="irctc-profile-modal-body">
+                <div class="form-grid-2">
+                    <div class="form-group-item">
+                        <label>Full Name as per Govt. ID*</label>
+                        <input type="text" id="editFullName" class="form-input-ctrl" value="@profile.FullName" required />
+                    </div>
+
+                    <div class="form-group-item">
+                        <label>ISD-Mobile Number*</label>
+                        <input type="text" id="editMobile" class="form-input-ctrl" value="@profile.MobileNumber" required />
+                    </div>
+
+                    <div class="form-group-item">
+                        <label>Date of Birth</label>
+                        <input type="date" id="editDOB" class="form-input-ctrl" value="@(profile.DateOfBirth.HasValue ? profile.DateOfBirth.Value.ToString("yyyy-MM-dd") : "")" />
+                    </div>
+
+                    <div class="form-group-item">
+                        <label>Gender</label>
+                        <select id="editGender" class="form-select-ctrl">
+                            <option value="Male" selected="@(profile.Gender == "Male")">Male</option>
+                            <option value="Female" selected="@(profile.Gender == "Female")">Female</option>
+                            <option value="Transgender" selected="@(profile.Gender == "Transgender")">Transgender</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group-item" style="grid-column: 1 / -1;">
+                        <label>Residential Address</label>
+                        <textarea id="editAddress" class="form-input-ctrl" rows="3" placeholder="Enter complete residential address">@profile.Address</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="irctc-profile-modal-footer">
+                <button type="button" class="btn-outline-action" onclick="closeEditProfileModal()">Cancel</button>
+                <button type="submit" class="btn-primary-action"><i class="fa-solid fa-check"></i> Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ================= EDIT MASTER PASSENGER MODAL ================= -->
+<div id="editPassengerModal" class="irctc-profile-modal-overlay">
+    <div class="irctc-profile-modal-card">
+        <div class="irctc-profile-modal-header">
+            <h3><i class="fa-solid fa-user-pen"></i> Edit Master Passenger</h3>
+            <button type="button" class="irctc-profile-modal-close" onclick="closeEditPassengerModal()">&times;</button>
+        </div>
+
+        <form id="editPassengerForm" onsubmit="saveEditPassengerDetails(event)">
+            <input type="hidden" id="editPassId" />
+            <div class="irctc-profile-modal-body">
+                <div class="form-grid-3">
+                    <div class="form-group-item">
+                        <label>Concession*</label>
+                        <select id="editPassConcession" class="form-select-ctrl">
+                            <option value="Normal User">Normal User</option>
+                            <option value="Senior Citizen">Senior Citizen</option>
+                            <option value="Divyangjan">Divyangjan</option>
+                            <option value="Student">Student</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group-item">
+                        <label>Full name as per Govt. ID*</label>
+                        <input type="text" id="editPassFullName" class="form-input-ctrl" placeholder="Enter full name" required />
+                    </div>
+
+                    <div class="form-group-item">
+                        <label>Date Of Birth*</label>
+                        <input type="date" id="editPassDOB" class="form-input-ctrl" required />
+                    </div>
+
+                    <div class="form-group-item">
+                        <label>Nationality</label>
+                        <input type="text" id="editPassNationality" class="form-input-ctrl" value="Indian" />
+                    </div>
+
+                    <div class="form-group-item">
+                        <label>Gender*</label>
+                        <select id="editPassGender" class="form-select-ctrl" required>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Transgender">Transgender</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group-item">
+                        <label>Berth Preference*</label>
+                        <select id="editPassBerth" class="form-select-ctrl">
+                            <option value="No Preference">Select Berth Preference</option>
+                            <option value="Lower">Lower</option>
+                            <option value="Middle">Middle</option>
+                            <option value="Upper">Upper</option>
+                            <option value="Side Lower">Side Lower</option>
+                            <option value="Side Upper">Side Upper</option>
+                            <option value="Window Side">Window Side</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group-item">
+                        <label>Catering Service Option*</label>
+                        <select id="editPassFood" class="form-select-ctrl">
+                            <option value="Veg">Veg</option>
+                            <option value="Non-Veg">Non-Veg</option>
+                            <option value="No Food">No Food/Beverages</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group-item">
+                        <label>ID Card Type</label>
+                        <select id="editPassIdType" class="form-select-ctrl">
+                            <option value="AADHAAR">AADHAAR ID/VIRTUAL ID</option>
+                            <option value="VOTER_ID">VOTER ID CARD</option>
+                            <option value="PASSPORT">PASSPORT</option>
+                            <option value="DRIVING_LICENCE">DRIVING LICENCE</option>
+                            <option value="PAN_CARD">PAN CARD</option>
+                            <option value="STUDENT_ID">STUDENT ID CARD</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group-item">
+                        <label>ID Card Number</label>
+                        <input type="text" id="editPassIdNumber" class="form-input-ctrl" placeholder="Enter ID number" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="irctc-profile-modal-footer">
+                <button type="button" class="btn-outline-action" onclick="closeEditPassengerModal()">Cancel</button>
+                <button type="submit" class="btn-primary-action"><i class="fa-solid fa-check"></i> Update Passenger</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ================= ADD WALLET MONEY MODAL ================= -->
+<div id="addWalletModal" class="irctc-profile-modal-overlay">
+    <div class="irctc-profile-modal-card" style="width: 460px;">
+        <div class="irctc-profile-modal-header">
+            <h3><i class="fa-solid fa-wallet"></i> Add Money to IRCTC e-Wallet</h3>
+            <button type="button" class="irctc-profile-modal-close" onclick="closeAddWalletModal()">&times;</button>
+        </div>
+
+        <form id="addWalletForm" onsubmit="submitWalletTopup(event)">
+            <div class="irctc-profile-modal-body">
+                <div class="form-group-item">
+                    <label>Amount to Add (₹)*</label>
+                    <input type="number" id="walletAmountInput" class="form-input-ctrl" placeholder="e.g. 500" min="10" max="50000" step="10" required />
+                </div>
+                <div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button type="button" class="service-pill" onclick="document.getElementById('walletAmountInput').value = 500;">+₹500</button>
+                    <button type="button" class="service-pill" onclick="document.getElementById('walletAmountInput').value = 1000;">+₹1000</button>
+                    <button type="button" class="service-pill" onclick="document.getElementById('walletAmountInput').value = 2000;">+₹2000</button>
+                    <button type="button" class="service-pill" onclick="document.getElementById('walletAmountInput').value = 5000;">+₹5000</button>
+                </div>
+            </div>
+
+            <div class="irctc-profile-modal-footer">
+                <button type="button" class="btn-outline-action" onclick="closeAddWalletModal()">Cancel</button>
+                <button type="submit" class="btn-primary-action"><i class="fa-solid fa-plus"></i> Add Money</button>
+            </div>
+        </form>
+    </div>
+</div>
+@section Scripts {
+    <script>
+        // Tab switching
+        function switchProfileTab(tabId, el) {
+            document.querySelectorAll('.profile-tab-section').forEach(sec => sec.classList.remove('active'));
+            document.querySelectorAll('.profile-nav-item').forEach(item => item.classList.remove('active'));
+            
+            const targetSection = document.getElementById('tab-' + tabId);
+            if (targetSection) targetSection.classList.add('active');
+            if (el) el.classList.add('active');
+
+            // Update URL without reload
+            const url = new URL(window.location);
+            url.searchParams.set('tab', tabId);
+            window.history.pushState({}, '', url);
+        }
+
+        // Profile Modal
+        function openEditProfileModal() {
+            document.getElementById('editProfileModal').style.display = 'flex';
+        }
+        function closeEditProfileModal() {
+            document.getElementById('editProfileModal').style.display = 'none';
+        }
+
+        // Master Passenger Edit Modal
+        function openEditPassengerModal(id) {
+            fetch(`/Profile/GetMasterPassenger/${id}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success && data.passenger) {
+                        const p = data.passenger;
+                        document.getElementById('editPassId').value = p.id;
+                        document.getElementById('editPassConcession').value = p.concession || 'Normal User';
+                        document.getElementById('editPassFullName').value = p.fullName || '';
+                        document.getElementById('editPassDOB').value = p.dob || '';
+                        document.getElementById('editPassNationality').value = p.nationality || 'Indian';
+                        document.getElementById('editPassGender').value = p.gender || 'Male';
+                        document.getElementById('editPassBerth').value = p.berth || 'No Preference';
+                        document.getElementById('editPassFood').value = p.food || 'Veg';
+                        document.getElementById('editPassIdType').value = p.idType || 'AADHAAR';
+                        document.getElementById('editPassIdNumber').value = p.idNumber || '';
+
+                        document.getElementById('editPassengerModal').style.display = 'flex';
+                    } else {
+                        alert(data.message || 'Failed to load passenger details.');
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert('Error loading passenger.');
+                });
+        }
+
+        function closeEditPassengerModal() {
+            document.getElementById('editPassengerModal').style.display = 'none';
+        }
+
+        function saveEditPassengerDetails(e) {
+            e.preventDefault();
+            const id = parseInt(document.getElementById('editPassId').value);
+            const concession = document.getElementById('editPassConcession').value;
+            const fullName = document.getElementById('editPassFullName').value;
+            const dob = document.getElementById('editPassDOB').value;
+            const nationality = document.getElementById('editPassNationality').value;
+            const gender = document.getElementById('editPassGender').value;
+            const berth = document.getElementById('editPassBerth').value;
+            const food = document.getElementById('editPassFood').value;
+            const idType = document.getElementById('editPassIdType').value;
+            const idNumber = document.getElementById('editPassIdNumber').value;
+
+            fetch('/Profile/UpdateMasterPassenger', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    Id: id,
+                    Concession: concession,
+                    FullName: fullName,
+                    DateOfBirth: dob ? dob : null,
+                    Nationality: nationality,
+                    Gender: gender,
+                    BerthPreference: berth,
+                    FoodChoice: food,
+                    IdCardType: idType,
+                    IdCardNumber: idNumber
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    closeEditPassengerModal();
+                    if (typeof showSuccess === 'function') showSuccess(data.message);
+                    else alert(data.message);
+                    setTimeout(() => window.location.href = '/Profile?tab=master-list', 400);
+                } else {
+                    alert(data.message || 'Failed to update passenger.');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Failed to update passenger.');
+            });
+        }
+
+        // Wallet Modal
+        function openAddWalletModal() {
+            document.getElementById('addWalletModal').style.display = 'flex';
+        }
+        function closeAddWalletModal() {
+            document.getElementById('addWalletModal').style.display = 'none';
+        }
+
+        // Save Profile Details
+        function saveProfileDetails(e) {
+            e.preventDefault();
+            const fullName = document.getElementById('editFullName').value;
+            const mobile = document.getElementById('editMobile').value;
+            const dob = document.getElementById('editDOB').value;
+            const gender = document.getElementById('editGender').value;
+            const address = document.getElementById('editAddress').value;
+
+            fetch('/Profile/UpdateProfile', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    FullName: fullName,
+                    MobileNumber: mobile,
+                    DateOfBirth: dob ? dob : null,
+                    Gender: gender,
+                    Address: address
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('displayFullName').innerText = fullName;
+                    document.getElementById('gridFullName').innerText = fullName;
+                    document.getElementById('gridMobile').innerText = mobile;
+                    document.getElementById('gridGender').innerText = gender;
+                    document.getElementById('gridAddress').innerText = address;
+                    if (dob) {
+                        const d = new Date(dob);
+                        document.getElementById('gridDOB').innerText = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth()+1).padStart(2, '0')}-${d.getFullYear()}`;
+                    }
+                    closeEditProfileModal();
+                    if (typeof showSuccess === 'function') showSuccess(data.message);
+                    else alert(data.message);
+                } else {
+                    alert(data.message || 'Failed to update profile.');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('An error occurred.');
+            });
+        }
+
+        // Top up e-Wallet
+        function submitWalletTopup(e) {
+            e.preventDefault();
+            const amount = parseFloat(document.getElementById('walletAmountInput').value);
+            if (isNaN(amount) || amount <= 0) return;
+
+            fetch('/Profile/AddWalletMoney', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(amount)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('walletBalanceDisplay').innerText = `₹${data.newBalance.toFixed(2)}`;
+                    closeAddWalletModal();
+                    if (typeof showSuccess === 'function') showSuccess(data.message);
+                    else alert(data.message);
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Wallet top-up failed.');
+            });
+        }
+
+        // Submit Master Passenger
+        function submitMasterPassenger(e) {
+            e.preventDefault();
+            const concession = document.getElementById('passConcession').value;
+            const fullName = document.getElementById('passFullName').value;
+            const dob = document.getElementById('passDOB').value;
+            const nationality = document.getElementById('passNationality').value;
+            const gender = document.getElementById('passGender').value;
+            const berth = document.getElementById('passBerth').value;
+            const food = document.getElementById('passFood').value;
+            const idType = document.getElementById('passIdType').value;
+            const idNumber = document.getElementById('passIdNumber').value;
+
+            fetch('/Profile/AddMasterPassenger', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    Concession: concession,
+                    FullName: fullName,
+                    DateOfBirth: dob ? dob : null,
+                    Nationality: nationality,
+                    Gender: gender,
+                    BerthPreference: berth,
+                    FoodChoice: food,
+                    IdCardType: idType,
+                    IdCardNumber: idNumber
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    if (typeof showSuccess === 'function') showSuccess(data.message);
+                    else alert(data.message);
+                    setTimeout(() => window.location.href = '/Profile?tab=master-list', 500);
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Failed to save passenger.');
+            });
+        }
+
+        // Delete Master Passenger
+        function deleteMasterPassenger(id) {
+            if (!confirm('Are you sure you want to remove this passenger from your master list?')) return;
+
+            fetch('/Profile/DeleteMasterPassenger', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(id)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    const card = document.getElementById('pass-card-' + id);
+                    if (card) card.remove();
+                    if (typeof showSuccess === 'function') showSuccess(data.message);
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Deletion failed.');
+            });
+        }
+
+        // Submit Favorite Journey
+        function submitFavoriteJourney(e) {
+            e.preventDefault();
+            const trainNumber = document.getElementById('favTrainNumber').value;
+            const classSelect = document.getElementById('favClass');
+            const classCode = classSelect.value;
+            const className = classSelect.options[classSelect.selectedIndex].getAttribute('data-name') || classCode;
+            const fromStation = document.getElementById('favFromStation').value;
+            const toStation = document.getElementById('favToStation').value;
+            const quota = document.getElementById('favQuota').value;
+
+            fetch('/Profile/AddFavoriteJourney', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    TrainNumber: trainNumber,
+                    ClassCode: classCode,
+                    ClassName: className,
+                    FromStation: fromStation,
+                    ToStation: toStation,
+                    Quota: quota
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    if (typeof showSuccess === 'function') showSuccess(data.message);
+                    else alert(data.message);
+                    setTimeout(() => window.location.href = '/Profile?tab=favorite-journey', 500);
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Failed to save route.');
+            });
+        }
+
+        // Delete Favorite Journey
+        function deleteFavoriteJourney(id) {
+            if (!confirm('Are you sure you want to remove this favorite journey?')) return;
+
+            fetch('/Profile/DeleteFavoriteJourney', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(id)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    const card = document.getElementById('fav-card-' + id);
+                    if (card) card.remove();
+                    if (typeof showSuccess === 'function') showSuccess(data.message);
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Deletion failed.');
+            });
+        }
+    </script>
+}

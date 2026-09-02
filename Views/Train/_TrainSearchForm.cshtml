@@ -1,0 +1,61 @@
+﻿@* @{
+    var fromStation = ViewBag.FromStation ?? "";
+    var toStation = ViewBag.ToStation ?? "";
+    var fromStationId = ViewBag.FromStationId ?? "";
+    var toStationId = ViewBag.ToStationId ?? "";
+    var journeyDate = ViewBag.JourneyDate ?? DateTime.Today.ToString("yyyy-MM-dd");
+}
+
+<div class="search-summary compact-search">
+
+    <form method="post" action="/Train/TrainResults" class="search-inline">
+
+        <!-- FROM -->
+        <div class="station-input">
+            <input type="text"
+                   id="fromStation"
+                   name="fromStation"
+                   value="@ViewBag.FromStation"
+                   autocomplete="off"
+                   required />
+            <input type="hidden"
+                   id="fromStationId"
+                   name="fromStationId"
+                   value="@ViewBag.FromStationId" />
+            <div id="fromStationList" class="autocomplete-list"></div>
+        </div>
+
+        <!-- SWAP -->
+        <button type="button" id="swapStations" class="swap-btn">⇄</button>
+
+        <!-- TO -->
+        <div class="station-input">
+            <input type="text"
+                   id="toStation"
+                   name="toStation"
+                   value="@ViewBag.ToStation"
+                   autocomplete="off"
+                   required />
+            <input type="hidden"
+                   id="toStationId"
+                   name="toStationId"
+                   value="@ViewBag.ToStationId" />
+            <div id="toStationList" class="autocomplete-list"></div>
+        </div>
+
+        <!-- DATE -->
+        <input type="date"
+               name="journeyDateStr"
+               value="@ViewBag.JourneyDate"
+               class="date-input"
+               required />
+
+        <!-- SEARCH -->
+        <button type="submit" class="search-btn">
+            Search Trains
+        </button>
+
+    </form>
+
+</div>
+ *@

@@ -1,0 +1,122 @@
+@model IEnumerable<IRCTCClone.Models.TrainRoute>
+
+@if (Model != null && Model.Any())
+{
+    <!-- RUNS ON (Always visible at the top of the route view) -->
+    <div class="runs-on-container" style="margin-bottom: 12px; padding: 5px 0;">
+        <span class="runs-label">Runs on:</span>
+
+        @{
+            var days = ViewBag.RunsOn as string ?? "-------";
+            var labels = new[] { "M", "T", "W", "T", "F", "S", "S" };
+        }
+
+        <div class="runs-days">
+            @for (int i = 0; i < 7; i++)
+            {
+                <span class="day @(days[i] != '-' ? "active" : "inactive")">
+                    @labels[i]
+                </span>
+            }
+        </div>
+    </div>
+
+    <!-- DESKTOP TABLE -->
+    <div class="route-table-wrapper">
+        <table class="table table-sm table-bordered mt-2 route-table">
+            <thead class="table-light">
+                <tr>
+                    <th>Stop No</th>
+                    <th>Station Code</th>
+                    <th>Station Name</th>
+                    <th>Arrival</th>
+                    <th>Departure</th>
+                    <th>Distance</th>
+                    <th>Day</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @foreach (var route in Model)
+                {
+                <tr>
+                    <td data-label="Stop">@route.StopNumber</td>
+                    <td data-label="Code">@(route.Station?.Code ?? "-")</td>
+                    <td data-label="Station">@(route.Station?.Name ?? "-")</td>
+                    <td data-label="Arrival">
+                        @(route.ArrivalTime.HasValue
+                                            ? route.ArrivalTime.Value.ToString(@"hh\:mm")
+                                            : "--")
+                                                </td>
+                                                    <td data-label="Departure">
+                            @(route.DepartureTime.HasValue
+                                                ? route.DepartureTime.Value.ToString(@"hh\:mm")
+                                                : "--")
+                    </td>
+                    <td data-label="Distance">@route.Distance</td>
+                    <td data-label="Day">@route.Day</td>
+                </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+
+    <!-- MOBILE ROUTE VIEW -->
+    <div class="mobile-route-schedule">
+
+        @foreach (var route in Model)
+        {
+            <div class="mobile-route-row">
+
+                <div class="station-left">
+                    <div class="code">@route.Station?.Code</div>
+                    <div class="time">
+                        @{
+                            var isFirst = route.StopNumber == 1;
+                            var isLast = route.DepartureTime == null;
+                        }
+
+                        @(isFirst
+                                    ? "N.A."
+                                    : (route.ArrivalTime?.ToString(@"hh\:mm") ?? "N.A."))
+                                                                                         -
+                        @(isLast
+                                    ? "N.A."
+                                    : (route.DepartureTime?.ToString(@"hh\:mm") ?? "N.A."))
+                    </div>
+                </div>
+
+                <div class="station-name">
+                    @route.Station?.Name
+                </div>
+
+                <div class="station-day">
+                    <span>@route.Day</span>
+                </div>
+
+            </div>
+        }
+
+    </div>
+
+}
+else
+{
+    <div class="text-muted text-center mt-3">
+        No route details available for this train.
+    </div>
+}
+
+@section Scripts
+{
+    <script>
+                // 🔥 Keep admin session alive
+        setInterval(() => {
+            fetch('/Admin/KeepAlive', {
+                method: 'GET',
+                credentials: 'include'
+            });
+        }, 60000); // every 1 minute
+    </script>
+}

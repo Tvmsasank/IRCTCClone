@@ -1,0 +1,91 @@
+﻿@{
+    ViewData["Title"] = "Admin Login";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="admin-login-page">
+
+    <div class="admin-login-box">
+
+        <div class="admin-login-title">Admin Login</div>
+
+        <form method="post" id="adminLoginForm" novalidate>
+
+            <!-- USERNAME -->
+            <div class="admin-input-group">
+                <input type="text" name="username" required placeholder=" " />
+                <label>Username *</label>
+            </div>
+
+            <!-- PASSWORD -->
+            <div class="admin-input-group admin-password-group">
+                <input type="password" id="password" name="password" required placeholder=" " />
+                <label>Password *</label>
+                <span class="admin-password-toggle" onclick="togglePassword()">👁</span>
+            </div>
+
+            <!-- CAPTCHA -->
+            <div class="admin-input-group">
+                <div class="admin-captcha-row">
+                    <img id="captchaImg" src="/captcha" height="40" />
+                    <button type="button" onclick="refreshCaptcha()">↻</button>
+                </div>
+            </div>
+
+            <div class="admin-input-group">
+                <input type="text" name="captchaInput" required placeholder=" " />
+                <label>Enter Captcha</label>
+            </div>
+
+            <button type="submit" class="admin-login-btn" id="loginBtn">
+                <span id="btnText">Login</span>
+                <span id="btnLoader" class="btn-loader"></span>
+            </button>
+
+        </form>
+
+    </div>
+</div>
+
+
+
+@section Scripts{
+    <script>
+
+        // Password toggle
+        function togglePassword() {
+            const input = document.getElementById("password");
+            input.type = input.type === "password" ? "text" : "password";
+        }
+
+        // Animated captcha reload
+        function refreshCaptcha() {
+            const img = document.getElementById("captchaImg");
+            img.style.opacity = "0.3";
+
+            setTimeout(() => {
+                img.src = "/captcha?ts=" + new Date().getTime();
+                img.style.opacity = "1";
+            }, 200);
+        }
+
+        $(function () {
+
+            var error = '@(ViewBag.Error ?? "")';
+
+            if (error.trim() !== "") {
+                showToast(error);
+            }
+
+        });
+
+                // 🔥 Keep admin session alive
+        setInterval(() => {
+            fetch('/Admin/KeepAlive', {
+                method: 'GET',
+                credentials: 'include'
+            });
+        }, 60000); // every 1 minute
+
+    </script>
+}

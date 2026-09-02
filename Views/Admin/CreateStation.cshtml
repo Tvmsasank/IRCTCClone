@@ -1,0 +1,71 @@
+﻿@model IRCTCClone.Models.Station
+@{
+    ViewData["Title"] = "Add Station";
+}
+
+<link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+
+<div class="container mt-5">
+    <div class="card shadow-sm p-4">
+        <h3 class="text-primary mb-4">🚉 Add New Station</h3>
+
+        <!-- ✅ Alert Messages -->
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                @TempData["SuccessMessage"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                @TempData["ErrorMessage"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        <form method="post" asp-action="CreateStation">
+            <div class="mb-3 w-50">
+                <label class="form-label fw-semibold">Station Code</label>
+                <input asp-for="Code" class="form-control" placeholder="e.g. SC" required />
+            </div>
+
+            <div class="mb-3 w-50">
+                <label class="form-label fw-semibold">Station Name</label>
+                <input asp-for="Name" class="form-control" placeholder="e.g. SECUNDERABAD JN" required />
+            </div>
+
+            <div class="mb-3 w-50">
+                <label class="form-label fw-semibold">City Name (Optional)</label>
+                <input asp-for="City" class="form-control" placeholder="e.g. SECUNDERABAD" />
+            </div>
+            <div class="mb-3 w-50">
+                <label class="form-label fw-semibold">State Name</label>
+                <input asp-for="State" class="form-control" placeholder="e.g. TELANGANA" required/>
+            </div>
+
+            <div class="mt-3">
+                <button type="submit" class="btn btn-primary me-2">💾 Save Station</button>
+                <a asp-action="Dashboard" class="btn btn-outline-secondary">↩ Cancel</a>
+                <a asp-action="Dashboard" class="btn btn-home">↩ Back to DashBoard</a>
+            </div>
+
+            <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+        </form>
+    </div>
+</div>
+
+@section Scripts
+{
+    <script>
+                // 🔥 Keep admin session alive
+        setInterval(() => {
+            fetch('/Admin/KeepAlive', {
+                method: 'GET',
+                credentials: 'include'
+            });
+        }, 60000); // every 1 minute
+    </script>
+}

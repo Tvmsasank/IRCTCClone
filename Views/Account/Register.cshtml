@@ -1,0 +1,275 @@
+@{
+    ViewData["Title"] = "Register";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+} 
+
+<section class="login-page">
+
+    <!-- SAME BACKGROUND -->
+    <div class="login-bg-overlay"></div>
+    <div class="login-bg-glow g1"></div>
+    <div class="login-bg-glow g2"></div>
+    <div class="login-bg-glow g3"></div>
+
+    <div class="login-card register-card-compact">
+
+        <!-- HEADER -->
+        <div class="login-card-header">
+            <div class="login-logo-badge">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="8" r="4" />
+                    <path d="M6 20v-2a4 4 0 014-4h4a4 4 0 014 4v2" />
+                </svg>
+            </div>
+            <h2 class="login-card-title">Create Account</h2>
+            <p class="login-card-subtitle">Register your IRCTC account</p>
+        </div>
+
+        <form method="post" action="/Account/Register">
+
+            <!-- USERNAME -->
+            <div class="form-field">
+                <label class="form-label">User Name</label>
+                <div class="form-input-wrap">
+                    <input type="text"
+                           name="Username"
+                           id="username"
+                           required
+                           minlength="3"
+                           maxlength="20"
+                           placeholder="Enter username"
+                           class="form-input" />
+                </div>
+                <small id="usernameMsg" style="font-size:12px;"></small>
+            </div>
+
+            <!-- FULL NAME -->
+            <div class="form-field">
+                <label class="form-label">Full Name</label>
+                <div class="form-input-wrap">
+                    <input type="text" name="FullName" required
+                           placeholder="Enter your name"
+                           class="form-input" />
+                </div>
+            </div>
+
+            <!-- EMAIL -->
+            <div class="form-field">
+                <label class="form-label">Email</label>
+                <div class="form-input-wrap">
+                    <input type="email" name="Email" required
+                           placeholder="Enter your email"
+                           class="form-input" />
+                </div>
+            </div>
+
+            <!-- PASSWORD -->
+            <div class="form-field">
+                <label class="form-label">Password</label>
+                <div class="form-input-wrap">
+                    <input type="password" id="password"
+                           name="Password"
+                           required
+                           placeholder="Enter password"
+                           class="form-input" />
+
+                    <button type="button" class="eye-toggle"
+                            onclick="togglePassword('password', this)">
+                        <i class="fa-solid fa-eye"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- CONFIRM PASSWORD -->
+            <div class="form-field">
+                <label class="form-label">Confirm Password</label>
+                <div class="form-input-wrap">
+                    <input type="password" id="confirmPassword"
+                           name="ConfirmPassword"
+                           required
+                           placeholder="Confirm password"
+                           class="form-input" />
+
+                    <button type="button" class="eye-toggle"
+                            onclick="togglePassword('confirmPassword', this)">
+                        <i class="fa-solid fa-eye"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- STRENGTH -->
+            <div class="password-strength">
+                <div id="strengthBar"></div>
+            </div>
+
+            <p id="matchText" class="match-text"></p>
+
+            <!-- CAPTCHA -->
+            <div class="form-field">
+                <label class="form-label">Verification Code</label>
+                <div class="captcha-row">
+                    <div class="captcha-img-wrap">
+                        <img id="captchaImg" src="/captcha" />
+                    </div>
+
+                    <button type="button" class="captcha-refresh-btn"
+                            onclick="refreshCaptcha()">
+                        ↻
+                    </button>
+
+                    <input type="text"
+                           name="CaptchaInput"
+                           placeholder="Enter code"
+                           required
+                           class="form-input captcha-input-field" />
+                </div>
+            </div>
+
+            <!-- BUTTON -->
+            <button type="submit" class="login-submit-btn">
+                Create Account
+            </button>
+
+        </form>
+
+        <!-- FOOTER -->
+        <div class="login-card-footer">
+            Already have an account?
+            <a href="/Account/Login" class="register-link">Login</a>
+        </div>
+
+    </div>
+
+</section>
+
+@section Scripts {
+    <script>
+
+        const usernameInput = document.getElementById("username");
+        const usernameMsg = document.getElementById("usernameMsg");
+
+        let usernameTimer;
+
+        usernameInput.addEventListener("input", function () {
+            const username = this.value.trim();
+
+            usernameMsg.textContent = "";
+
+            //Basic validation
+            if (username.length < 3) {
+                usernameMsg.textContent = "Username must be at least 3 characters";
+                usernameMsg.style.color = "red";
+                return;
+            }
+
+            if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+                usernameMsg.textContent = "Only letters, numbers, underscore allowed";
+                usernameMsg.style.color = "red";
+                return;
+            }
+
+            //Debounce
+            clearTimeout(usernameTimer);
+
+            usernameTimer = setTimeout(() => {
+                fetch(`/Account/CheckUsername?username=${username}`)
+                .then(res => res.json())
+                .then(data => {
+
+                    if (data.exists) {
+                        usernameMsg.textContent = "Username already taken";
+                        usernameMsg.style.color = "red";
+                    } else {
+                        usernameMsg.textContent = "Username available ✔";
+                        usernameMsg.style.color = "darkgreen";
+                    }
+                });
+            }, 400);
+        });
+
+        function refreshCaptcha() {
+            document.getElementById("captchaImg").src =
+                "/captcha?ts=" + new Date().getTime();
+        }
+
+        // Load captcha on page load
+        refreshCaptcha();
+    </script>
+
+    <script>
+        function refreshCaptcha() {
+            document.getElementById("captchaImg").src =
+                "/captcha?ts=" + new Date().getTime();
+        }
+
+        refreshCaptcha();
+
+        // PASSWORD TOGGLE
+        function togglePassword(id, el) {
+            const input = document.getElementById(id);
+            const icon = el.querySelector("i");
+
+            if (input.type === "password") {
+                input.type = "text";
+                icon.classList.replace("fa-eye", "fa-eye-slash");
+            } else {
+                input.type = "password";
+                icon.classList.replace("fa-eye-slash", "fa-eye");
+            }
+        }
+
+        // PASSWORD STRENGTH
+        const password = document.getElementById("password");
+        const bar = document.getElementById("strengthBar");
+
+        password.addEventListener("input", () => {
+            let val = password.value;
+            let strength = 0;
+
+            if (val.length > 5) strength++;
+            if (/[A-Z]/.test(val)) strength++;
+            if (/[0-9]/.test(val)) strength++;
+            if (/[^A-Za-z0-9]/.test(val)) strength++;
+
+            const width = strength * 25;
+            bar.style.width = width + "%";
+
+            if (width <= 25) bar.style.background = "red";
+            else if (width <= 50) bar.style.background = "orange";
+            else if (width <= 75) bar.style.background = "yellow";
+            else bar.style.background = "darkgreen";
+        });
+
+        // CONFIRM PASSWORD MATCH
+        const confirm = document.getElementById("confirmPassword");
+        const matchText = document.getElementById("matchText");
+
+        confirm.addEventListener("input", () => {
+            if (confirm.value === "" || password.value === "") {
+                matchText.textContent = "";
+                return;
+            }
+
+            if (confirm.value === password.value) {
+                matchText.textContent = "✔ Passwords match";
+                matchText.style.color = "darkgreen";
+            } else {
+                matchText.textContent = "✖ Passwords do not match";
+                matchText.style.color = "red";
+            }
+        });
+
+
+
+    </script>
+
+    @if (TempData["Success"] != null)
+    {
+        <script>
+            document.addEventListener("DOMContentLoaded", function () {
+                showToast("@TempData["Success"]", "success");
+            });
+        </script>
+    }
+
+}

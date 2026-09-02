@@ -1,0 +1,418 @@
+@using IRCTCClone.Models
+@model IRCTCClone.Models.Booking
+
+@{
+    Layout = null;
+    ViewData["Title"] = "Booking Details";
+}
+
+<div class="booking-card">
+    <div class="booking-info">
+        <p><strong>PNR:</strong> @Model.PNR</p>
+        <p><strong>Train:</strong> @Model.TrainNumber - @Model.TrainName</p>
+        <p><strong>Class:</strong> @Model.ClassCode</p>
+        <p><strong>Journey Date:</strong> @Model.JourneyDate.ToString("dd-MM-yyyy")</p>
+        <p><strong>Quota :</strong> @Model.Quota</p> 
+        <p><strong>From:</strong> @Model.Frmst</p>
+        <p><strong>To:</strong> @Model.Tost</p>
+        <p><strong>Amount:</strong> ₹@Model.BaseFare</p>
+        @{
+            string ModelStatus = @Model.Status switch
+            {
+                "CONFIRMED" or "CNF" => "booking-CNF",
+                "RAC" => "booking-RAC",
+                "WL" => "booking-WL",
+                "CAN" or "CANCELLED" => "booking-CAN",
+                _ => "booking-Default"
+            };
+        }
+        <p><strong>Current Status:</strong> <span class="@ModelStatus">@Model.Status</span></p>
+    </div>
+</div>
+
+<h3 style="margin-top: 15px; margin-bottom: 10px; font-size: 18px; color: #1f3c88;">Passengers</h3>
+
+<div style="overflow-x: auto; width: 100%; -webkit-overflow-scrolling: touch;">
+<table class="passengers-table">
+    <thead>
+        <tr>
+            <th class="hide-column"> ID</th>
+            <th>Name</th>
+            <th>Age</th>
+            <th>Gender</th>
+            <th>Coach</th>
+            <th>Seat</th>
+            <th>Berth</th>
+            <th>From</th>
+            <th>To</th>
+            <th>Booking Status</th>
+            <th>Current Status</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var p in Model.Passengers)
+        {
+            string coach = "--";
+            string seat = "--";
+
+            if (p.BookingStatus == "CNF" && !string.IsNullOrEmpty(p.SeatNumber))
+            {
+                if (p.SeatNumber.Contains("-"))
+                {
+                    var parts = p.SeatNumber.Split('-');
+                    coach = parts[0];
+                    seat = parts[1];
+                }
+                else
+                {
+                    coach = p.SeatPrefix ?? "--";
+                    seat = p.SeatNumber;
+                }
+            }
+
+            string BookingStatus = p.BookingStatus switch
+            {
+                "CONFIRMED" or "CNF" => "details-CNF",
+                "RAC" => "details-RAC",
+                "WL" => "details-WL",
+                _ => "details-Default"
+            };
+
+            <tr id="passenger-row-@p.Id">
+                <td class="hide-column">@p.Id</td>
+                <td>@p.Name</td>
+                <td>@p.Age</td>
+                <td>@p.Gender</td>
+                <td>@coach</td>
+                <td>@seat</td>
+                <td>@p.Berth</td>
+                <td>@Model.Frmst</td>
+                <td>@Model.Tost</td>
+
+                <td class="@BookingStatus">
+                    @p.BookingStatus
+                    @if ((p.BookingStatus == "RAC" || p.BookingStatus == "WL") && p.Position != null)
+                    {
+                        <span>(@p.Position)</span>
+                    }
+                </td>
+
+                <td class="booking-@(p.CurrentStatus ?? p.BookingStatus)">
+                    @{
+                        var status = p.CurrentStatus ?? p.BookingStatus;
+                    }
+                    @status
+                    @if ((status == "RAC" || status == "WL") && p.Position != null)
+                    {
+                        <span>(@p.Position)</span>
+                    }
+                </td>
+
+                <td class="action-buttons">
+                    @if (p.EditCount >= 1)
+                    {
+                        <button class="btn-edit" disabled title="Passenger already edited">Edited</button>
+                    }
+                    else
+                    {
+                        <button class="btn-edit editPassengerBtn"
+                                data-id="@p.Id"
+                                data-name="@p.Name"
+                                data-age="@p.Age"
+                                data-gender="@p.Gender">
+                            Edit
+                        </button>
+                    }
+
+                    <button class="btn-reschedule rescheduleBtn"
+                            data-bookingid="@Model.BookingId"
+                            data-trainid="@Model.TrainId"
+                            data-classid="@Model.TrainClassId">
+                        Re-Schedule
+                    </button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+</div>
+
+<!-- Reschedule Modal -->
+<div id="reschedulePopup" class="reschedule-popup">
+    <div class="ppp-cont">
+        <h4>Reschedule Ticket</h4>
+
+        <input type="hidden" id="bookingIdInput">
+        <input type="hidden" id="trainIdInput">
+        <input type="hidden" id="classInput">
+
+        <p id="seatAvailability"></p>
+
+        <label>Select New Journey Date</label>  
+        <input type="date" id="newDateInput" 
+                min="@DateTime.Today.ToString("yyyy-MM-dd")" 
+                max="@DateTime.Today.AddMonths(2).ToString("yyyy-MM-dd")">
+
+        <div class="popup-buttons">
+            <button onclick="closePopup()">Cancel</button>
+            <button onclick="confirmReschedule()">Confirm</button>
+        </div>
+    </div>
+</div>
+
+<div id="editPassengerPopup" class="reschedule-popup">
+    <div class="ppp-cont">
+        <h4>Edit Passenger</h4>
+
+        <input type="hidden" id="editPassengerId">
+
+        <label>Name</label>
+        <input type="text" id="editName">
+
+        <label>Age</label>
+        <input type="number" id="editAge">
+
+        <label>Gender</label>
+        <select id="editGender">
+            <option value="M">Male</option>
+            <option value="F">Female</option>
+            <option value="O">Other</option>
+        </select>
+
+        <div class="popup-buttons">
+            <button onclick="closeEditPopup()">Cancel</button>
+            <button onclick="confirmPassengerEdit()">Save</button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+
+        $(document).on("click", ".deleteBtnpassenger", function () {
+
+            let id = $(this).data("id");
+
+            showWarningConfirm("Are you sure you want to cancel this passenger?")
+            .then((res) => {
+
+                if (!res.isConfirmed) return;
+
+                // 👉 your existing AJAX call
+                $.ajax({
+                    url: '/Booking/DeletePassenger',
+                    type: 'POST',
+                    data: { id: id },
+                    success: function (res) {
+
+                        if (res.success) {
+                            showSuccess(res.message || "Passenger cancelled successfully");
+
+                            $("#passenger-row-" + id).fadeOut(300, function () {
+                                $(this).remove();
+                            });
+
+                            setTimeout(() => safeReload(), 800);
+                        }
+                        else {
+                            showError(res.message || "Passenger deletion failed");
+                        }
+                    },
+                    error: function () {
+                        showError("Server error occurred");
+                    }
+                });
+
+            });
+        });
+
+        function openRescheduleModal(bookingId){
+
+            document.getElementById("bookingIdInput").value = bookingId;
+
+            document.getElementById("newDateInput").min =
+                new Date().toISOString().split("T")[0];
+
+            document.getElementById("reschedulePopup").style.display = "flex";
+        }
+
+        function closePopup(){
+            document.getElementById("reschedulePopup").style.display = "none";
+        }
+
+        function confirmReschedule(){
+
+            let bookingId = document.getElementById("bookingIdInput").value;
+            let newDate = document.getElementById("newDateInput").value;
+
+            if(!newDate){
+                alert("Please select a new journey date");
+                return;
+            }
+
+            fetch('/Booking/Reschedule', {
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({
+                    bookingId: bookingId,
+                    newTravelDate: newDate
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+
+                showSuccess(data.message);
+
+                if(data.success){
+                    safeReload();
+                }
+
+            });
+        }
+
+        document.addEventListener("click", function(e){
+
+            if(e.target.classList.contains("rescheduleBtn")){
+
+                let bookingId = e.target.getAttribute("data-bookingid");
+                let trainId = e.target.getAttribute("data-trainid");
+                let classId = e.target.getAttribute("data-classid");
+
+                document.getElementById("bookingIdInput").value = bookingId;
+                document.getElementById("trainIdInput").value = trainId;
+                document.getElementById("classInput").value = classId;
+
+                console.log("BookingId:", bookingId);
+                console.log("TrainId:", trainId);
+                console.log("ClassId:", classId);
+
+                document.getElementById("reschedulePopup").style.display = "block";
+
+                openRescheduleModal(bookingId);
+            }
+
+        });
+
+        document.getElementById("newDateInput").addEventListener("change", function(){
+
+            let trainId = document.getElementById("trainIdInput").value;
+            let classId = document.getElementById("classInput").value;
+            let selectedDate = this.value;
+
+            console.log("TrainId:", trainId);
+            console.log("ClassId:", classId);
+
+            console.log(`/Booking/GetSeatAvailability?trainId=${trainId}&classId=${classId}&journeyDate=${selectedDate}`);
+
+             fetch(`/Booking/GetSeatAvailability?trainId=${trainId}&classId=${classId}&journeyDate=${selectedDate}`)
+            .then(res => res.json())
+            .then(data => {
+
+                let seatText = document.getElementById("seatAvailability");
+                let confirmBtn = document.querySelector(".popup-buttons button:last-child");
+
+                if(data.seatAvailability > 0){
+                    seatText.innerText = "Available Seat: " + data.seatAvailability;
+                    seatText.style.color = "green";
+                    confirmBtn.disabled = false;
+                }
+                else{
+                    seatText.innerText = "No Seats Available for this class/train !";
+                    seatText.style.color = "red";
+                    confirmBtn.disabled = true;
+                }
+
+            });
+
+        });
+
+    </script>
+}
+
+<style>
+    /* Hide duplicate heading inside details modal */
+    #detailsModalBody h2 {
+        display: none !important;
+    }
+
+    .booking-card {
+        padding: 20px !important;
+        background-color: #fff !important;
+        border-radius: 12px !important;
+        border: 1px solid #e2e8f0 !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+        margin-bottom: 25px !important;
+    }
+
+    .booking-info {
+        display: grid !important;
+        grid-template-columns: repeat(4, 1fr) !important;
+        gap: 15px 25px !important;
+        background: #f8fafc !important;
+        border-radius: 8px !important;
+        border: 1px solid #e2e8f0 !important;
+        padding: 20px !important;
+    }
+
+    .booking-info p {
+        font-size: 0.95rem !important;
+        margin: 0 !important;
+        font-weight: 500 !important;
+        color: #475569 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 4px !important;
+    }
+
+    .booking-info p strong {
+        color: #1e293b !important;
+        font-weight: 600 !important;
+        font-size: 0.85rem !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.5px !important;
+    }
+
+    .booking-CNF {
+        color: #10b981 !important;
+        font-weight: 600 !important;
+    }
+
+    .booking-RAC {
+        color: #f97316 !important;
+        font-weight: 600 !important;
+    }
+
+    .booking-WL {
+        color: #ef4444 !important;
+        font-weight: 600 !important;
+    }
+
+    .booking-CAN {
+        color: #ef4444 !important;
+        font-weight: 600 !important;
+    }
+
+    /* Media Screen Responsiveness for booking details columns */
+    @@media (max-width: 992px) {
+        .booking-info {
+            grid-template-columns: repeat(3, 1fr) !important;
+        }
+    }
+
+    @@media (max-width: 768px) {
+        .booking-info {
+            grid-template-columns: repeat(2, 1fr) !important;
+        }
+    }
+
+    @@media (max-width: 480px) {
+        .booking-info {
+            grid-template-columns: 1fr !important;
+            gap: 12px !important;
+        }
+    }
+</style>

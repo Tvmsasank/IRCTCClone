@@ -1,0 +1,41 @@
+﻿@* @model IRCTCClone.Models.PaymentViewModel
+
+<div class="container py-4">
+
+    <h2 class="mb-4">Payment</h2>
+
+    <div class="card p-4 shadow-sm">
+
+        <h4 class="mb-3">Select Payment Method</h4>
+
+        <form method="post" asp-action="ProcessPayment">
+            <input type="hidden" name="TrainId" value="@Model.TrainId" />
+            <input type="hidden" name="ClassId" value="@Model.ClassId" />
+            <input type="hidden" name="JourneyDate" value="@Model.JourneyDate" />
+            <input type="hidden" name="TotalFare" value="@Model.TotalFare" />
+
+            <div class="form-check mb-3">
+                <input class="form-check-input" type="radio" name="PaymentMethod" value="UPI" checked>
+                <label class="form-check-label">UPI (Google Pay / PhonePe / Paytm)</label>
+            </div>
+
+            <div class="form-check mb-3">
+                <input class="form-check-input" type="radio" name="PaymentMethod" value="Card">
+                <label class="form-check-label">Credit / Debit Card</label>
+            </div>
+
+            <div class="form-check mb-4">
+                <input class="form-check-input" type="radio" name="PaymentMethod" value="NetBanking">
+                <label class="form-check-label">NetBanking</label>
+            </div>
+
+            <h4>Total Amount: <span class="text-success">₹@Model.TotalFare</span></h4>
+
+            <button type="submit" class="btn btn-primary btn-lg mt-3">
+                Pay Now
+            </button>
+        </form>
+
+    </div>
+</div>
+ *@

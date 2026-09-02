@@ -1,0 +1,538 @@
+﻿@using IRCTCClone.Models
+@model List<TrainRoute>
+
+@{
+    ViewBag.Title = "Add Train Route";
+    var stations = ViewBag.Stations as List<Station> ?? new List<Station>();
+    var routes = ViewBag.Routes as List<TrainRoute> ?? new List<TrainRoute>();
+    int trainId = ViewBag.TrainId;
+}
+
+@{
+    var train = ViewBag.Train as Train;
+}
+
+<!-- Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+<!-- ✅ TIMELINE CARD -->
+<div class="timeline-card mb-4 sticky-timeline">
+    <div class="timeline-body">
+
+        <div class="timeline-flex">
+
+            <!-- LEFT: TIMELINE -->
+            <div class="timeline-left">
+
+                <div class="timeline-line"></div>
+
+                <div class="timeline-item">
+                    <div class="timeline-icon bg-danger">
+                        <i class="bi bi-geo-alt-fill"></i>
+                    </div>
+                    <div class="timeline-sub">Source</div>
+                    <div class="timeline-title station-badge">
+                        @train.FromStation?.Name
+                    </div>
+                    <div class="mt-2">
+                        <span class="timeline-badge">
+                            <i class="bi bi-clock-history me-1"></i>
+                            Departure: @train.Departure.ToString(@"hh\:mm")
+                        </span>
+                    </div>
+                </div>
+
+                <div class="timeline-item">
+                    <div class="timeline-icon bg-success">
+                        <i class="bi bi-geo-alt"></i>
+                    </div>
+                    <div class="timeline-sub">Destination</div>
+                    <div class="timeline-title station-badge">
+                        @train.ToStation?.Name
+                    </div>
+                    <div class="mt-2">
+                        <span class="timeline-badge">
+                            <i class="bi bi-clock me-1"></i>
+                            Arrival: @train.Arrival.ToString(@"hh\:mm")
+                        </span>
+                    </div>
+                </div>
+
+                <div class="timeline-item">
+                    <div class="timeline-icon bg-info">
+                        <i class="bi bi-hourglass-split"></i>
+                    </div>
+                    <div class="timeline-sub">Total Journey Time</div>
+                    <div class="timeline-title">
+                        <span class="timeline-badge">@train.Duration</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- RIGHT: TRAIN INFO -->
+            <div class="timeline-train-summary">
+                <div class="timeline-train-number">@train.Number</div>
+                <div class="timeline-train-name">@train.Name</div>
+                <div class="timeline-train-sub">
+                    IRCTC Train Timeline View
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+
+<!-- Bootstrap Icons  -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+
+<div class="route-card">
+
+    <!-- ✅ Section Title -->
+    <div class="route-title">
+        <i class="bi bi-signpost-split"></i>
+        Add Route Stops
+    </div>
+
+    <a asp-action="TrainList" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Train List
+    </a>
+
+    <!-- ✅ Success Message -->
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="success-popup ">
+            <div class="popup-content">
+                @TempData["SuccessMessage"]
+            </div>
+        </div>
+    }
+
+    <form method="post" asp-action="AddRoute" asp-route-trainId="@trainId">
+        <input type="hidden" id="deletedIds" name="deletedIds" />
+
+        <div style="background:#f5f7fa; padding:15px; border-radius:8px; margin-bottom:15px; display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
+
+            <!-- ✅ SINGLE CALENDAR FOR BOTH -->
+            <div class="route-controls">
+
+                <div class="date-box">
+                    <label>Skip Dates</label>
+                    <input type="text" id="skipDates" name="skipDates"
+                           value="@ViewBag.SkipDates"
+                           placeholder="Select skip dates"
+                           readonly class="form-control date-input" />
+                </div>
+
+                <div class="date-box">
+                    <label>Cancel Dates</label>
+                    <input type="text" id="cancelDates" name="cancelDates"
+                           value="@ViewBag.CancelDates"
+                           placeholder="Select cancel dates"
+                           readonly class="form-control date-input" />
+                </div>
+
+                <button type="button" onclick="clearSkipDates()" class="btn btn-warning" style="cursor: pointer;">
+                    Reset Skip
+                </button>
+
+                <button type="button" onclick="clearCancelDates()" class="btn btn-danger" style="cursor: pointer;">
+                    Reset Cancel
+                </button>
+
+                <button type="submit" class="btn btn-success btn-save" style="cursor: pointer; background-color: lightgreen;">
+                    <i class="bi bi-save2 me-1"></i> Save Route
+                </button>
+
+            </div>
+        </div>
+
+        <!-- ✅ Table -->
+        <table class="table route-table" id="routeTable">
+            <thead>
+                <tr>
+                    <th style="width:90px;">Stop #</th>
+                    <th>Station</th>
+                    <th style="width:150px;">Arrival</th>
+                    <th style="width:150px;">Departure</th>
+                    <th style="width:150px;">Distance</th>
+                    <th style="width:150px;">Day</th>
+                    <th style="width:100px;" class="text-center">Action</th>
+                    <th style="width:100px;">Skip?</th>
+                </tr>
+            </thead>
+
+            <tbody id="routeTableBody">
+
+                @if (Model != null && Model.Any())
+                {
+                    for (int i = 0; i < Model.Count; i++)
+                    {
+                        <tr class="fade-row">
+                            <td>
+                                <input name="routes[@i].StopNumber" type="number" min="1" class="form-control" value="@Model[i].StopNumber" />
+                            </td>
+
+                            <td>
+                                <select name="routes[@i].StationId" class="form-select">
+                                    @foreach (var s in stations)
+                                    {
+                                        <option value="@s.Id" selected="@(s.Id == Model[i].StationId)">
+                                            @s.Name
+                                        </option>
+                                    }
+                                </select>
+                            </td>
+
+                            <td>
+                                <input name="routes[@i].ArrivalTime" type="time" class="form-control"
+                                       value="@(Model[i].ArrivalTime?.ToString(@"hh\:mm"))" />
+                            </td>
+
+                            <td>
+                                <input name="routes[@i].DepartureTime" type="time" class="form-control"
+                                       value="@(Model[i].DepartureTime?.ToString(@"hh\:mm"))" />
+                            </td>
+
+                            <td>
+                                <input name="routes[@i].Distance" type="number" class="form-control" value="@Model[i].Distance" />
+                            </td>
+
+
+                            <td>
+                                <input name="routes[@i].Day" type="number" class="form-control" value="@Model[i].Day" />
+                            </td>
+
+
+                            <!-- Hidden ID -->
+                            <td style="display:none;">
+                                <input name="routes[@i].Id" type="hidden" value="@Model[i].Id" />
+                            </td>
+
+                            <td class="text-center">
+                                <button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteRouteRow(this)">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </td>
+                            <td>
+                                <input type="checkbox"
+                                       class="skip-checkbox"
+                                       name="routes[@i].IsSkipped"
+                                       value="true"
+                                       @(Model[i].IsSkipped ? "checked" : "") />
+
+                                <input type="hidden" name="routes[@i].IsSkipped" value="false" />
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr class="fade-row">
+                        <td><input name="routes[0].StopNumber" type="number" class="form-control" /></td>
+
+                        <td>
+                            <select name="routes[0].StationId" class="form-select">
+                                @foreach (var s in stations)
+                                {
+                                    <option value="@s.Id">@s.Name</option>
+                                }
+                            </select>
+                        </td>
+
+                        <td><input name="routes[0].ArrivalTime" type="time" class="form-control" /></td>
+                        <td><input name="routes[0].DepartureTime" type="time" class="form-control" /></td>
+                        <td><input name="routes[0].Distance" type="number" class="form-control" /></td>
+                        <td><input name="routes[0].Day" min="1" type="number" class="form-control" /></td>
+
+                        <td class="text-center">
+                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteRouteRow(this)">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                        <td>
+                            <input type="checkbox" class="skip-checkbox" />
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <!-- ✅ Buttons -->
+        <div class="mt-3 d-flex gap-2">
+            <button type="button" id="addRow" class="btn btn-primary btn-add">
+                <i class="bi bi-plus-circle me-1"></i> Add Stop
+            </button>
+
+            <button type="submit" class="btn btn-success btn-save">
+                <i class="bi bi-save2 me-1"></i> Save Route
+            </button>
+
+            <a asp-action="TrainList" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Back
+            </a>
+        </div>
+
+    </form>
+</div>
+
+@section Scripts {
+    <!-- ✅ JAVASCRIPT -->
+    <script>
+        var tableBody = document.getElementById("routeTableBody");
+        var deletedIdsInput = document.getElementById("deletedIds");
+
+        // ✅ Add row (MINIMAL FIX ONLY)
+        document.getElementById("addRow").addEventListener("click", function () {
+            var rowCount = tableBody.rows.length;
+            var newRow = tableBody.rows[0].cloneNode(true);
+
+            newRow.querySelectorAll("input, select").forEach(function (input) {
+                input.name = input.name.replace(/\[\d+\]/, "[" + rowCount + "]");
+
+                if (input.tagName.toLowerCase() === "select") {
+                    input.selectedIndex = 0;
+                }
+                else if (input.name.endsWith(".Id")) {
+                    input.value = 0;
+                }
+                else if (input.name.endsWith(".Day")) {
+                    input.value = 1;   // ✅ Default Day = 1
+                }
+                else if (input.type === "checkbox") {
+                    input.checked = false;
+                }
+                else {
+                    input.value = "";
+                }
+            });
+
+            newRow.classList.add("fade-row");
+            tableBody.appendChild(newRow);
+        });
+
+        // ✅ Delete row (UNCHANGED)
+        function deleteRouteRow(btn) {
+            var row = btn.closest("tr");
+            var idInput = row.querySelector("input[name$='.Id']");
+
+            if (idInput && idInput.value && idInput.value != "0") {
+                var deletedIds = deletedIdsInput.value ? deletedIdsInput.value.split(",") : [];
+                deletedIds.push(idInput.value);
+                deletedIdsInput.value = deletedIds.join(",");
+            }
+
+            if (tableBody.rows.length > 1) {
+                let confirmDelete = confirm("do you want delete this stop ?");
+
+                if(confirmDelete) {
+                    row.remove();
+                    updateRowIndices();
+                }
+            } else {
+                alert("At least one stop is required.");
+            }
+        }
+
+        // ✅ Fade-out success popup (RESTORED 100%)
+        document.addEventListener("DOMContentLoaded", () => {
+            const popup = document.querySelector(".success-popup");
+            if (popup) {
+                const popupContent = popup.querySelector(".popup-content");
+
+                setTimeout(() => {
+                    popupContent.classList.add("fade-out");
+                    setTimeout(() => {
+                        popup.style.display = "none";
+                    }, 500);
+                }, 100);
+            }
+        });
+
+        // ✅ Fix indices after deletion (UNCHANGED)
+        function updateRowIndices() {
+            tableBody.querySelectorAll("tr").forEach(function (row, index) {
+                row.querySelectorAll("input, select").forEach(function (input) {
+                    input.name = input.name.replace(/\[\d+\]/, "[" + index + "]");
+                });
+            });
+        }
+
+        // GLOBAL VARIABLES
+        let skipFp;
+        let cancelFp;
+
+        document.addEventListener("DOMContentLoaded", function () {
+
+            const skipInput = document.getElementById("skipDates");
+            const cancelInput = document.getElementById("cancelDates");
+
+            // ✅ INIT SKIP CALENDAR
+            if (skipInput) {
+                skipFp = flatpickr(skipInput, {
+                    mode: "multiple",
+                    dateFormat: "Y-m-d",
+                    minDate: "today",   // 🔥 prevents past dates
+                    maxDate: new Date().fp_incr(60), // 🔥 only next 2 months
+
+                    defaultDate: skipInput.value ? skipInput.value.split(",") : [],
+
+                    onChange: function (selectedDates, dateStr) {
+                        skipInput.value = dateStr;
+                    }
+                });
+            }
+
+            // ✅ INIT CANCEL CALENDAR
+            if (cancelInput) {
+                cancelFp = flatpickr(cancelInput, {
+                    mode: "multiple",
+                    dateFormat: "Y-m-d",
+                    minDate: "today",   // 🔥 prevents past dates
+                    maxDate: new Date().fp_incr(60), // 🔥 only next 2 months
+
+                    defaultDate: cancelInput.value ? cancelInput.value.split(",") : [],
+
+                    onChange: function (selectedDates, dateStr) {
+                        cancelInput.value = dateStr;
+                    }
+                });
+            }
+
+            // ✅ SKIP VALIDATION
+            document.addEventListener("change", function (e) {
+
+                if (e.target.classList.contains("skip-checkbox")) {
+
+                    let dates = skipInput.value;
+
+                    if (e.target.checked && (!dates || dates.trim() === "")) {
+                        alert("Select SKIP dates first");
+                        e.target.checked = false;
+                    }
+                }
+            });
+        });
+
+        // ✅ GLOBAL RESET FUNCTIONS (IMPORTANT)
+        function clearCancelDates() {
+            if (cancelFp) {
+                cancelFp.clear();
+                document.getElementById("cancelDates").value = "";
+            }
+        }
+
+        function clearSkipDates() {
+            if (skipFp) {
+                skipFp.clear();
+                document.getElementById("skipDates").value = "";
+            }
+        }
+
+        // 🔥 Keep admin session alive
+        setInterval(() => {
+            fetch('/Admin/KeepAlive', {
+                method: 'GET',
+                credentials: 'include'
+            });
+        }, 60000); // every 1 minute
+    </script>
+}
+
+<style>
+    .route-controls {
+        display: flex;
+        align-items: flex-end;
+        gap: 20px;
+        flex-wrap: wrap;
+        background: #f4f6fb;
+        padding: 20px;
+        border-radius: 12px;
+        border: 1px solid #e2e6ea;
+    }
+
+    .date-box {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+        .date-box label {
+            font-weight: 600;
+            font-size: 14px;
+            color: #333;
+        }
+
+    .date-input {
+        width: 240px;
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid #ced4da;
+        transition: all 0.2s ease;
+    }
+
+        .date-input:focus {
+            border-color: #0d6efd;
+            box-shadow: 0 0 4px rgba(13,110,253,0.3);
+        }
+
+    .btn-warning {
+        background: #ffc107;
+        border: none;
+        color: #000;
+        font-weight: 500;
+        border-radius: 8px;
+        padding: 8px 14px;
+    }
+
+    .btn-danger {
+        background: #dc3545;
+        border: none;
+        color: #fff;
+        font-weight: 500;
+        border-radius: 8px;
+        padding: 8px 14px;
+    }
+
+    .btn-warning:hover {
+        background: #e0a800;
+    }
+
+    .btn-danger:hover {
+        background: #bb2d3b;
+    }
+
+    /* TABLE */
+
+    .route-table {
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid #dee2e6;
+    }
+
+        .route-table th {
+            background: linear-gradient(90deg, #0d6efd, #0b5ed7);
+            color: white;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .route-table td {
+            vertical-align: middle;
+            text-align: center;
+        }
+
+        .route-table input,
+        .route-table select {
+            border-radius: 6px;
+        }
+
+    /* Smooth row animation */
+    .fade-row {
+        animation: fadeIn 0.3s ease-in-out;
+    }
+
+</style>

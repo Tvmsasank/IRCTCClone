@@ -1,0 +1,109 @@
+﻿IRCTC Refund Rules (Updated April 2026)
+
+---------------------------------------
+CONFIRMED TICKETS (CNF)
+---------------------------------------
+
+1. More than 72 hours before departure:
+- Maximum refund.
+- Only minimum flat cancellation charges are deducted.
+
+2. Between 72 hours and 24 hours:
+- 25% of total fare is deducted.
+
+3. Between 24 hours and 8 hours:
+- 50% of total fare is deducted.
+
+4. Less than 8 hours before departure:
+- No refund (0% refund).
+
+---------------------------------------
+WAITLISTED (WL) TICKETS
+---------------------------------------
+
+1. If ticket remains waitlisted after chart preparation:
+- Ticket is automatically cancelled.
+- Full refund is issued.
+
+2. If cancelled manually before chart:
+- Small cancellation charge (~₹20 + GST) may apply.
+
+---------------------------------------
+RAC (RESERVATION AGAINST CANCELLATION)
+---------------------------------------
+
+- Partial refund is issued after deduction of charges.
+
+---------------------------------------
+TATKAL TICKETS
+---------------------------------------
+
+1. Confirmed Tatkal ticket:
+- No refund on cancellation.
+
+2. Waitlisted Tatkal ticket:
+- Partial refund allowed.
+
+---------------------------------------
+CHART PREPARATION RULE
+---------------------------------------
+
+- E-tickets cannot be cancelled online after chart preparation.
+- User must file TDR (Ticket Deposit Receipt) for refund.
+
+---------------------------------------
+TRAIN CANCELLATION
+---------------------------------------
+
+- If train is cancelled by Railways:
+- Full refund is issued automatically.
+
+---------------------------------------
+TRAIN DELAY (>3 HOURS)
+---------------------------------------
+
+- If train is delayed more than 3 hours and passenger does not travel:
+- Full refund is allowed after filing TDR before departure.
+
+---------------------------------------
+PARTIALLY CONFIRMED TICKETS
+---------------------------------------
+
+- Mixed CNF + WL tickets:
+- Refund rules depend on cancellation timing and TDR filing.
+
+---------------------------------------
+TDR (TICKET DEPOSIT RECEIPT)
+---------------------------------------
+
+- Required in cases like:
+  - Late train
+  - Train diverted
+  - Passenger not travelled
+  - AC failure
+  - Chart prepared cases
+
+- Time limits:
+  - Usually within 72 hours of departure or arrival.
+
+---------------------------------------
+OTHER IMPORTANT RULES
+---------------------------------------
+
+- Boarding station can be changed up to 30 minutes before departure.
+- OTP verification required for agent-based ticket cancellations.
+- No refund if:
+  - Ticket not cancelled before allowed time
+  - TDR not filed when required
+
+---------------------------------------
+SYSTEM NOTES FOR AI
+---------------------------------------
+
+- Refund depends on:
+  1. Ticket status (CNF / RAC / WL)
+  2. Time of cancellation
+  3. Train conditions (delay/cancelled)
+  4. Tatkal or normal booking
+
+- Always explain refund using above factors.

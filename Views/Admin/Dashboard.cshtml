@@ -1,0 +1,173 @@
+
+
+@{
+    ViewData["Title"] = "Admin Dashboard";
+}
+
+<div class="home-layout">
+
+    <!-- LEFT SIDE (existing content stays here) -->
+    <div class="home-left">
+        <!-- your existing search form code -->
+    </div>
+
+    <!-- RIGHT SIDE (NEW) -->
+    <div class="home-right">
+        <h2 class="indian-railways-text">INDIAN RAILWAYS</h2>
+        <p class="railways-tagline">Safety | Security | Punctuality</p>
+    </div>
+
+</div>
+
+<style>
+    /* Fix global site.css dropdown overrides for Bootstrap dropdown menu */
+    .dropdown-menu.show {
+        opacity: 1 !important;
+        visibility: visible !important;
+        transform: translateY(0) !important;
+        display: block !important;
+    }
+
+    /* Admin container styling */
+    .admin-container {
+        padding: 30px !important;
+        border-radius: 12px !important;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15) !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Media Screen Responsiveness */
+    @@media (max-width: 1200px) {
+        .admin-container {
+            max-width: 95% !important;
+            padding: 25px !important;
+            min-height: 65vh !important;
+        }
+    }
+
+    @@media (max-width: 768px) {
+        .admin-container {
+            max-width: 92% !important;
+            padding: 20px !important;
+            min-height: 50vh !important;
+            margin-top: 10px !important;
+            margin-bottom: 10px !important;
+        }
+        
+        .admin-container h3 {
+            font-size: 1.5rem !important;
+        }
+
+        .home-layout {
+            flex-direction: column !important;
+            align-items: center !important;
+            text-align: center !important;
+            padding: 10px !important;
+        }
+        
+        .home-right {
+            text-align: center !important;
+            margin-top: 10px !important;
+        }
+    }
+
+    @@media (max-width: 480px) {
+        .admin-container {
+            max-width: 95% !important;
+            padding: 15px !important;
+            min-height: 40vh !important;
+        }
+
+        .admin-container h3 {
+            font-size: 1.25rem !important;
+        }
+
+        .dropdown-toggle {
+            width: 100% !important;
+            text-align: left !important;
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+        }
+        
+        .dropdown-menu {
+            width: 100% !important;
+        }
+    }
+</style>
+
+<div class="admin-container mt-3 mb-3" style="
+        min-height: 75vh;
+        width: 100% !important;
+        max-width: 1200px !important;
+        margin: 15px auto !important;
+        background-image: url('/images/beautifulirctc.jpg');
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+    ">
+
+    <div class="">
+        <!-- Top Bar -->
+        <div class="">
+            <h3>Welcome, Admin 👋</h3>
+        </div>
+
+        <hr />
+
+        <!-- Dropdown Section -->
+        <div class="">
+            <div class="dropdown">
+                <button class="btn bg-light text-primary border border-info dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Manage IRCTC Data</button>
+                <ul class="dropdown-menu p-1 small">
+                    <li>
+                        <a class="dropdown-item text-black"
+                           onmouseover="this.classList.replace('text-black','text-primary')"
+                           onmouseout="this.classList.replace('text-primary','text-black')"
+                            asp-action="CreateStation" asp-controller="Admin">Create Station</a></li>
+                    <li>
+                        <a class="dropdown-item text-black"
+                           onmouseover="this.classList.replace('text-black','text-primary')"
+                           onmouseout="this.classList.replace('text-primary','text-black')"
+                           asp-action="StationList" asp-controller="Admin">Edit/Delete Stations</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item text-black"
+                           onmouseover="this.classList.replace('text-black','text-primary')"
+                           onmouseout="this.classList.replace('text-primary','text-black')"
+                           asp-action="CreateTrain" asp-controller="Admin">Add Train</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item text-black"
+                           onmouseover="this.classList.replace('text-black','text-primary')"
+                           onmouseout="this.classList.replace('text-primary','text-black')"
+                           asp-controller="Admin" asp-action="TrainList">Edit/Delete Trains</a>
+                    </li>
+                </ul>
+             </div>
+        </div>
+    </div>
+</div>
+
+<link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+<link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+<link rel="stylesheet" href="~/WebApplication2.styles.css" asp-append-version="true" />
+<!-- Bootstrap CSS -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<!-- Bootstrap JS + Popper -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+
+@section Scripts
+{
+    <script>
+                // 🔥 Keep admin session alive
+        setInterval(() => {
+            fetch('/Admin/KeepAlive', {
+                method: 'GET',
+                credentials: 'include'
+            });
+        }, 60000); // every 1 minute
+    </script>
+}

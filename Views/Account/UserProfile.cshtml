@@ -1,0 +1,28 @@
+﻿@model IRCTCClone.Models.ViewModels
+
+<h2>User Profile</h2>
+
+<div class="card p-3" style="max-width: 600px;">
+    <p><strong>Email:</strong> @Model.Email</p>
+    <p><strong>Name:</strong> @Model.FullName</p>
+    <p>
+        <strong>Aadhaar Status:</strong>
+        @if (Model.AadhaarVerified)
+        {
+            <span class="text-success fw-bold">✅ Verified</span>
+        }
+        else
+        {
+            <span class="text-danger fw-bold">❌ Not Verified</span>
+        }
+    </p>
+
+    @if (!Model.AadhaarVerified)
+    {
+        <form method="post" action="/Account/VerifyAadhaar" class="mt-3">
+            <label>Enter Aadhaar Number</label>
+            <input type="text" name="aadhaarNumber" class="form-control" maxlength="12" required />
+            <button type="submit" class="btn btn-primary mt-2">Verify Aadhaar</button>
+        </form>
+    }
+</div>

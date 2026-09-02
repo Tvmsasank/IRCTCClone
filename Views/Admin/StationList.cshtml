@@ -1,0 +1,135 @@
+﻿@model IEnumerable<IRCTCClone.Models.Station>
+@{
+    ViewData["Title"] = "Station List";
+}
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<div class="container mt-5 pb-5">
+    <h3 class="mb-2">@ViewData["Title"]</h3>
+    <a asp-action="CreateStation" class="btn btn-success mb-3">+ Add Station</a>
+    <a asp-action="Dashboard" class="btn btn-home mb-3">Back to DashBoard</a>
+
+    <div class="station-search-bar d-flex gap-2 mb-3">
+        <input type="text"
+                id="stationSearch"
+                placeholder="Search Code / Name / City..."
+                class="form-control station-filter" />
+
+        <button class="btn btn-secondary" onclick="clearStationSearch()">
+            Clear
+        </button> 
+
+    </div>
+
+    <div id="noStationMessage"
+         style="display:none; margin:10px 0; font-weight:600; color:#dc3545;">
+        No Stations found.
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped table-hover small">
+            <thead class="table-dark">
+                <tr>
+                    <th scope="col">ID</th>
+                    <th scope="col">Code</th>
+                    <th scope="col">Name</th>
+                    <th scope="col">City</th>
+                    <th scope="col">State</th>
+                    <th scope="col">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var s in Model)
+                {
+                    <tr class="station-row"
+                        data-code="@s.Code"
+                        data-name="@s.Name"
+                        data-city="@s.City"
+                        data-state="@s.State">
+
+                        <td>@s.Id</td>
+                        <td>@s.Code</td>
+                        <td>@s.Name</td>
+                        <td>@s.City</td>
+                        <td>@s.State</td>
+                        <td>
+                            <a asp-action="EditStation" asp-route-id="@s.Id" class="btn btn-sm btn-primary me-1">Edit</a>
+                            <form asp-action="DeleteStation" asp-route-id="@s.Id" method="post" style="display:inline">
+                                <button type="submit" onclick="return confirmdelete()"class="btn btn-sm btn-danger">Delete</button>
+                            </form>
+                            <script>
+                                function confirmdelete() {
+                                    if (confirm("Are you sure you want to delete this station?")) {
+                                        
+                                        // allow form submission (delete happens)
+                                        return true;
+                                    }
+
+                                    // cancel form submission
+                                    return false;
+                                }
+                            </script>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.getElementById("stationSearch").addEventListener("keyup", filterStations);
+
+        function filterStations() {
+            let searchValue = document.getElementById("stationSearch").value.toLowerCase();
+
+            let stations = document.querySelectorAll(".station-row");
+
+            let visibleCount = 0;
+
+            stations.forEach(station => {
+                let code = station.dataset.code.toLowerCase();
+                let name = station.dataset.name.toLowerCase();
+                let city = station.dataset.city.toLowerCase();
+
+                let match = 
+                    code.includes(searchValue) ||
+                    name.includes(searchValue) ||
+                    city.includes(searchValue);
+
+                if (match) {
+                    station.style.display = "";
+                    visibleCount++ ;
+                } else {
+                    station.style.display = "none";
+                }
+            });
+
+            const msg = document.getElementById ("noStationMessage");
+
+            if (msg) {
+                if (visibleCount === 0) {
+                    msg.style.display = "block";
+                } else {
+                    msg.style.display = "none";
+                }
+            }
+        }
+
+        function clearStationSearch() {
+            document.getElementById("stationSearch").value = "";
+            filterStations();
+        }
+
+                // 🔥 Keep admin session alive
+        setInterval(() => {
+            fetch('/Admin/KeepAlive', {
+                method: 'GET',
+                credentials: 'include'
+            });
+        }, 60000); // every 1 minute
+
+    </script>
+}

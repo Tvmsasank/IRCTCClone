@@ -1,0 +1,1036 @@
+@{
+    var controller = ViewContext.RouteData.Values["controller"]?.ToString();
+}
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>@ViewData["Title"] - IRCTC Clone</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="icon" type="image/png" href="~/images/irctc_Logo.png" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    @if (User.Identity.IsAuthenticated)
+    {
+        var logoutUrl = User.IsInRole("Admin") ? "/Admin/Logout" : "/Account/Logout";
+        <script>
+            function safeReload() {
+                sessionStorage.setItem("backButtonReload", "true");
+                window.location.reload();
+            }
+
+            if (performance.getEntriesByType("navigation")[0]?.type === "reload") {
+                if (sessionStorage.getItem("backButtonReload") === "true") {
+                    sessionStorage.removeItem("backButtonReload");
+                } else {
+                    window.location.href = "@logoutUrl";
+                }
+            }
+        </script>
+    }
+    else
+    {
+        <script>
+            function safeReload() {
+                window.location.reload();
+            }
+        </script>
+    }
+</head>
+<body>
+    @using Microsoft.AspNetCore.Http
+    @inject IHttpContextAccessor HttpContextAccessor
+
+    <div id="toastContainer"></div>
+
+    <!-- UPPER UTILITY BAR -->
+    <div class="header-utility-bar">
+        <div class="utility-container">
+            <div class="utility-left">
+                <span class="live-datetime" id="currentDateTime"><i class="fa-regular fa-clock"></i> --/--/---- [--:--:--]</span>
+            </div>
+            <div class="utility-right">
+                <!-- Font Controls -->
+                <div class="font-controls">
+                    <button class="font-btn" onclick="changeFontSize(-1)" title="Decrease Font Size">A-</button>
+                    <button class="font-btn" onclick="resetFontSize()" title="Reset Font Size">A</button>
+                    <button class="font-btn" onclick="changeFontSize(1)" title="Increase Font Size">A+</button>
+                </div>
+                
+                <!-- Language Selector -->
+                <div class="lang-selector">
+                    <span class="lang-option active">English</span>
+                    <span class="lang-divider">|</span>
+                    <span class="lang-option">हिंदी</span>
+                </div>
+
+                <!-- Theme Toggle -->
+                <button id="themeToggle" class="utility-theme-toggle" title="Toggle Theme">
+                    <span class="light-icon">☀️</span>
+                    <span class="dark-icon">🌙</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN HEADER -->
+    <header class="site-header">
+        <div class="header-container">
+
+            <!-- LEFT LOGO -->
+            <div class="logo-section">
+                <img src="~/images/irctc_logo.png" alt="IRCTC Logo" class="logo" />
+                <div class="brand-text">
+                    <span class="brand-name">IRCTC Clone</span>
+                    <span class="brand-subname">NexusRail Portal</span>
+                </div>
+            </div>
+
+            <!-- HAMBURGER BUTTON (mobile only) -->
+            <div class="hamburger" id="hamburgerBtn">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+
+            @if (controller != "Error")
+            {
+                <!-- CENTER NAVIGATION -->
+                <nav id="navMenu" class="nav-links">
+                    
+                    <!-- HOME -->
+                    <a href="/" class="nav-item-link"><i class="fa-solid fa-house"></i> Home</a>
+
+                    <!-- DYNAMIC USER SECTION / LOGIN -->
+                    @{
+                        var adminUser = HttpContextAccessor.HttpContext.Session.GetString("AdminUser");
+                    }
+
+                    @if (!string.IsNullOrEmpty(adminUser))
+                    {
+                        <!-- Admin Dropdown -->
+                        <div class="nav-dropdown">
+                            <a href="#" class="nav-item-link dropdown-toggle"><i class="fa-solid fa-user-shield"></i> Admin Panel <i class="fa-solid fa-chevron-down"></i></a>
+                            <div class="nav-dropdown-menu">
+                                <a asp-controller="Admin" asp-action="Dashboard"><i class="fa-solid fa-chart-line"></i> Dashboard</a>
+                                <a href="#" onclick="confirmLogout()"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+                            </div>
+                        </div>
+                    }
+                    else if (User?.Identity?.IsAuthenticated == true)
+                    {
+                        <!-- Logged In User Dropdown Matching IRCTC Beta Design -->
+                        <div class="nav-dropdown user-profile-dropdown">
+                            <a href="#" class="nav-user-pill dropdown-toggle">
+                                <i class="fa-regular fa-user user-pill-icon"></i>
+                                <span class="user-pill-name">@(User.Identity.Name?.Split('@')[0] ?? User.Identity.Name)</span>
+                                <i class="fa-solid fa-circle-check user-pill-verified"></i>
+                            </a>
+                            <div class="nav-dropdown-menu user-menu-dropdown">
+                                <a href="/Profile"><i class="fa-regular fa-user"></i> My Profile</a>
+                                
+                                <div class="dropdown-divider-line"></div>
+                                <div class="dropdown-submenu-heading"><i class="fa-solid fa-globe"></i> My Transactions</div>
+                                <a href="/Booking/History" class="submenu-item"><i class="fa-solid fa-clock-rotate-left"></i> Booked Ticket History</a>
+                                <a href="/Home/Meals" class="submenu-item"><i class="fa-solid fa-utensils"></i> Booked Food History - E-Pantry</a>
+                                <a href="/Booking/History" class="submenu-item"><i class="fa-solid fa-receipt"></i> Transaction History</a>
+                                <a href="/Booking/History" class="submenu-item"><i class="fa-regular fa-folder-open"></i> File TDR</a>
+                                <a href="/Booking/History" class="submenu-item"><i class="fa-solid fa-file-invoice"></i> TAX Invoice</a>
+                                
+                                <div class="dropdown-divider-line"></div>
+                                <a href="/Home/Contact"><i class="fa-regular fa-star"></i> Feedback</a>
+                                
+                                <form method="get" action="/Account/Logout" style="display:block; margin:0;">
+                                    <button type="submit" class="dropdown-btn-logout">
+                                        <i class="fa-solid fa-right-from-bracket"></i> Logout
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <!-- Login / Register combined button -->
+                        <div class="nav-auth-buttons">
+                            @if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") != "Production")
+                            {
+                                <a asp-controller="Admin" asp-action="AdminLogin" class="admin-login-btn"><i class="fa-solid fa-user-tie"></i> Admin</a>
+                            }
+                            <a asp-controller="Account" asp-action="Login" class="nav-btn-login-register"><i class="fa-solid fa-right-from-bracket"></i> LOGIN / REGISTER</a>
+                        </div>
+                    }
+
+                    <!-- TRAINS DROPDOWN -->
+                    <div class="nav-dropdown">
+                        <a href="#" class="nav-item-link dropdown-toggle" data-translate="trains">TRAINS <i class="fa-solid fa-chevron-down"></i></a>
+                        <div class="nav-dropdown-menu">
+                            <a href="/"><i class="fa-solid fa-ticket-simple"></i> Book Ticket</a>
+                            <a href="/?quota=FOREIGN_TOURIST"><i class="fa-solid fa-passport"></i> Foreign Tourist Booking</a>
+                            <a href="javascript:void(0)" onclick="openNavModal('connectingJourney')"><i class="fa-solid fa-circle-nodes"></i> Connecting Journey Booking</a>
+                            <a href="/Booking/History"><i class="fa-solid fa-circle-xmark"></i> Cancel E-Ticket</a>
+                            <a asp-controller="Booking" asp-action="CheckPNR"><i class="fa-solid fa-magnifying-glass"></i> PNR Enquiry</a>
+                            <a href="javascript:void(0)" onclick="openNavModal('trainSchedule')"><i class="fa-solid fa-calendar-days"></i> Train Schedule</a>
+                            <a href="javascript:void(0)" onclick="openNavModal('trackTrain')"><i class="fa-solid fa-location-crosshairs"></i> Track Your Train</a>
+                            <a href="javascript:void(0)" onclick="openNavModal('ftrBooking')"><i class="fa-solid fa-train-subway"></i> FTR Coach/Train Booking</a>
+                            <a href="javascript:void(0)" onclick="openNavModal('petBooking')"><i class="fa-solid fa-paw"></i> Dogs/Cats Booking</a>
+                            <a href="javascript:void(0)" onclick="openNavModal('linkAadhaar')"><i class="fa-solid fa-id-card"></i> Link Your Aadhaar</a>
+                            <a href="javascript:void(0)" onclick="openNavModal('counterCancel')"><i class="fa-solid fa-trash-can"></i> Counter Ticket Cancellation</a>
+                            <a href="javascript:void(0)" onclick="openNavModal('counterBoarding')"><i class="fa-solid fa-arrows-spin"></i> Counter Boarding Point Change</a>
+                        </div>
+                    </div>
+
+                    <!-- MEALS DROPDOWN -->
+                    <div class="nav-dropdown">
+                        <a href="#" class="nav-item-link dropdown-toggle" data-translate="meals">MEALS <i class="fa-solid fa-chevron-down"></i></a>
+                        <div class="nav-dropdown-menu">
+                            <a href="javascript:void(0)" onclick="openNavModal('ePantry')"><i class="fa-solid fa-utensils"></i> Book Food - E-Pantry</a>
+                            <a href="javascript:void(0)" onclick="openNavModal('eCatering')"><i class="fa-solid fa-bowl-food"></i> Order Food - E-Catering</a>
+                            <a href="javascript:void(0)" onclick="openNavModal('foodMenu')"><i class="fa-solid fa-square-poll-horizontal"></i> Cooked Food Menu</a>
+                        </div>
+                    </div>
+
+                    <!-- LOYALTY DROPDOWN -->
+                    <div class="nav-dropdown">
+                        <a href="#" class="nav-item-link dropdown-toggle" data-translate="loyalty">LOYALTY <i class="fa-solid fa-chevron-down"></i></a>
+                        <div class="nav-dropdown-menu">
+                            <a href="javascript:void(0)" onclick="openNavModal('cashbackInfo')"><i class="fa-solid fa-percent"></i> Upto 10% Cashback</a>
+                            <a href="javascript:void(0)" onclick="openNavModal('loyaltyInfo')"><i class="fa-solid fa-award"></i> Loyalty Program Info</a>
+                            <a href="javascript:void(0)" onclick="openNavModal('cardRegistration')"><i class="fa-solid fa-credit-card"></i> Co-branded Card Registration</a>
+                        </div>
+                    </div>
+
+                    <!-- E-WALLET DROPDOWN -->
+                    <div class="nav-dropdown">
+                        <a href="#" class="nav-item-link dropdown-toggle" data-translate="ewallet">E-WALLET <i class="fa-solid fa-chevron-down"></i></a>
+                        <div class="nav-dropdown-menu">
+                            <a href="javascript:void(0)" onclick="openNavModal('ewalletAbout')"><i class="fa-solid fa-wallet"></i> About IRCTC eWallet</a>
+                            <a href="javascript:void(0)" onclick="openNavModal('ewalletGuide')"><i class="fa-solid fa-circle-info"></i> IRCTC eWallet User Guide</a>
+                        </div>
+                    </div>
+
+                    <!-- ALERTS -->
+                    <a href="javascript:void(0)" onclick="openNavModal('alerts')" class="nav-item-link" data-translate="alerts">ALERTS</a>
+
+                    <!-- OTHER SERVICES DROPDOWN -->
+                    <div class="nav-dropdown">
+                        <a href="#" class="nav-item-link dropdown-toggle" data-translate="otherservices">OTHER SERVICES <i class="fa-solid fa-chevron-down"></i></a>
+                        <div class="nav-dropdown-menu">
+                            <a href="javascript:void(0)" onclick="openNavModal('ipay')"><i class="fa-solid fa-money-bill-transfer"></i> IRCTC-IPAY</a>
+                            <a href="javascript:void(0)" onclick="openNavModal('buses')"><i class="fa-solid fa-bus"></i> Buses</a>
+                            <a href="javascript:void(0)" onclick="openNavModal('flights')"><i class="fa-solid fa-plane"></i> Flights</a>
+                            <a href="javascript:void(0)" onclick="openNavModal('hotels')"><i class="fa-solid fa-hotel"></i> Hotels</a>
+                            <a href="javascript:void(0)" onclick="openNavModal('holidays')"><i class="fa-solid fa-umbrella-beach"></i> Holidays</a>
+                            <a href="javascript:void(0)" onclick="openNavModal('wheelchair')"><i class="fa-solid fa-wheelchair"></i> e-Wheelchair</a>
+                            <a href="javascript:void(0)" onclick="openNavModal('promotions')"><i class="fa-solid fa-bullhorn"></i> Promotions</a>
+                        </div>
+                    </div>
+
+                    <!-- CONTACT US -->
+                    <a href="javascript:void(0)" onclick="openNavModal('contactUs')" class="nav-item-link" data-translate="contactus">CONTACT US</a>
+
+                </nav>
+            }
+
+            <!-- RIGHT LOGO -->
+            <div class="nostalgiclogo">
+                <img src="~/images/nostalgicirctclogo2.png" alt="IRCTC Logo" class="nostlogo" />
+            </div>
+        </div>
+    </header>
+
+    <main role="main" class="main-content flex-grow-1">
+        @RenderBody()
+    </main>
+
+    <footer class="site-footer">
+        © 2026 IRCTC Clone — All Rights Reserved
+    </footer>
+
+    <script>
+        // Prevent going back to secured pages
+        window.history.pushState(null, "", window.location.href);
+        window.onpopstate = function () {
+            window.history.pushState(null, "", window.location.href);
+        };
+    </script>
+
+    <!-- ✅ Load scripts first -->
+    <!-- 1️⃣ jQuery first -->
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+
+    <!-- 2️⃣ Bootstrap -->
+    <script src="~/lib/bootstrap/js/bootstrap.bundle.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <!-- 3️⃣ Other libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.2/rollups/aes.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.4/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <!-- 4️⃣ Your custom JS LAST -->
+    @*     <script src="~/js/site.js"></script>
+ *@
+
+    @*     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.2/rollups/aes.js"></script>
+    <script src="~/lib/jquery/dist/jquery.min.js" asp-append-version="true"></script>
+    <script src="~/lib/bootstrap/js/bootstrap.bundle.min.js" asp-append-version="true"></script> 
+    
+    <script src="~/js/backhandle.js" asp-append-version="true"></script> 
+    <script src="~/js/site.min.js" asp-append-version="true"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.4/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/emoji-mart@latest/dist/browser.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script id="signalrjs" src="~/js/signalr/dist/browser/signalr.js"></script>
+ *@ 
+
+     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="~/lib/signalr/dist/browser/signalr.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+
+    <!-- ✅ Then render page-specific scripts -->
+    @RenderSection("Scripts", required: false)
+
+    <script>
+        let currentSize = 1;
+
+        window.changeFontSize = function (step) {
+            currentSize += step * 0.1;
+            document.documentElement.style.setProperty('--base-scale', currentSize);
+        };
+
+        window.resetFontSize = function () {
+            currentSize = 1;
+            document.documentElement.style.setProperty('--base-scale', 1);
+        };
+
+        function updateDateTime() {
+            const now = new Date();
+            const day = String(now.getDate()).padStart(2, '0');
+            const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            const month = months[now.getMonth()];
+            const year = now.getFullYear();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            
+            const formatted = `${day} ${month} ${year} [${hours}:${minutes}:${seconds}]`;
+
+            const el = document.getElementById("currentDateTime");
+            if (el) el.innerText = formatted;
+        }
+
+        setInterval(updateDateTime, 1000);
+        updateDateTime();
+
+        // Dynamic Language Translation Logic
+        const translations = {
+            "en": {
+                "home": "Home",
+                "trains": "TRAINS",
+                "meals": "MEALS",
+                "loyalty": "LOYALTY",
+                "ewallet": "E-WALLET",
+                "alerts": "ALERTS",
+                "otherservices": "OTHER SERVICES",
+                "contactus": "CONTACT US",
+                "bookticket": "BOOK TICKET",
+                "from": "From*",
+                "from_placeholder": "Enter source station",
+                "to": "To*",
+                "to_placeholder": "Enter destination station",
+                "date": "DD/MM/YYYY *",
+                "date_placeholder": "Select Journey Date",
+                "classes": "Classes",
+                "quota": "Quota",
+                "searchtrains": "Search Trains",
+                "searchmemu": "🔍 Search MEMU/DEMU/MMTS Trains",
+                "checkpnr": "🔍 Check PNR Status",
+                "chartvacancy": "Chart Vacancy"
+            },
+            "hi": {
+                "home": "होम",
+                "trains": "ट्रेनें",
+                "meals": "भोजन",
+                "loyalty": "वफादारी",
+                "ewallet": "ई-वॉलेट",
+                "alerts": "अलर्ट",
+                "otherservices": "अन्य सेवाएं",
+                "contactus": "संपर्क करें",
+                "bookticket": "टिकट बुक करें",
+                "from": "से*",
+                "from_placeholder": "स्रोत स्टेशन दर्ज करें",
+                "to": "तक*",
+                "to_placeholder": "गंतव्य स्टेशन दर्ज करें",
+                "date": "दिनांक *",
+                "date_placeholder": "यात्रा की तारीख चुनें",
+                "classes": "श्रेणी",
+                "quota": "कोटा",
+                "searchtrains": "ट्रेनें खोजें",
+                "searchmemu": "🔍 मेमू/डेमू/एमएमटीएस ट्रेनें खोजें",
+                "checkpnr": "🔍 पीएनआर स्थिति जांचें",
+                "chartvacancy": "चार्ट रिक्ति"
+            }
+        };
+
+        function applyTranslation(lang) {
+            document.querySelectorAll('.lang-option').forEach(o => {
+                const optText = o.innerText.trim();
+                if ((optText === 'English' && lang === 'en') || (optText === 'हिंदी' && lang === 'hi')) {
+                    o.classList.add('active');
+                } else {
+                    o.classList.remove('active');
+                }
+            });
+
+            document.querySelectorAll('[data-translate]').forEach(el => {
+                const key = el.getAttribute('data-translate');
+                if (translations[lang] && translations[lang][key]) {
+                    const icon = el.querySelector('i');
+                    if (icon) {
+                        el.innerHTML = '';
+                        el.appendChild(icon);
+                        el.appendChild(document.createTextNode(' ' + translations[lang][key]));
+                        if (el.classList.contains('dropdown-toggle') && key !== 'home') {
+                            const chevron = document.createElement('i');
+                            chevron.className = 'fa-solid fa-chevron-down';
+                            chevron.style.marginLeft = '4px';
+                            el.appendChild(chevron);
+                        }
+                    } else {
+                        if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+                            el.setAttribute('placeholder', translations[lang][key]);
+                        } else {
+                            el.innerText = translations[lang][key];
+                            if (el.classList.contains('dropdown-toggle')) {
+                                const chevron = document.createElement('i');
+                                chevron.className = 'fa-solid fa-chevron-down';
+                                chevron.style.marginLeft = '4px';
+                                el.appendChild(chevron);
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            const savedLang = localStorage.getItem("lang") || "en";
+            applyTranslation(savedLang);
+
+            document.querySelectorAll('.lang-option').forEach(option => {
+                option.addEventListener('click', function() {
+                    const lang = this.innerText.trim() === 'English' ? 'en' : 'hi';
+                    localStorage.setItem("lang", lang);
+                    applyTranslation(lang);
+                });
+            });
+        });
+    </script>
+
+    <div id="globalLoader" class="loading-modal">
+        <div class="loading-box">
+            <div class="loader"></div>
+            <div class="loading-text">Please wait...</div>
+        </div>
+    </div>
+
+    <script>
+        function confirmLogout() {
+            if (confirm("Are you sure you want to log out from Admin Panel?")) {
+                window.location.href = "/Admin/Logout";
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+
+            const btn = document.getElementById("hamburgerBtn");
+            const menu = document.getElementById("navMenu");
+
+            if (btn && menu) {
+                btn.addEventListener("click", function () {
+                    menu.classList.toggle("show");
+                    btn.classList.toggle("active");
+                });
+            }
+
+            // Accordion toggle for dropdown menus on mobile viewports
+            document.querySelectorAll('.dropdown-toggle').forEach(toggle => {
+                toggle.addEventListener('click', function(e) {
+                    if (window.innerWidth < 992) {
+                        e.preventDefault();
+                        const parent = this.parentElement;
+                        parent.classList.toggle('active');
+                    }
+                });
+            });
+
+        });
+    </script>
+
+    <script>
+        const themeToggle = document.getElementById("themeToggle");
+
+        // LOAD SAVED THEME
+        if (localStorage.getItem("theme") === "dark") {
+            document.body.classList.add("dark-mode");
+        }
+
+        // TOGGLE THEME
+        themeToggle?.addEventListener("click", () => {
+            document.body.classList.toggle("dark-mode");
+            if (document.body.classList.contains("dark-mode")) {
+                localStorage.setItem("theme", "dark");
+            } else {
+                localStorage.setItem("theme", "light");
+            }
+        });
+    </script>
+
+    @*     <script>
+        function updateIRCTCTime() {
+
+            const now = new Date();
+
+            const day = String(now.getDate()).padStart(2, '0');
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const year = now.getFullYear();
+
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+
+            const formatted =
+                `${day}-${month}-${year} [${hours}:${minutes}:${seconds}]`;
+
+            const clock = document.getElementById("irctcClock");
+
+            if (clock) {
+                clock.innerText = formatted;
+            }
+        }
+
+        updateIRCTCTime();
+
+        setInterval(updateIRCTCTime, 1000);
+    </script>
+ *@
+
+
+    <!-- GLOBAL NAVBAR INTERACTIVE MODAL -->
+    <div id="irctcNavModal" class="modal-overlay" style="display:none; z-index: 30000;">
+        <div class="modal-content" style="max-width: 850px; width: 92%; border-radius: 12px; padding: 25px;">
+            <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                <h4 id="irctcNavModalTitle" class="m-0 text-primary fw-bold" style="color:#1d3ca5 !important;">Modal Title</h4>
+                <span onclick="closeNavModal()" style="cursor:pointer; font-size: 24px; font-weight: bold; color: #888;">&times;</span>
+            </div>
+            <div id="irctcNavModalBody"></div>
+        </div>
+    </div>
+
+    <script>
+        function openNavModal(key) {
+            if (typeof hideLoader === 'function') hideLoader();
+            const modal = document.getElementById("irctcNavModal");
+            const titleEl = document.getElementById("irctcNavModalTitle");
+            const bodyEl = document.getElementById("irctcNavModalBody");
+            if (!modal || !titleEl || !bodyEl) return;
+
+            let title = "";
+            let content = "";
+
+            switch(key) {
+                case 'connectingJourney':
+                    title = "🚆 Connecting Journey Booking";
+                    content = `
+                        <div class="p-2">
+                            <p class="lead text-muted" style="font-size:14px;">Book multi-leg connecting train journeys seamlessly across stations with automatic connection window validation.</p>
+                            <form onsubmit="event.preventDefault(); Swal.fire('Connecting Search', 'Searching available connecting trains between selected stations...', 'info');">
+                                <div class="row g-3">
+                                    <div class="col-md-5">
+                                        <label class="form-label fw-bold">Origin Station</label>
+                                        <input type="text" class="form-control" placeholder="e.g. NDLS - New Delhi" required>
+                                    </div>
+                                    <div class="col-md-2 text-center align-self-end pb-1">
+                                        <span class="badge bg-primary fs-5" style="padding: 8px 12px;">⇄</span>
+                                    </div>
+                                    <div class="col-md-5">
+                                        <label class="form-label fw-bold">Destination Station</label>
+                                        <input type="text" class="form-control" placeholder="e.g. HWH - Howrah Jn" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">Connecting Junction</label>
+                                        <input type="text" class="form-control" placeholder="e.g. CNB - Kanpur Central (Optional)">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">Journey Date</label>
+                                        <input type="date" class="form-control" required>
+                                    </div>
+                                </div>
+                                <div class="mt-4 text-end">
+                                    <button type="button" class="btn btn-secondary me-2" onclick="closeNavModal()">Close</button>
+                                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-magnifying-glass me-1"></i> Find Connecting Trains</button>
+                                </div>
+                            </form>
+                        </div>`;
+                    break;
+                case 'trainSchedule':
+                    title = "📅 Train Schedule & Timetable Lookup";
+                    content = `
+                        <div class="p-2">
+                            <p class="text-muted mb-2">Enter Train Number or Name to view detailed route timetable and station halts.</p>
+                            <div class="input-group mb-3">
+                                <input type="text" id="scheduleTrainInput" class="form-control" placeholder="e.g. 19725, 20812, 17053, DBG AMRIT BHARAT">
+                                <button class="btn btn-primary" onclick="searchNavSchedule()"><i class="fa-solid fa-search me-1"></i> Search Schedule</button>
+                            </div>
+                            <div id="navScheduleResults" class="mt-3">
+                                <div class="table-responsive">
+                                    <table class="table table-bordered table-hover">
+                                        <thead class="table-dark" style="background:#1d3ca5;">
+                                            <tr><th>Seq</th><th>Station Name</th><th>Code</th><th>Arrive</th><th>Depart</th><th>Halt</th><th>Distance</th></tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr><td>1</td><td>KHATIPURA</td><td>KWP</td><td>Source</td><td>22:30</td><td>--</td><td>0 km</td></tr>
+                                            <tr><td>2</td><td>JAIPUR JN</td><td>JP</td><td>22:50</td><td>23:00</td><td>10 min</td><td>18 km</td></tr>
+                                            <tr><td>3</td><td>AGRA FORT</td><td>AF</td><td>03:15</td><td>03:20</td><td>5 min</td><td>240 km</td></tr>
+                                            <tr><td>4</td><td>DARBHANGA JN</td><td>DBG</td><td>00:55</td><td>Destination</td><td>--</td><td>1180 km</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>`;
+                    break;
+                case 'trackTrain':
+                    title = "📍 Track Your Train - Live Running Status";
+                    content = `
+                        <div class="p-2">
+                            <p class="text-muted mb-3">Get real-time live location, arrival delays, and platform info for any running train.</p>
+                            <div class="row g-2 mb-3">
+                                <div class="col-md-7">
+                                    <input type="text" class="form-control" placeholder="Enter Train No. e.g., 20812 (NED VSKP SF EXP)">
+                                </div>
+                                <div class="col-md-3">
+                                    <select class="form-select"><option>Today</option><option>Yesterday</option></select>
+                                </div>
+                                <div class="col-md-2">
+                                    <button class="btn btn-success w-100" onclick="Swal.fire('Live Status', 'Train 20812 is running ON TIME. Next Stop: VISAKHAPATNAM (09:20)', 'success')"><i class="fa-solid fa-location-arrow me-1"></i> Track</button>
+                                </div>
+                            </div>
+                            <div class="alert alert-info d-flex align-items-center mt-3">
+                                <i class="fa-solid fa-circle-check fs-3 me-3 text-success"></i>
+                                <div>
+                                    <strong>Live Status Update:</strong> DBG AMRIT BHARAT (19725) — Departed from KHATIPURA on time. Expected Arrival at DARBHANGA JN: 00:55 (+0 mins delay).
+                                </div>
+                            </div>
+                        </div>`;
+                    break;
+                case 'ftrBooking':
+                    title = "🚆 Full Tariff Rate (FTR) Special Train & Coach Booking";
+                    content = `
+                        <div class="p-2">
+                            <p class="text-muted">Register request to book full train rakes or individual special coaches for marriage parties, tours, and corporate events.</p>
+                            <form onsubmit="event.preventDefault(); Swal.fire('FTR Registered', 'Your FTR booking request has been logged. Reference No: FTR-2026-9812.', 'success'); closeNavModal();">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">Booking Type</label>
+                                        <select class="form-select"><option>Entire Special Train</option><option>Individual Coach (AC/SL)</option></select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">Number of Passengers</label>
+                                        <input type="number" class="form-control" placeholder="e.g. 72" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">Origin Station</label>
+                                        <input type="text" class="form-control" placeholder="Origin Station Code" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">Destination Station</label>
+                                        <input type="text" class="form-control" placeholder="Destination Station Code" required>
+                                    </div>
+                                    <div class="col-md-12">
+                                        <label class="form-label fw-bold">Contact Person Name & Mobile</label>
+                                        <input type="text" class="form-control" placeholder="Name & 10-digit mobile number" required>
+                                    </div>
+                                </div>
+                                <div class="mt-4 text-end">
+                                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-paper-plane me-1"></i> Submit FTR Application</button>
+                                </div>
+                            </form>
+                        </div>`;
+                    break;
+                case 'petBooking':
+                    title = "🐾 Dogs/Cats Booking Guidelines & Request";
+                    content = `
+                        <div class="p-2">
+                            <div class="alert alert-warning mb-3">
+                                <i class="fa-solid fa-triangle-exclamation me-1"></i> <strong>Note:</strong> Pets (Dogs/Cats) can be booked in First AC (1A) / Executive Coupes (whole coupe booking required) or in Guard Van dog boxes.
+                            </div>
+                            <form onsubmit="event.preventDefault(); Swal.fire('Pet Booking Request', 'Pet travel application reference generated: PET-8841. Please carry veterinary fitness certificate.', 'success'); closeNavModal();">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">PNR Number (First AC Booking)</label>
+                                        <input type="text" class="form-control" placeholder="Enter 10-digit PNR" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">Pet Type</label>
+                                        <select class="form-select"><option>Dog</option><option>Cat</option></select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">Veterinary Certificate Number</label>
+                                        <input type="text" class="form-control" placeholder="Certificate No." required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">Pet Weight (kg)</label>
+                                        <input type="number" class="form-control" placeholder="Weight in kg" required>
+                                    </div>
+                                </div>
+                                <div class="mt-4 text-end">
+                                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check me-1"></i> Register Pet Travel Request</button>
+                                </div>
+                            </form>
+                        </div>`;
+                    break;
+                case 'linkAadhaar':
+                    title = "🪪 Link Your Aadhaar - Instant Verification";
+                    content = `
+                        <div class="p-2">
+                            <p class="text-muted">Link your 12-digit Aadhaar number to increase your monthly ticket booking limit from 6 to 24 tickets and enable opening-day ARP bookings.</p>
+                            <form onsubmit="event.preventDefault(); Swal.fire('Aadhaar Verified', 'Your Aadhaar has been successfully verified & linked to your IRCTC account!', 'success'); closeNavModal();">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Aadhaar Number</label>
+                                    <input type="text" class="form-control form-control-lg" placeholder="12-digit Aadhaar number" maxlength="12" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Full Name as per Aadhaar</label>
+                                    <input type="text" class="form-control" placeholder="Full Name" required>
+                                </div>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="aadhaarConsent" required>
+                                    <label class="form-check-label" for="aadhaarConsent">I give consent to IRCTC for Aadhaar e-KYC verification.</label>
+                                </div>
+                                <div class="text-end">
+                                    <button type="submit" class="btn btn-success"><i class="fa-solid fa-shield-halved me-1"></i> Verify & Link Aadhaar</button>
+                                </div>
+                            </form>
+                        </div>`;
+                    break;
+                case 'counterCancel':
+                    title = "🎫 Counter Ticket Cancellation";
+                    content = `
+                        <div class="p-2">
+                            <p class="text-muted">Cancel physical tickets purchased at Railway Station PRS Counters online and claim refund at your nearest station counter.</p>
+                            <form onsubmit="event.preventDefault(); Swal.fire('Cancellation Submitted', 'OTP sent to mobile number registered on counter ticket. Enter OTP to confirm refund.', 'info');">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">PNR Number</label>
+                                        <input type="text" class="form-control" placeholder="10-digit PNR" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">Train Number</label>
+                                        <input type="text" class="form-control" placeholder="5-digit Train No." required>
+                                    </div>
+                                    <div class="col-md-12">
+                                        <label class="form-label fw-bold">Captcha Text</label>
+                                        <input type="text" class="form-control" placeholder="Enter Captcha" required>
+                                    </div>
+                                </div>
+                                <div class="mt-4 text-end">
+                                    <button type="submit" class="btn btn-danger"><i class="fa-solid fa-xmark me-1"></i> Submit Cancellation Request</button>
+                                </div>
+                            </form>
+                        </div>`;
+                    break;
+                case 'counterBoarding':
+                    title = "🔄 Counter Ticket Boarding Point Change";
+                    content = `
+                        <div class="p-2">
+                            <p class="text-muted">Request change of boarding station up to 24 hours before scheduled train departure from origin.</p>
+                            <form onsubmit="event.preventDefault(); Swal.fire('Boarding Changed', 'Boarding point successfully updated! SMS notification dispatched.', 'success'); closeNavModal();">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">PNR Number</label>
+                                        <input type="text" class="form-control" placeholder="10-digit PNR" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">New Boarding Station</label>
+                                        <input type="text" class="form-control" placeholder="Station Code e.g. JP, AF, CNB" required>
+                                    </div>
+                                </div>
+                                <div class="mt-4 text-end">
+                                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-arrows-spin me-1"></i> Update Boarding Station</button>
+                                </div>
+                            </form>
+                        </div>`;
+                    break;
+                case 'ePantry':
+                case 'eCatering':
+                case 'foodMenu':
+                    title = "🍽️ IRCTC E-Catering & Pantry Food Ordering";
+                    content = `
+                        <div class="p-2">
+                            <p class="text-muted mb-3">Order hygienic, fresh meals from top-rated restaurants delivered straight to your train berth!</p>
+                            <div class="row g-3 mb-4">
+                                <div class="col-md-3">
+                                    <div class="card p-2 text-center h-100 border-primary shadow-sm">
+                                        <i class="fa-solid fa-leaf text-success fs-1 my-2"></i>
+                                        <h6 class="fw-bold">Standard Veg Thali</h6>
+                                        <p class="text-muted small mb-2">Paneer, Dal, Rice, 3 Roti, Sweets</p>
+                                        <h5 class="text-primary fw-bold">₹120</h5>
+                                        <button class="btn btn-sm btn-outline-primary mt-auto" onclick="Swal.fire('Added', 'Standard Veg Thali added to cart', 'success')">Order Now</button>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card p-2 text-center h-100 border-danger shadow-sm">
+                                        <i class="fa-solid fa-drumstick-bite text-danger fs-1 my-2"></i>
+                                        <h6 class="fw-bold">Non-Veg Thali</h6>
+                                        <p class="text-muted small mb-2">Chicken Curry, Rice, Paratha, Salad</p>
+                                        <h5 class="text-primary fw-bold">₹160</h5>
+                                        <button class="btn btn-sm btn-outline-primary mt-auto" onclick="Swal.fire('Added', 'Non-Veg Thali added to cart', 'success')">Order Now</button>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card p-2 text-center h-100 border-warning shadow-sm">
+                                        <i class="fa-solid fa-bowl-rice text-warning fs-1 my-2"></i>
+                                        <h6 class="fw-bold">Hyderabadi Biryani</h6>
+                                        <p class="text-muted small mb-2">Authentic Chicken Biryani + Raita</p>
+                                        <h5 class="text-primary fw-bold">₹150</h5>
+                                        <button class="btn btn-sm btn-outline-primary mt-auto" onclick="Swal.fire('Added', 'Biryani added to cart', 'success')">Order Now</button>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card p-2 text-center h-100 border-info shadow-sm">
+                                        <i class="fa-solid fa-mug-hot text-info fs-1 my-2"></i>
+                                        <h6 class="fw-bold">Tea & Snacks</h6>
+                                        <p class="text-muted small mb-2">Masala Tea, Coffee, Samosa Combo</p>
+                                        <h5 class="text-primary fw-bold">₹50</h5>
+                                        <button class="btn btn-sm btn-outline-primary mt-auto" onclick="Swal.fire('Added', 'Snacks combo added to cart', 'success')">Order Now</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>`;
+                    break;
+                case 'cashbackInfo':
+                case 'loyaltyInfo':
+                case 'cardRegistration':
+                    title = "💳 IRCTC SBI Co-branded Card & Loyalty Rewards";
+                    content = `
+                        <div class="p-2 text-center">
+                            <h4 class="fw-bold text-primary">Get Up to 10% Value Back on Train Tickets!</h4>
+                            <p class="text-muted">Enjoy zero transaction charges on train ticket bookings, complimentary railway lounge access across India, and bonus reward points.</p>
+                            <div class="d-flex justify-content-center flex-wrap gap-2 my-3">
+                                <span class="badge bg-success p-2 fs-6">Zero Payment Gateway Fee</span>
+                                <span class="badge bg-primary p-2 fs-6">4 Premium Lounge Visits / Year</span>
+                                <span class="badge bg-warning text-dark p-2 fs-6">3500 Activation Reward Points</span>
+                            </div>
+                            <button class="btn btn-lg btn-success mt-2" onclick="Swal.fire('Application Submitted', 'Thank you for registering for IRCTC SBI Co-branded Card! Agent will contact you shortly.', 'success'); closeNavModal();">Apply Now for Free</button>
+                        </div>`;
+                    break;
+                case 'ewalletAbout':
+                case 'ewalletGuide':
+                    title = "👛 IRCTC eWallet - Instant Ticket Booking";
+                    content = `
+                        <div class="p-2">
+                            <h5 class="fw-bold mb-3">Why use IRCTC eWallet?</h5>
+                            <ul class="list-group list-group-flush mb-4">
+                                <li class="list-group-item"><i class="fa-solid fa-bolt text-warning me-2 fs-5"></i> <strong>Lightning Fast Payment:</strong> No bank OTP delays during high-rush Tatkal 10:00 AM booking hours.</li>
+                                <li class="list-group-item"><i class="fa-solid fa-rotate-left text-success me-2 fs-5"></i> <strong>Instant Refunds:</strong> Cancellation refunds credited back directly to eWallet within minutes.</li>
+                                <li class="list-group-item"><i class="fa-solid fa-lock text-primary me-2 fs-5"></i> <strong>Highly Secure:</strong> Protected by transaction passwords and encrypted OTP authorization.</li>
+                            </ul>
+                            <div class="text-center">
+                                <button class="btn btn-primary" onclick="Swal.fire('eWallet Status', 'Your IRCTC eWallet Balance: ₹2,450.00', 'info')">Check My eWallet Balance</button>
+                            </div>
+                        </div>`;
+                    break;
+                case 'alerts':
+                    title = "🔔 Official Railway Travel Alerts & Announcements";
+                    content = `
+                        <div class="p-2">
+                            <div class="list-group">
+                                <div class="list-group-item list-group-item-warning mb-2 rounded">
+                                    <h6 class="mb-1 fw-bold"><i class="fa-solid fa-triangle-exclamation me-1"></i> Mandatory Aadhaar Verification</h6>
+                                    <p class="mb-0 small">w.e.f. 12 January 2026, Aadhaar verification is mandatory for opening-day ARP general bookings.</p>
+                                </div>
+                                <div class="list-group-item list-group-item-info mb-2 rounded">
+                                    <h6 class="mb-1 fw-bold"><i class="fa-solid fa-train me-1"></i> Vande Bharat Special Services</h6>
+                                    <p class="mb-0 small">Special Vande Bharat express trains introduced on Delhi-Varanasi & Ayodhya routes to handle holiday rush.</p>
+                                </div>
+                                <div class="list-group-item list-group-item-success rounded">
+                                    <h6 class="mb-1 fw-bold"><i class="fa-solid fa-shield-heart me-1"></i> Zero Payment Gateway Surcharge</h6>
+                                    <p class="mb-0 small">No convenience fee surcharge applicable when paying via UPI & IRCTC iPay payment engine.</p>
+                                </div>
+                            </div>
+                        </div>`;
+                    break;
+                case 'ipay':
+                    title = "💳 IRCTC iPay Payment Gateway Engine";
+                    content = `
+                        <div class="p-2 text-center">
+                            <i class="fa-solid fa-credit-card text-primary display-4 mb-3"></i>
+                            <h4 class="fw-bold">IRCTC iPay - Unified Payment Interface</h4>
+                            <p class="text-muted">India's dedicated railway payment gateway offering seamless checkout via Net Banking, Credit/Debit Cards, UPI (GPay, PhonePe, Paytm), and EMI.</p>
+                            <div class="alert alert-success mt-3">Auto-Refund Enabled: Instant refund processing upon ticket cancellation or failed transactions.</div>
+                        </div>`;
+                    break;
+                case 'buses':
+                    title = "🚌 IRCTC Bus Tickets Booking";
+                    content = `
+                        <div class="p-2">
+                            <p class="text-muted">Book intercity Volvo AC & Sleeper buses across 50,000+ routes with live tracking and zero service fees.</p>
+                            <form onsubmit="event.preventDefault(); Swal.fire('Bus Search', 'Searching available AC Volvo buses...', 'info');">
+                                <div class="row g-2">
+                                    <div class="col-md-4"><input type="text" class="form-control" placeholder="From City" required></div>
+                                    <div class="col-md-4"><input type="text" class="form-control" placeholder="To City" required></div>
+                                    <div class="col-md-4"><input type="date" class="form-control" required></div>
+                                </div>
+                                <div class="mt-3 text-end"><button type="submit" class="btn btn-warning fw-bold text-dark"><i class="fa-solid fa-bus me-1"></i> Search Buses</button></div>
+                            </form>
+                        </div>`;
+                    break;
+                case 'flights':
+                    title = "✈️ IRCTC Air - Cheap Flight Tickets";
+                    content = `
+                        <div class="p-2">
+                            <p class="text-muted">Book domestic & international flights at lowest airfares with complimentary ₹50 Lakhs travel insurance.</p>
+                            <form onsubmit="event.preventDefault(); Swal.fire('Flight Search', 'Searching flights with zero markup fee...', 'info');">
+                                <div class="row g-2">
+                                    <div class="col-md-4"><input type="text" class="form-control" placeholder="From Airport (DEL, BOM, BLR)" required></div>
+                                    <div class="col-md-4"><input type="text" class="form-control" placeholder="To Airport" required></div>
+                                    <div class="col-md-4"><input type="date" class="form-control" required></div>
+                                </div>
+                                <div class="mt-3 text-end"><button type="submit" class="btn btn-info text-white fw-bold"><i class="fa-solid fa-plane me-1"></i> Search Flights</button></div>
+                            </form>
+                        </div>`;
+                    break;
+                case 'hotels':
+                    title = "🏨 IRCTC Retiring Rooms & Hotels";
+                    content = `
+                        <div class="p-2">
+                            <p class="text-muted">Book Railway Station Retiring Rooms, Executive Lounges, and verified budget & luxury hotels near major railway stations.</p>
+                            <form onsubmit="event.preventDefault(); Swal.fire('Hotel Search', 'Searching available retiring rooms and nearby hotels...', 'info');">
+                                <div class="row g-2">
+                                    <div class="col-md-6"><input type="text" class="form-control" placeholder="Station Code or City" required></div>
+                                    <div class="col-md-6"><input type="date" class="form-control" required></div>
+                                </div>
+                                <div class="mt-3 text-end"><button type="submit" class="btn btn-primary"><i class="fa-solid fa-hotel me-1"></i> Search Hotels</button></div>
+                            </form>
+                        </div>`;
+                    break;
+                case 'holidays':
+                    title = "🏖️ IRCTC Tourism & Special Holiday Packages";
+                    content = `
+                        <div class="p-2">
+                            <p class="text-muted mb-3">Explore all-inclusive domestic & international tour packages, Bharat Gaurav Tourist Trains, and pilgrimage circuits.</p>
+                            <div class="row g-3 text-center">
+                                <div class="col-md-4"><div class="border p-3 rounded shadow-sm bg-light"><h6>Bharat Gaurav Yatra</h6><p class="small text-muted mb-2">12 Days South India Temple Tour</p><span class="badge bg-success fs-6">₹18,500</span></div></div>
+                                <div class="col-md-4"><div class="border p-3 rounded shadow-sm bg-light"><h6>Kashmir Paradise</h6><p class="small text-muted mb-2">6 Days Srinagar & Gulmarg Special</p><span class="badge bg-success fs-6">₹24,990</span></div></div>
+                                <div class="col-md-4"><div class="border p-3 rounded shadow-sm bg-light"><h6>Char Dham Yatra</h6><p class="small text-muted mb-2">10 Days Devbhoomi Uttarakhand</p><span class="badge bg-success fs-6">₹32,100</span></div></div>
+                            </div>
+                        </div>`;
+                    break;
+                case 'wheelchair':
+                    title = "♿ e-Wheelchair Assistance Booking";
+                    content = `
+                        <div class="p-2">
+                            <p class="text-muted">Free wheelchair assistance booking at major railway stations for senior citizens, patients, and Persons with Disability (PwD).</p>
+                            <form onsubmit="event.preventDefault(); Swal.fire('Wheelchair Reserved', 'Wheelchair booking reference generated. Attendant will assist at station platform.', 'success'); closeNavModal();">
+                                <div class="row g-3">
+                                    <div class="col-md-6"><label class="form-label fw-bold">PNR Number</label><input type="text" class="form-control" placeholder="10-digit PNR" required></div>
+                                    <div class="col-md-6"><label class="form-label fw-bold">Station Name</label><input type="text" class="form-control" placeholder="Station Code" required></div>
+                                </div>
+                                <div class="mt-3 text-end"><button type="submit" class="btn btn-success"><i class="fa-solid fa-wheelchair me-1"></i> Book Wheelchair</button></div>
+                            </form>
+                        </div>`;
+                    break;
+                case 'promotions':
+                    title = "📢 IRCTC Media & Brand Promotions";
+                    content = `
+                        <div class="p-2 text-center">
+                            <i class="fa-solid fa-bullhorn text-warning display-4 mb-3"></i>
+                            <h4 class="fw-bold">Advertise with IRCTC Portal</h4>
+                            <p class="text-muted">Reach millions of daily active train travelers across India with banner advertisements, ticket branding, and app placement.</p>
+                            <button class="btn btn-outline-primary" onclick="Swal.fire('Advertising Enquiry', 'Please contact advertise@irctc.co.in for media rate card.', 'info')">Download Rate Card</button>
+                        </div>`;
+                    break;
+                case 'contactUs':
+                default:
+                    title = "📞 IRCTC Customer Support & Emergency Helpline";
+                    content = `
+                        <div class="p-2">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="card p-3 h-100 text-center bg-light border-0 shadow-sm">
+                                        <i class="fa-solid fa-phone-volume text-primary fs-1 mb-2"></i>
+                                        <h5 class="fw-bold">24x7 Railway Helpline</h5>
+                                        <h3 class="text-primary fw-bold">139 / 14567</h3>
+                                        <p class="text-muted small">Toll-free across India for security, PNR, and general queries.</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card p-3 h-100 text-center bg-light border-0 shadow-sm">
+                                        <i class="fa-solid fa-envelope text-success fs-1 mb-2"></i>
+                                        <h5 class="fw-bold">Email Support</h5>
+                                        <h6 class="fw-bold">care@irctc.co.in</h6>
+                                        <p class="text-muted small">Send ticket booking, refund, or technical assistance emails.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>`;
+                    break;
+            }
+
+            titleEl.innerHTML = title;
+            bodyEl.innerHTML = content;
+            modal.style.display = "flex";
+        }
+
+        function closeNavModal() {
+            if (typeof hideLoader === 'function') hideLoader();
+            const modal = document.getElementById("irctcNavModal");
+            if (modal) modal.style.display = "none";
+        }
+
+        function searchNavSchedule() {
+            const val = document.getElementById("scheduleTrainInput")?.value?.trim();
+            if (!val) {
+                Swal.fire('Input Required', 'Please enter a valid Train Number or Name', 'warning');
+                return;
+            }
+            Swal.fire('Schedule Found', 'Displaying active schedule for train: ' + val, 'success');
+        }
+    </script>
+
+</body>
+</html>
+
+
+@section Scripts {
+    <script>
+            window.addEventListener("load", () => {
+            setTimeout(() => {
+                document.getElementById("loadingScreen").style.display = "none";
+            }, 1000);
+        });
+    </script>
+
+    <script>
+        var error = '@TempData["Error"]';
+        if (error) {
+            showToast(error);
+        }
+    </script>
+
+    @*     <script>
+        function openLogoutModal() {
+            document.getElementById("logoutModal").style.display = "flex";
+        }
+
+        function closeLogoutModal() {
+            document.getElementById("logoutModal").style.display = "none";
+        }
+    </script> *@
+
+}

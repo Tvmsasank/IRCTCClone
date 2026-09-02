@@ -1,0 +1,3225 @@
+@model IRCTCClone.Models.Booking
+@using IRCTCClone.E_D
+
+@{
+    ViewData["Title"] = "Booking Details";
+}
+
+@{
+    var classCode = ViewBag.Class?.Code ?? "";
+}
+
+@{
+    int currentStep = ViewBag.CurrentStep ?? 1;
+}
+
+@{
+    var train = ViewBag.Train as IRCTCClone.Models.Train;
+    var cls = ViewBag.Class as IRCTCClone.Models.TrainClass;
+    var journey = ViewBag.JourneyDate as string ?? DateTime.Today.ToString("yyyy-MM-dd");
+    var frmst = ViewBag.FromStation;
+    var tost = ViewBag.ToStation;
+    var FromStation1 = ViewBag.FromStation1;
+    var ToStation1 = ViewBag.ToStation1;
+    var Departure = ViewBag.Departure;
+    var Arrival = ViewBag.Arrival;
+    var Duration = ViewBag.Duration;
+    var Quota = ViewBag.Quota;
+    var departureDay = ViewBag.DepartureDay is int depDay ? depDay : 1;
+    var arrivalDay = ViewBag.ArrivalDay is int arrDay ? arrDay : 1;
+    var parsedJourneyDate = DateTime.Parse(journey);
+    var departureDate = parsedJourneyDate.AddDays(departureDay - 1);
+    var arrivalDate = parsedJourneyDate.AddDays(arrivalDay - 1);
+
+    // Retrieve user email and mobile number dynamically
+    var userEmail = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "divinebutterfly1322@gmail.com";
+    string maskedEmail = "";
+    if (!string.IsNullOrEmpty(userEmail) && userEmail.Contains((char)64))
+    {
+        var parts = userEmail.Split((char)64);
+        var name = parts[0];
+        var domain = parts[1];
+        if (name.Length <= 2)
+        {
+            maskedEmail = name + "***@" + domain;
+        }
+        else
+        {
+            maskedEmail = name.Substring(0, 2) + new string('*', Math.Min(6, name.Length - 2)) + (name.Length > 4 ? name.Substring(name.Length - 2) : "") + "@" + domain;
+        }
+    }
+    else
+    {
+        maskedEmail = "gu***@gmail.com";
+    }
+
+    var username = User.Identity.Name ?? "";
+    string mobileNumber = "9000485456"; // Default fallback
+    if (System.Text.RegularExpressions.Regex.IsMatch(username, @"^\d{10}$"))
+    {
+        mobileNumber = username;
+    }
+    else if (!string.IsNullOrEmpty(userEmail) && userEmail != "guest@gmail.com")
+    {
+        // Hash the email to get a deterministic 10-digit number for different logged-in users
+        using (var md5 = System.Security.Cryptography.MD5.Create())
+        {
+            var hash = md5.ComputeHash(System.Text.Encoding.UTF8.GetBytes(userEmail));
+            long val = Math.Abs(BitConverter.ToInt64(hash, 0));
+            mobileNumber = "9" + (val % 1000000000).ToString("D9");
+        }
+    }
+    
+    string maskedMobile = "";
+    if (mobileNumber.Length >= 10)
+    {
+        maskedMobile = mobileNumber.Substring(0, 2) + "******" + mobileNumber.Substring(mobileNumber.Length - 2);
+    }
+    else
+    {
+        maskedMobile = mobileNumber;
+    }
+}
+
+<div class="checkout-wrapper">
+
+    <!-- TOP STEPPER -->
+    <div class="booking-steps">
+
+        <!-- STEP 1 -->
+        <div class="step-item @(currentStep >= 1 ? "active" : "")">
+            <div class="step-circle">
+                @if (currentStep > 1)
+                {
+                    <i class="bi bi-check-lg"></i>
+                }
+                else
+                {
+                    <span>1</span>
+                }
+            </div>
+            <div class="step-label">Passenger Details</div>
+        </div>
+
+        <div class="step-line @(currentStep >= 2 ? "completed" : "")"></div>
+
+        <!-- STEP 2 -->
+        <div class="step-item @(currentStep >= 2 ? "active" : "")">
+            <div class="step-circle">
+                @if (currentStep > 3)
+                {
+                    <i class="bi bi-check-lg"></i>
+                }
+                else
+                {
+                    <span>2</span>
+                }
+            </div>
+            <div class="step-label">Review Journey</div>
+        </div>
+
+        <div class="step-line @(currentStep >= 3 ? "completed" : "")"></div>
+
+        <!-- STEP 3 -->
+        <div class="step-item @(currentStep >= 3 ? "active" : "")">
+            <div class="step-circle">
+                <span>3</span>
+            </div>
+            <div class="step-label">Payment</div>
+        </div>
+
+    </div>
+
+    <!-- MAIN LAYOUT -->
+    <div class="booking-layout">
+
+        <!-- LEFT -->
+        <div class="booking-left">
+
+            <form method="post"
+                  action="/Booking/Confirm"
+                  class="checkout-form">
+
+                <input type="hidden"
+                       name="edata"
+                       value="@ViewBag.EncryptedData" />
+
+                <input type="hidden"
+                       name="trainId"
+                       value="@train.Id" />
+
+                <input type="hidden"
+                       name="classId"
+                       value="@cls.Id" />
+
+                <input type="hidden"
+                       name="journeyDate"
+                       value="@journey" />
+
+                <input type="hidden"
+                       name="trainName"
+                       value="@train.Name" />
+
+                <input type="hidden"
+                       name="trainNumber"
+                       value="@train.Number" />
+
+                <input type="hidden"
+                       name="Class"
+                       value="@cls.Code" />
+
+                <input type="hidden"
+                       name="quota"
+                       value="@ViewBag.Quota" />
+
+                <input type="hidden"
+                       name="FromStationId"
+                       value="@ViewBag.FromStationId" />
+
+                <input type="hidden"
+                       name="ToStationId"
+                       value="@ViewBag.ToStationId" />
+
+                <input type="hidden"
+                       name="SeatStatuscount"
+                       value="@ViewBag.SeatStatusCount" />
+
+                <input type="hidden"
+                       name="BookingStatus"
+                       value="@ViewBag.BookingStatus" />
+
+                <input type="hidden"
+                       name="boardingStation"
+                       id="boardingStationInput"
+                       value="@FromStation1" />
+
+                <input type="hidden"
+                       id="boardingDepartureInput"
+                       name="boardingDeparture"
+                       value="@Departure" />
+
+                <input type="hidden"
+                       id="boardingDayInput"
+                       name="boardingDay"
+                       value="@departureDay" />
+
+                <!-- IRCTC WARNING BANNER -->
+                <div class="irctc-warning-banner">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <span>Senior Citizen concession not allowed for this Train/Quota/Class. Person With Disability/ Journalist may check after entering details.</span>
+                </div>
+
+                <!-- compact train card -->
+                <div class="irctc-compact-train-card">
+                    <div class="irctc-train-header" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                        <span class="irctc-train-title">
+                            @train.Name (@train.Number)
+                        </span>
+                        <span class="irctc-train-location-icon checkout-route-link"
+                              data-train-id="@train.Id"
+                              data-train-name="@train.Name"
+                              data-train-number="@train.Number"
+                              data-from="@FromStation1"
+                              data-to="@ToStation1"
+                              style="cursor: pointer;">
+                            <i class="fa-solid fa-location-dot" style="color: #64748b;"></i>
+                        </span>
+                    </div>
+
+                    <div class="irctc-route-row" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                        <div class="irctc-route-station-info">
+                            <span class="irctc-route-time">@Departure</span>
+                            <span class="irctc-route-station-name">@FromStation1</span>
+                            <div class="irctc-route-date">@departureDate.ToString("ddd, dd MMM")</div>
+                        </div>
+                        
+                        <div class="irctc-route-duration-container">
+                            <span class="irctc-route-duration">@Duration</span>
+                            <div class="irctc-route-line-graphic">
+                                <span class="irctc-circle-dot"></span>
+                                <span class="irctc-circle-dot"></span>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; align-items: center; gap: 15px; text-align: right; width: 35% !important; justify-content: flex-end;">
+                            <div class="irctc-route-station-info text-right" style="width: auto !important; display: flex; flex-direction: column;">
+                                <span class="irctc-route-time">@Arrival</span>
+                                <span class="irctc-route-station-name">@ToStation1</span>
+                                <div class="irctc-route-date">@arrivalDate.ToString("ddd, dd MMM")</div>
+                            </div>
+                            <span class="live-seat-status" id="liveSeatStatusTop" style="display: none; font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 4px; text-transform: uppercase;"></span>
+                        </div>
+                    </div>
+
+                    <div class="irctc-class-quota-row">
+                        <span class="irctc-class-quota-badge">@cls.Code | @ViewBag.Quota</span>
+                    </div>
+
+                    <div class="irctc-boarding-change-section">
+                        <div class="irctc-boarding-title">CHANGE</div>
+                        <button type="button" class="irctc-boarding-dropdown-trigger" id="toggleBoardingStations">
+                            <span class="irctc-boarding-station-text">
+                                Boarding Station | <span id="selectedBoardingStation">@FromStation1</span> | <span id="selectedBoardingDeparture">Departure: @Departure</span> | <span id="selectedBoardingDay">Day: @departureDay</span> | Boarding Date: @departureDate.ToString("dd MMM yyyy")
+                            </span>
+                            <i class="fa-solid fa-chevron-down" style="color: #64748b; font-size: 0.8rem;"></i>
+                        </button>
+                        
+                        <!-- List of boarding stations -->
+                        <div class="boarding-station-list" id="boardingStationList" style="display:none; margin-top: 8px;">
+                            @foreach (var stop in ViewBag.RouteStops)
+                            {
+                                <div class="boarding-station-item"
+                                     data-station="@stop.StationName"
+                                     data-departure="@stop.DepartureTime"
+                                     data-day="@stop.DayNumber"
+                                     data-arrival="@stop.ArrivalTime"
+                                     data-stopno="@stop.StopNumber">
+                                    <div>
+                                        <div class="boarding-item-name">
+                                            @stop.StopNumber. @stop.StationName
+                                        </div>
+                                        <div class="boarding-item-time">
+                                            Arrival: @stop.ArrivalTime | Departure: @stop.DepartureTime | Day: @stop.DayNumber | @stop.Distance km
+                                        </div>
+                                    </div>
+                                    <div class="boarding-select-circle"></div>
+                                </div>
+                            }
+                        </div>
+                        <div class="irctc-boarding-note">
+                            Please check NTES website or NTES app for actual time before boarding.
+                        </div>
+                    </div>
+
+                    <!-- Read-only boarding summary for Step 2 -->
+                    <div class="irctc-boarding-summary-row" id="irctcBoardingSummaryRow" style="display: none; padding: 12px 15px; background: #ffffff; border-top: 1px dashed #cbd5e1; font-size: 13px; color: #334155; line-height: 1.4;">
+                        <div id="dynamicReviewBoardingTop" style="font-weight: bold; color: #334155;">
+                            1 Adult | @cls.Code | @ViewBag.Quota | Boarding at @FromStation1 | Boarding Date: @departureDate.ToString("dd MMM yyyy") @Departure
+                        </div>
+                        <div style="font-size: 11px; color: #64748b; margin-top: 5px;">
+                            Please check NTES website or NTES app for actual time before boarding
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CO-BRANDED BENEFITS -->
+                <div class="booking-card irctc-cobranded-card">
+                    <div class="cobranded-header">
+                        <strong>IRCTC Co-branded Card Benefits</strong>
+                        <div class="cobranded-options">
+                            <label class="cobranded-radio-label">
+                                <input type="radio" name="cobrandedBenefits" value="earn" />
+                                <span>Earn Loyalty Points</span>
+                            </label>
+                            <label class="cobranded-radio-label">
+                                <input type="radio" name="cobrandedBenefits" value="pay" />
+                                <span>Pay with Loyalty Points</span>
+                            </label>
+                            <label class="cobranded-radio-label">
+                                <input type="radio" name="cobrandedBenefits" value="skip" checked />
+                                <span class="highlight-orange">Skip</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="cobranded-subtext">
+                        ( Pay Less, Earn More: 1% PG Waiver + upto 10% Reward Points )
+                    </div>
+                </div>
+
+                <!-- NOTES -->
+                <div class="booking-card irctc-notes-card">
+                    <div class="notes-title">Notes:</div>
+                    <ol class="notes-list">
+                        <li>The ID card will be required during journey</li>
+                        <li>Please fill your current citizenship status while booking the ticket. Incorrect information may attract action under the Foreigners Act, 1946.</li>
+                    </ol>
+                </div>
+
+                <!-- PASSENGER CARD -->
+                <div class="booking-card">
+
+                    <h2>Passenger Details</h2>
+                    @*<div class="catering-notice">
+                        Enhance Your Travel with Taste! Opt for Onboard Catering for a Delicious Dining Experience!
+                    </div>*@
+
+                    <div id="passengers">
+                        <div class="passenger-row-item">
+                            <input name="passengerNames" type="text" placeholder="Passenger Name" class="passenger-field p-name" required />
+                            <input name="passengerAges" type="number" placeholder="Age" min="1" max="120" class="passenger-field p-age" required />
+                            <select name="passengerGenders" class="passenger-field p-gender" required>
+                                <option value="">Gender</option>
+                                <option value="M">Male</option>
+                                <option value="F">Female</option>
+                                <option value="O">Transgender</option>
+                            </select>
+                            <select name="passengerCountries" class="passenger-field p-country">
+                                <option value="India">India</option>
+                                <option value="Other">Other</option>
+                            </select>
+                            <select name="passengerBerths" class="passenger-field p-berth">
+                                @{
+                                    var classCode = ViewBag.Class?.Code ?? "";
+                                    if (classCode.Contains("(2S)") || classCode.Contains("(CC)") || classCode.Contains("(EC)"))
+                                    {
+                                        <option value="">No Preference</option>
+                                        <option value="WS">Window Side</option>
+                                        <option value="AS">Aisle</option>
+                                    }
+                                    else
+                                    {
+                                        <option value="">No Preference</option>
+                                        <option value="LB">Lower</option>
+                                        <option value="MB">Middle</option>
+                                        <option value="UB">Upper</option>
+                                        <option value="SL">Side Lower</option>
+                                        <option value="SU">Side Upper</option>
+                                    }
+                                }
+                            </select>
+                            <button type="button" class="remove-passenger-btn">✕</button>
+                        </div>
+                    </div>
+
+                    <div class="add-passenger-links-container">
+                        <button type="button" id="addPassenger" class="add-btn">+ Add Passenger/ Add Infant With Berth</button>
+                        <span class="link-divider">|</span>
+                        <button type="button" class="add-btn" onclick="showToast('Add Infant Without Berth option selected', 'info')">+ Add Infant Without Berth</button>
+                    </div>
+                    <div class="infant-notice">
+                        *Children under 5 years of age shall be carried free and no purchase of any ticket is required. (If no separate berth is opted.)
+                    </div>
+
+                    <!-- CONTACT DETAILS SECTION -->
+                    <div class="irctc-contact-section">
+                        <div class="contact-header">Contact Details</div>
+                        <div class="contact-subtext">(Ticket details will be sent to email- @maskedEmail)</div>
+                        
+                        <div class="contact-inputs" style="margin-bottom: 12px !important;">
+                            <div class="mobile-input-wrapper">
+                                <span class="country-code">+91</span>
+                                <input type="tel" id="contactMobileInput" class="mobile-field" value="@mobileNumber" maxlength="10" placeholder="Mobile Number" style="border: none !important; height: 100% !important; padding: 0 8px !important; font-size: 13px !important; width: 120px !important; outline: none !important;" />
+                            </div>
+                        </div>
+
+                        <div class="gst-row">
+                            <button type="button" class="gst-toggle-btn" onclick="showToast('GST optional details enabled', 'info')">GST Details (Optional)</button>
+                            <input type="text" class="passenger-field gst-field" placeholder="GST Identification Number(GSTIN)" readonly />
+                        </div>
+                    </div>
+
+                    <div class="step-navigation">
+
+                        <button type="button"
+                                id="backToResultsBtn"
+                                class="back-btn"
+                                style="cursor: pointer">
+
+                            Back
+
+                        </button>
+
+                        <button type="button"
+                                id="nextToReviewBtn"
+                                class="next-btn"
+                                style="cursor: pointer">
+
+                            Next
+
+                        </button>
+
+                    </div>
+
+                </div>
+                <!-- REVIEW SECTION -->
+                <div class="booking-card"
+                     id="reviewSection"
+                     style="display:none; padding: 12px 15px !important;">
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #cbd5e1; padding-bottom: 5px; margin-bottom: 10px;">
+                        <h2 style="font-size: 14px !important; font-weight: 700 !important; color: #0f2954 !important; margin: 0 !important; border-bottom: none !important; padding-bottom: 0 !important;">Passenger Details</h2>
+                        <i class="fa-solid fa-chevron-up" style="color: #64748b; font-size: 0.85rem;"></i>
+                    </div>
+
+                    <div id="reviewPassengerContainer" style="margin-bottom: 15px;"></div>
+
+                    <!-- Ticket notification banner -->
+                    <div class="review-ticket-sent-banner" style="padding: 10px 12px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; color: #334155; margin-bottom: 15px;">
+                        Your ticket will be sent to <strong style="color: #0f2954;">@maskedEmail / <span id="reviewMobile">@maskedMobile</span></strong>
+                    </div>
+
+                    <!-- CAPTCHA -->
+                    <div class="modern-boarding-box review-captcha-box" style="margin-top: 15px !important; border: 1px solid #dbeafe !important; background: #eff6ff !important; border-radius: 4px !important; padding: 12px 15px !important;">
+
+                        <div class="modern-boarding-title" style="font-size: 13px !important; font-weight: 700 !important; color: #1d4ed8 !important; margin-bottom: 6px !important;">
+                            Verification
+                        </div>
+
+                        <div class="captcha-payment-wrapper" style="display: flex !important; align-items: center !important; gap: 12px !important; flex-wrap: wrap !important;">
+
+                            <div class="captcha-left" style="display: flex !important; align-items: center !important; gap: 8px !important;">
+
+                                <img id="captchaImg"
+                                     src="/captcha"
+                                     alt="captcha"
+                                     class="captcha-image"
+                                     style="height: 36px !important; width: 110px !important; object-fit: cover !important; border-radius: 4px !important; border: 1px solid #cbd5e1 !important; background: #fff !important;" />
+
+                                <button type="button"
+                                        class="captcha-refresh-btn"
+                                        onclick="refreshCaptcha()"
+                                        style="width: 32px !important; height: 32px !important; border: none !important; border-radius: 4px !important; background: #fb792b !important; color: white !important; font-size: 16px !important; font-weight: 700 !important; cursor: pointer !important; display: flex !important; align-items: center !important; justify-content: center !important;">
+                                    ⟳
+                                </button>
+                            </div>
+
+                            <div class="captcha-input-wrapper" style="flex: 1 !important; min-width: 150px !important;">
+
+                                <input type="text"
+                                       id="captchaInput"
+                                       name="CaptchaInput"
+                                       placeholder="Enter captcha"
+                                       autocomplete="off"
+                                       class="captcha-payment-input"
+                                       style="width: 100% !important; height: 32px !important; border-radius: 4px !important; border: 1px solid #cbd5e1 !important; padding: 0 10px !important; font-size: 13px !important; font-weight: 500 !important; background: #fff !important; box-sizing: border-box !important;"
+                                       required />
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                    <div class="step-navigation" style="margin-top: 15px !important; display: flex !important; justify-content: space-between !important; align-items: center !important;">
+
+                        <button type="button"
+                                id="backToPassengerBtn"
+                                class="back-btn"
+                                style="cursor: pointer">
+                            Back
+                        </button>
+
+                        <button type="button"
+                                id="nextToPaymentBtn"
+                                class="next-btn"
+                                style="cursor: pointer">
+                            Next
+                        </button>
+
+                    </div>
+
+                </div>
+
+                <!-- PAYMENT SECTION -->
+                <div class="booking-card"
+                     id="paymentSection"
+                     style="display:none;">
+
+                    <h2>Payment</h2>
+                    <!-- INSURANCE -->
+                    <div class="payment-box">
+
+                        <div class="payment-title">
+                            Travel Insurance
+                        </div>
+
+                        <label class="payment-option">
+
+                            <input type="checkbox"
+                                   id="travelInsurance"
+                                   checked />
+
+                            <div>
+
+                                <div class="payment-name">
+                                    Secure My Journey
+                                </div>
+
+                                <div class="payment-desc">
+                                    ₹0.45 per passenger
+                                </div>
+
+                            </div>
+
+                        </label>
+
+                    </div>
+
+                    <!-- PAYMENT MODE -->
+                    <div class="payment-box">
+
+                        <div class="payment-title">
+                            Payment Method
+                        </div>
+
+                        <!-- CARD -->
+                        <label class="payment-option">
+
+                            <input type="radio"
+                                   name="paymentMode"
+                                   value="CARD"
+                                   checked />
+
+                            <div>
+
+                                <div class="payment-name">
+                                    Credit / Debit Card
+                                </div>
+
+                                <div class="payment-desc">
+                                    Dynamic Convenience Fee
+                                </div>
+
+                            </div>
+
+                        </label>
+
+                        <!-- UPI -->
+                        <label class="payment-option">
+
+                            <input type="radio"
+                                   name="paymentMode"
+                                   value="UPI" />
+
+                            <div>
+
+                                <div class="payment-name">
+                                    BHIM / UPI
+                                </div>
+
+                                <div class="payment-desc">
+                                    Dynamic Convenience Fee
+                                </div>
+
+                            </div>
+
+                        </label>
+
+                        <!-- NETBANKING -->
+                        <label class="payment-option">
+
+                            <input type="radio"
+                                   name="paymentMode"
+                                   value="NETBANKING" />
+
+                            <div>
+
+                                <div class="payment-name">
+                                    Net Banking
+                                </div>
+
+                                <div class="payment-desc">
+                                    Dynamic Convenience Fee
+                                </div>
+
+                            </div>
+
+                        </label>
+
+                        <!-- WALLET -->
+                        <label class="payment-option">
+
+                            <input type="radio"
+                                   name="paymentMode"
+                                   value="WALLET" />
+
+                            <div>
+
+                                <div class="payment-name">
+                                    Wallet
+                                </div>
+
+                                <div class="payment-desc">
+                                    Dynamic Convenience Fee
+                                </div>
+
+                            </div>
+
+                        </label>
+
+                    </div>
+
+                    <div class="step-navigation">
+
+                        <button type="button"
+                                id="backToReviewBtn"
+                                class="back-btn"
+                                style="cursor: pointer">
+
+                            Back
+
+                        </button>
+
+                        <button type="button"
+                                id="payBookBtn"
+                                class="pay-btn"
+                                style="cursor: pointer">
+
+                            Continue
+
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </form>
+
+        </div>
+
+        <!-- RIGHT SIDE -->
+        <div class="booking-right">
+            
+            <!-- JOURNEY SUMMARY CARD (Step 3 only) -->
+            <div class="summary-card journey-summary-card" id="journeySummaryCard" style="display:none;">
+                <div class="summary-header" style="background: #0f2954; color: white; padding: 10px 15px;">
+                    <h2 style="color: white !important; font-size: 14px; margin: 0; font-weight: bold; border-bottom: none !important; padding-bottom: 0 !important;">JOURNEY SUMMARY</h2>
+                </div>
+                <div class="summary-body" style="padding: 15px; font-size: 13px;">
+                    <div style="display: flex; justify-content: space-between; font-weight: bold; color: #0f2954; margin-bottom: 5px;">
+                        <span>@train.Name (@train.Number)</span>
+                        <span>@DateTime.Parse(journey).ToString("ddd, dd MMM")</span>
+                    </div>
+                    <div style="font-weight: bold; color: #334155; margin-bottom: 5px;">
+                        <span>@FromStation1 → @ToStation1</span>
+                    </div>
+
+                    <hr style="margin: 10px 0; border: 0; border-top: 1px solid #e2e8f0;" />
+                    <div style="font-size: 12px; color: #334155; line-height: 1.4;" id="journeySummaryBoardingText">
+                        <!-- Dynamic boarding info -->
+                    </div>
+                    <hr style="margin: 10px 0; border: 0; border-top: 1px solid #e2e8f0;" />
+                    <div style="font-weight: bold; color: #0f2954; margin-bottom: 5px; font-size: 13px;">Passenger Details</div>
+                    <div id="journeySummaryPassengerContainer" style="font-size: 12px; color: #334155; line-height: 1.4;">
+                        <!-- Dynamic passengers -->
+                    </div>
+                    <hr style="margin: 10px 0; border: 0; border-top: 1px solid #e2e8f0;" />
+                    <div style="font-weight: bold; color: #0f2954; margin-bottom: 5px; font-size: 13px;">Contact Details</div>
+                    <div style="font-size: 12px; color: #334155; line-height: 1.4;">
+                        <div>Email: @maskedEmail</div>
+                        <div>Mobile: <span id="summaryMobile">@maskedMobile</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="summary-card premium-summary">
+
+                <!-- HEADER -->
+                <div class="summary-header">
+                    <h2>Fare Summary</h2>
+                </div>
+
+                <!-- FARE DETAILS -->
+                <div class="live-fare-box" id="fareSummaryBox">
+
+                    <!-- ALWAYS VISIBLE -->
+                    <div class="live-fare-row">
+                        <span>Ticket Fare</span>
+                        <strong>
+                            ₹<span id="baseFare">@cls.TotalFare</span>
+                        </strong>
+                    </div>
+
+                    <!-- STEP 2 & 3 ONLY -->
+                    <div id="detailedFareSection" style="display:none;">
+
+                        <div class="live-fare-row">
+                            <span>Passengers</span>
+                            <strong id="passengerCount">1</strong>
+                        </div>
+
+                        <div class="live-fare-row">
+                            <span>Convenience Fee (Incl. GST)</span>
+                            <strong>
+                                ₹<span id="convenienceFee">0.00</span>
+                            </strong>
+                        </div>
+
+                        <div class="live-fare-row" style="display:none;">
+                            <span>GST (18%)</span>
+                            <strong>
+                                ₹<span id="gstFee">1.80</span>
+                            </strong>
+                        </div>
+
+                        <div class="live-fare-row" style="display:none;">
+                            <span>Travel Insurance</span>
+                            <strong>
+                                ₹<span id="insuranceFee">0.45</span>
+                            </strong>
+                        </div>
+
+                    </div>
+
+                    <div class="live-total-row">
+                        <span>Total Fare</span>
+                        <strong>
+                            ₹<span id="totalFare">@cls.TotalFare</span>
+                        </strong>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div id="sidebar-overlay" class="sidebar-overlay"></div>
+    <div id="route-sidebar" class="route-sidebar">
+        <div class="sidebar-header">
+            <h4 class="sidebar-title">Train Route</h4>
+            <button class="sidebar-close" id="close-sidebar">&times;</button>
+        </div>
+
+        <div id="sidebar-content" class="sidebar-content">
+            <!-- AJAX Loaded Route -->
+        </div>
+    </div>
+
+</div>
+
+<!-- PREMIUM OTP MODAL -->
+
+<div id="otpOverlay" class="otp-overlay">
+
+    <div class="otp-modal">
+
+        <!-- TOP -->
+
+        <div class="otp-top">
+
+            <div class="otp-icon">
+                🔐
+            </div>
+
+            <button type="button"
+                    class="otp-close-btn"
+                    id="cancelOtpBtn">
+
+                ✕
+
+            </button>
+
+        </div>
+
+        <!-- TITLE -->
+
+        <div class="otp-header">
+            OTP Verification
+        </div>
+
+        <div class="otp-subtitle">
+            Secure IRCTC Payment Authentication
+        </div>
+
+        <!-- MOBILE -->
+
+        <div class="otp-mobile">
+
+            OTP sent to registered Mail Id
+
+        </div>
+
+        <!-- INPUT -->
+
+        <input type="text"
+               id="otpInput"
+               maxlength="6"
+               autocomplete="off"
+               placeholder="Enter 6 digit OTP" />
+
+        <!-- TIMER -->
+
+        <div class="otp-timer-wrapper">
+
+            <span id="otpPrefix">
+                Expires in
+            </span>
+
+            <span id="otpTimer">
+                02:00
+            </span>
+
+        </div>
+
+        <!-- HIDDEN -->
+
+        <input type="hidden"
+               id="otpExpiryTime" />
+
+        <!-- ACTIONS -->
+
+        <div class="otp-actions">
+
+            <button type="button"
+                    id="verifyOtpBtn"
+                    class="otp-verify-btn">
+
+                Verify & Confirm
+
+            </button>
+
+            <button type="button"
+                    id="resendOtpBtn"
+                    class="otp-resend-btn">
+
+                Resend OTP
+
+            </button>
+
+        </div>
+
+        <!-- FOOTER -->
+
+        <div class="otp-footer">
+
+            Your transaction is protected with
+            IRCTC secure authentication
+
+        </div>
+
+    </div>
+
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+
+    $(function () {
+
+        function toggleFareSummary(showDetailed) {
+            if (showDetailed) {
+                $("#detailedFareSection").fadeIn(200, function() {
+                    updateTotal();
+                });
+                updateTotal();
+            } else {
+                $("#detailedFareSection").hide();
+                updateTotal();
+            }
+        }
+
+        let initialStatus =
+            $("#liveSeatStatus").text().trim();
+
+        if (initialStatus) {
+            updateSeatStatusColor(initialStatus);
+        }
+
+        toggleFareSummary(false);
+
+        // BACK TO TRAIN RESULTS
+        $("#backToResultsBtn").click(function () {
+
+            if (document.referrer) {
+                window.location.href = document.referrer;
+            }
+            else {
+                window.location.href = "/";
+            }
+        });
+
+        // --- Update Total Fare ---
+        function updateTotal() {
+
+            let baseFare =
+                parseFloat('@cls.TotalFare');
+
+            let passengerCount =
+                $("#passengers .passenger-row-item").length;
+
+            $("#passengerCount").text(passengerCount);
+
+            let classCode = '@cls.Code'.toUpperCase();
+
+            let paymentMode =
+                $("input[name='paymentMode']:checked").val();
+
+            // =========================
+            // CHECK AC OR NON AC
+            // =========================
+
+            let isAcClass =
+                classCode.includes("1A") ||
+                classCode.includes("2A") ||
+                classCode.includes("3A") ||
+                classCode.includes("EC") ||
+                classCode.includes("CC") ||
+                classCode.includes("AC");
+
+            // =========================
+            // IRCTC CONVENIENCE FEES
+            // INCLUDING GST
+            // =========================
+
+            let convenienceFee = 0;
+            let gst = 0;
+
+            // =========================
+            // REAL DYNAMIC IRCTC FEES
+            // =========================
+
+            // BASE CONVENIENCE
+            let baseConvenienceFee =
+                isAcClass ? 20 : 10;
+
+            // GST
+            gst =
+                baseConvenienceFee * 0.18;
+
+            // FINAL CONVENIENCE
+            convenienceFee =
+                baseConvenienceFee + gst;
+
+            // =========================
+            // INSURANCE
+            // =========================
+
+            let insurance =
+                $("#travelInsurance").is(":checked")
+                ? (0.45 * passengerCount)
+                : 0;
+
+            // =========================
+            // TOTALS
+            // =========================
+
+            let ticketFare =
+                baseFare * passengerCount;
+
+            // Only add convenience fee and insurance if detailed fare is shown (Steps 2 or 3)
+            let isDetailed = $("#reviewSection").is(":visible") || $("#paymentSection").is(":visible");
+
+            let total = ticketFare;
+            if (isDetailed) {
+                total += convenienceFee + insurance;
+            }
+
+            // =========================
+            // UI UPDATE
+            // =========================
+
+            $("#baseFare")
+                .text(ticketFare.toFixed(2));
+
+            $("#convenienceFee")
+                .text(convenienceFee.toFixed(2));
+
+            $("#gstFee")
+                .text(gst.toFixed(2));
+
+            $("#insuranceFee")
+                .text(insurance.toFixed(2));
+
+            $("#totalFare")
+                .text(total.toFixed(2));
+
+            $("#reviewFare")
+                .text(total.toFixed(2));
+
+            $("#reviewPassengerCount")
+                .text(passengerCount);
+
+            // =========================
+            // PASSENGER REVIEW
+            // =========================
+
+            // Calculate boarding date based on day number
+            let dateParts = '@journey'.split('-');
+            let baseDate = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
+            let boardingDay = parseInt($("#boardingDayInput").val() || '1');
+            baseDate.setDate(baseDate.getDate() + (boardingDay - 1));
+            let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            let formattedBoardingDate = String(baseDate.getDate()).padStart(2, '0') + " " + months[baseDate.getMonth()] + " " + baseDate.getFullYear();
+
+            let departureTime = $("#boardingDepartureInput").val() || '@Departure';
+            if (departureTime.includes("Departure : ")) {
+                departureTime = departureTime.replace("Departure : ", "").trim();
+            }
+            if (departureTime.length > 5) {
+                departureTime = departureTime.substring(0, 5);
+            }
+
+            // Update boarding details in review dynamically
+            let reviewBoardingText = `${passengerCount} ${passengerCount > 1 ? 'Passengers' : 'Adult'} | ${classCode} | @ViewBag.Quota | Boarding at ${$("#selectedBoardingStation").text().trim() || '@FromStation1'} | Boarding Date: ${formattedBoardingDate} ${departureTime}`;
+            $("#dynamicReviewBoardingTop").text(reviewBoardingText);
+
+            // Update journey summary boarding details
+            let journeySummaryBoarding = `${passengerCount} ${passengerCount > 1 ? 'Passengers' : 'Adult'} | ${classCode} | @ViewBag.Quota | Boarding at ${$("#selectedBoardingStation").text().trim() || '@FromStation1'} | Boarding Date: ${formattedBoardingDate} ${departureTime}`;
+            $("#journeySummaryBoardingText").text(journeySummaryBoarding);
+
+            // Update journey summary passenger list
+            let passengerSummaryHtml = '';
+            $(".passenger-row-item").each(function(index){
+                let name = $(this).find("input[name='passengerNames']").val() || "";
+                let age = $(this).find("input[name='passengerAges']").val();
+                let gender = $(this).find("select[name='passengerGenders']").val();
+                let genderText = gender === "M" ? "Male" : (gender === "F" ? "Female" : "Other");
+                passengerSummaryHtml += `<div style="margin-bottom: 3px;">${index + 1}. ${name.toUpperCase()} ${age} yrs | ${genderText}</div>`;
+            });
+            $("#journeySummaryPassengerContainer").html(passengerSummaryHtml);
+
+            buildPassengerReview();
+
+        }
+
+        $("input[name='paymentMode']").change(function () {
+            updateTotal();
+        });
+
+        $("#travelInsurance").change(function () {
+            updateTotal();
+        });
+
+        const MAX_PASSENGERS = 6;
+
+        // --- Add Passenger ---
+        $("#addPassenger").on("click", function () {
+
+            const passengerCount = $(".passenger-row-item").length;
+
+            if (passengerCount >= MAX_PASSENGERS) {
+
+                showToast("Maximum 6 passengers allowed per ticket.", "warning");
+
+                return;
+            }
+
+            var classCode = '@(ViewBag.Class?.Code ?? "")';
+
+            let berthOptions = '';
+
+            if (classCode.includes("(2S)") || classCode.includes("(CC)") || classCode.includes("(EC)"))
+            {
+                berthOptions = `
+                    <option value="">No Preference</option>
+                    <option value="WS">Window Side</option>
+                    <option value="AS">Aisle</option>
+                `;
+
+            } else {
+                berthOptions = `
+                    <option value="">No Preference</option>
+                    <option value="LB">Lower</option>
+                    <option value="MB">Middle</option>
+                    <option value="UB">Upper</option>
+                    <option value="SL">Side Lower</option>
+                    <option value="SU">Side Upper</option>
+                `;
+            }
+
+            var passengerHtml = `
+            <div class="passenger-row-item">
+                <input name="passengerNames" type="text" placeholder="Passenger Name" class="passenger-field p-name" required />
+                <input name="passengerAges" type="number" placeholder="Age" min="1" max="120" class="passenger-field p-age" required />
+                <select name="passengerGenders" class="passenger-field p-gender" required>
+                    <option value="">Gender</option>
+                    <option value="M">Male</option>
+                    <option value="F">Female</option>
+                    <option value="O">Transgender</option>
+                </select>
+                <select name="passengerCountries" class="passenger-field p-country">
+                    <option value="India">India</option>
+                    <option value="Other">Other</option>
+                </select>
+                <select name="passengerBerths" class="passenger-field p-berth">
+                    ${berthOptions}
+                </select>
+                <button type="button" class="remove-passenger-btn">✕</button>
+            </div>
+            `;
+            $("#passengers").append(passengerHtml);
+            updateTotal();
+        });
+
+        // --- Remove Passenger (Delegated Event) ---
+        $(document).on("click", ".remove-passenger-btn", function () {
+
+            if ($(".passenger-row-item").length <= 1) {
+
+                showToast("At least one passenger is required.", "warning");
+
+                return;
+            }
+
+            $(this)
+                .closest(".passenger-row-item")
+                .fadeOut(300, function () {
+
+                    $(this).remove();
+
+                    // UPDATE TOTAL AFTER REMOVE
+                    updateTotal();
+
+                });
+
+        });
+
+        $(document).on("input", "input[name='passengerAges']", function () {
+            let val = parseInt($(this).val());
+            if (val < 1 || isNaN(val)) {
+                $(this).val("");
+            }
+        });
+
+        // --- Initial Fare Update ---
+        updateTotal();
+
+        // ---------- OTP TIMER ----------
+
+        let otpTimerInterval = null;
+
+        function startOtpTimer(expiryUtc) {
+            if (!expiryUtc) {
+                const fallback = new Date();
+                fallback.setMinutes(fallback.getMinutes() + 2);
+                expiryUtc = fallback.toISOString();
+            }
+
+            let expiry = new Date(expiryUtc);
+            if (isNaN(expiry.getTime())) {
+                expiry = new Date();
+                expiry.setMinutes(expiry.getMinutes() + 2);
+            }
+            const prefix = $("#otpPrefix");
+            const timerSpan = $("#otpTimer");
+            const resendBtn = $("#resendOtpBtn");
+            const verifyBtn = $("#verifyOtpBtn");
+
+            resendBtn.prop("disabled", true);
+            verifyBtn.prop("disabled", false);
+
+            $("#otpExpiryTime").val(expiryUtc);
+
+            if (otpTimerInterval) {
+                clearInterval(otpTimerInterval);
+            }
+
+            function renderTimer() {
+                const now = new Date();
+                const diffMs = expiry - now;
+
+                if (diffMs <= 0) {
+                    clearInterval(otpTimerInterval);
+
+                    prefix.text("");
+                    timerSpan.text("OTP expired, Click to Resend OTP");
+                    resendBtn.prop("disabled", false);
+                    verifyBtn.prop("disabled", true);
+                    return;
+                }
+
+                const totalSeconds = Math.floor(diffMs / 1000);
+                const minutes = Math.floor(totalSeconds / 60);
+                const seconds = totalSeconds % 60;
+
+                timerSpan.text(
+                    String(minutes).padStart(2, '0') + ":" +
+                    String(seconds).padStart(2, '0')
+                );
+            }
+
+            renderTimer();
+
+            otpTimerInterval = setInterval(renderTimer,1000);
+        }
+
+        // ---------- OTP REQUEST ----------
+        let otpRequested = false;
+
+        $("#payBookBtn").on("click", function () {
+
+            const form = $(".checkout-form")[0];
+
+            if (!form.checkValidity()) {
+                showValidationErrors(form);
+                return;
+            }
+
+            // 🚫 PREVENT MULTIPLE CLICKS
+            if (otpRequested) return;
+            otpRequested = true;
+
+            const btn = $("#payBookBtn");
+            btn.prop("disabled", true);
+
+            // 🔥 SHOW GLOBAL LOADER
+            showLoader();
+
+            $.ajax({
+                url: "/Booking/RequestOtp",
+                type: "POST",
+                data: $(".checkout-form").serialize(),
+
+                success: function (res) {
+
+                    // HIDE LOADER FIRST
+                    hideLoader();
+
+                    if (res.success) {
+
+                        $("#otpOverlay").css("display", "flex");
+
+                        startOtpTimer(res.otpExpiryUtc);
+
+                    } else {
+
+                        showToast("Failed to send OTP", "error");
+
+                    }
+                },
+
+                error: function (xhr) {
+
+                    console.log(xhr.responseText);
+
+                    showToast(xhr.responseText, "error");
+
+                },
+
+                complete: function () {
+
+                    // 🔥 ALWAYS RESTORE
+
+                    otpRequested = false;
+                    btn.prop("disabled", false);
+                }
+            });
+        });
+        // ---------- RESEND OTP ----------
+        $("#resendOtpBtn").on("click", function () {
+
+            $(this).prop("disabled", true);
+
+            $.ajax({
+                url: "/Booking/RequestOtp",
+                type: "POST",
+                data: $(".checkout-form").serialize(),
+                success: function (res) {
+                    if (res.success) {
+
+                        startOtpTimer(res.otpExpiryUtc);
+                    }
+                    else {
+                        showToast("Failed to resend OTP", "error");
+                    }
+                }
+            });
+        });
+
+        // ---------- VERIFY OTP ----------
+        $("#verifyOtpBtn").on("click", function () {
+
+            let otp = $("#otpInput").val().trim();
+
+            if (otp.length !== 6) {
+                showToast("Enter valid 6 digit OTP", "error");
+                return;
+            }
+
+            const btn = $(this);
+
+            btn.prop("disabled", true);
+
+            $.ajax({
+
+                url: "/Booking/VerifyOtp",
+                type: "POST",
+
+                data: {
+                    otp: otp
+                },
+
+                success: function (res) {
+
+                    if (res.success) {
+
+                        // ADD OTP TO FORM
+                        $("<input>").attr({
+                            type: "hidden",
+                            name: "otp",
+                            value: otp
+                        }).appendTo(".checkout-form");
+
+                        // CLOSE OTP
+                        $("#otpOverlay").fadeOut();
+
+                        // SUBMIT BOOKING FORM
+                        $(".checkout-form").submit();
+                    }
+                    else {
+
+                        showToast(res.message || "Invalid OTP", "error");
+
+                        btn.prop("disabled", false);
+                    }
+                },
+
+                error: function () {
+
+                    showToast("OTP verification failed", "error");
+
+                    btn.prop("disabled", false);
+                }
+            });
+        });
+
+        // ---------- CANCEL OTP ----------
+        $("#cancelOtpBtn").on("click", function () {
+            $("#otpOverlay").hide();
+            $("#otpInput").val("");
+            $(".otp-error").text("");
+            $("#otpTimer").text("--:--");
+
+            if(otpTimerInterval){
+                clearInterval(otpTimerInterval);
+            }
+        });
+
+    if (window.location.search.length > 0) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+        window.onload = function () {
+        sessionStorage.removeItem("selectedTrain");
+        sessionStorage.removeItem("availabilityData");
+    };
+
+    $(document).on("click", ".checkout-route-link", function (e) {
+
+        e.preventDefault();
+
+        var trainId = $(this).data("train-id");
+        var trainName = $(this).data("train-name");
+        var trainNumber = $(this).data("train-number");
+        var fromStation = $(this).data("from");
+        var toStation = $(this).data("to");
+
+        var headerHtml = `
+            <div class="mobile-train-header">
+
+                <strong>
+                    ${trainNumber} - (${trainName})
+                </strong>
+
+                <div class="mobile-route">
+                    ${fromStation} → ${toStation}
+                </div>
+
+            </div>
+        `;
+
+        $(".sidebar-title").html(headerHtml);
+
+        var journeyDate = '@journey';
+
+        $.get("/Admin/GetTrainRoute",
+            {
+                trainId: trainId,
+                journeyDate: journeyDate
+            },
+            function (html) {
+
+                $("#sidebar-content").html(html);
+
+                $("#sidebar-overlay").addClass("show");
+                $("#route-sidebar").addClass("open");
+
+            }).fail(function (xhr) {
+                if (xhr.status === 401) {
+                    showToast("Login required to view schedule during Tatkal timings", "warning");
+                    setTimeout(function() {
+                        window.location.href = "/Account/Login?returnUrl=" + encodeURIComponent(window.location.pathname + window.location.search);
+                    }, 1500);
+                } else {
+                    showToast("Failed to fetch train route details.", "error");
+                }
+            });
+
+    });
+
+    $(document).on("click", "#close-sidebar, #sidebar-overlay", function () {
+
+        $("#route-sidebar").removeClass("open");
+        $("#sidebar-overlay").removeClass("show");
+
+        // $("#route-sidebar").css("right", "-700px");
+        // $("#sidebar-overlay").fadeOut(200);
+    });
+
+    // BOARDING STATION TOGGLE
+    $(document).on("click", "#toggleBoardingStations", function () {
+
+        $("#boardingStationList").slideToggle(250);
+
+    });
+
+    // BOARDING STATION SELECT
+    $(document).on("click", ".boarding-station-item", function () {
+
+        $(".boarding-station-item").removeClass("active");
+
+        $(this).addClass("active");
+
+        let station =
+            $(this).data("station");
+
+        let departure =
+            $(this).data("departure");
+
+        let arrival =
+            $(this).data("arrival");
+
+        let day =
+            $(this).data("day");
+
+        // UPDATE UI
+
+        $("#selectedBoardingStation")
+            .text(station);
+
+        $("#selectedBoardingDeparture")
+            .text(`Departure : ${departure}`);
+
+        $("#selectedBoardingDay")
+            .text(`Day : ${day}`);
+
+        // HIDDEN VALUES
+
+        $("#boardingStationInput")
+            .val(station);
+
+        $("#boardingDepartureInput")
+            .val(departure);
+
+        $("#boardingDayInput")
+            .val(day);
+
+        // CLOSE DROPDOWN
+
+        $("#boardingStationList").slideUp(250);
+
+        let arrivalTime =
+            '@Arrival';
+
+        let newDuration =
+            calculateDuration(departure, arrivalTime);
+
+        $("#journeyDuration")
+            .text(newDuration);
+
+        $("#reviewDuration")
+            .text(newDuration);
+
+        // RE-CALCULATE AND UPDATE EVERYTHING
+        updateTotal();
+
+    });
+
+    // =========================
+    // STEP NAVIGATION
+    // =========================
+
+    // INIT
+    $("#reviewSection").hide();
+    $("#paymentSection").hide();
+
+    // STEP 1 -> STEP 2
+    $("#nextToReviewBtn").click(function () {
+
+        let isValid = true;
+
+        $("#passengers")
+            .find("input[required], select[required]")
+            .each(function () {
+
+                if ($(this).val().trim() === "") {
+
+                    $(this).focus();
+
+                    isValid = false;
+
+                    return false;
+                }
+            });
+
+        if (!isValid) {
+            showToast("Please fill all passenger details", "error");
+            return;
+        }
+
+        let rawMobile = $("#contactMobileInput").val().trim();
+        if (rawMobile === "" || !/^\d{10}$/.test(rawMobile)) {
+            showToast("Please enter a valid 10-digit mobile number", "error");
+            $("#contactMobileInput").focus();
+            return;
+        }
+
+        let maskedMob = rawMobile.substring(0, 2) + "******" + rawMobile.substring(rawMobile.length - 2);
+        $("#reviewMobile").text(maskedMob);
+        $("#summaryMobile").text(maskedMob);
+
+        // HIDE STEP 1
+        $(".booking-card").not("#reviewSection").hide();
+        $(".irctc-warning-banner").hide();
+        $(".irctc-boarding-change-section").hide();
+        $(".irctc-class-quota-row").hide();
+
+        // SHOW REVIEW
+        $("#reviewSection").show();
+        $("#liveSeatStatusTop").show();
+        $("#irctcBoardingSummaryRow").show();
+
+        // REFRESH CAPTCHA
+        refreshCaptcha();
+
+        $("html, body").animate({
+            scrollTop: 0
+        }, 300);
+
+        // STEPPER
+        $(".step-item").removeClass("active");
+
+        $(".step-item:eq(0)").addClass("active");
+        $(".step-item:eq(1)").addClass("active");
+
+        $(".step-line:eq(0)").addClass("completed");
+
+        buildPassengerReview();
+
+        // LIVE SEAT STATUS
+        $.ajax({
+
+            url: "/Booking/GetLatestSeatAvailability",
+
+            type: "GET",
+
+            data: {
+
+                trainId: '@train.Id',
+                classId: '@cls.Id',
+                journeyDate: '@journey',
+                quota: "@ViewBag.Quota"
+
+            },
+
+            success: function (res) {
+
+                let finalStatus = res.status;
+
+                if (res.count > 0) {
+
+                    finalStatus += " " + res.count;
+                }
+
+                $("#liveSeatStatus")
+                    .text(finalStatus);
+
+                updateSeatStatusColor(finalStatus);
+            },
+
+            error: function () {
+
+                $("#liveSeatStatus")
+                    .text("Unavailable");
+            }
+        });
+
+        toggleFareSummary(true);
+
+    });
+
+
+    // STEP 2 -> STEP 1
+    $("#backToPassengerBtn").click(function () {
+
+        // SHOW ALL STEP 1 CARDS
+        $(".booking-card").show();
+        $(".irctc-warning-banner").show();
+        $(".irctc-boarding-change-section").show();
+        $(".irctc-class-quota-row").show();
+
+        // HIDE OTHERS
+        $("#reviewSection").hide();
+        $("#paymentSection").hide();
+        $("#liveSeatStatusTop").hide();
+        $("#journeySummaryCard").hide();
+        $("#irctcBoardingSummaryRow").hide();
+
+        // STEPPER
+        $(".step-item").removeClass("active");
+
+        $(".step-item:eq(0)").addClass("active");
+
+        $(".step-line").removeClass("completed");
+
+        $("html, body").animate({
+            scrollTop: 0
+        }, 300);
+
+        toggleFareSummary(false);
+    });
+
+
+    // STEP 2 -> STEP 3
+    $("#nextToPaymentBtn").click(function () {
+
+        let captchaValue =
+            $("#captchaInput").val().trim();
+
+        if (!captchaValue) {
+
+            showToast("Please enter captcha", "error");
+            return;
+        }
+
+        $.ajax({
+
+            url: "/Captcha/ValidateCaptcha",
+
+            type: "POST",
+
+            data: {
+                captcha: captchaValue
+            },
+
+            success: function (res) {
+
+                if (!res.success) {
+
+                    showToast("Invalid Captcha", "error");
+
+                    refreshCaptcha();
+
+                    $("#captchaInput").val("");
+
+                    return;
+                }
+
+                // CAPTCHA SUCCESS
+
+                $("#reviewSection").hide();
+
+                $("#paymentSection").show();
+
+                $(".irctc-compact-train-card").hide();
+                $("#journeySummaryCard").show();
+
+                $("html, body").animate({
+                    scrollTop: 0
+                }, 300);
+
+                $(".step-item").removeClass("active");
+
+                $(".step-item:eq(0)").addClass("active");
+                $(".step-item:eq(1)").addClass("active");
+                $(".step-item:eq(2)").addClass("active");
+
+                $(".step-line").addClass("completed");
+            },
+
+            error: function () {
+
+                showToast("Captcha validation failed", "error");
+
+            }
+
+        });
+
+    });
+
+    // STEP 3 -> STEP 2
+    $("#backToReviewBtn").click(function () {
+
+        // HIDE PAYMENT
+        $("#paymentSection").hide();
+
+        // SHOW REVIEW
+        $("#reviewSection").show();
+
+        $(".irctc-compact-train-card").show();
+        $("#irctcBoardingSummaryRow").show();
+        $(".irctc-class-quota-row").hide();
+        $(".irctc-boarding-change-section").hide();
+        $("#journeySummaryCard").hide();
+
+        $("html, body").animate({
+            scrollTop: 0
+        }, 300);
+
+        // STEPPER
+        $(".step-item").removeClass("active");
+
+        $(".step-item:eq(0)").addClass("active");
+        $(".step-item:eq(1)").addClass("active");
+
+        $(".step-line:eq(0)").addClass("completed");
+        $(".step-line:eq(1)").removeClass("completed");
+    });
+
+    function buildPassengerReview() {
+
+        let html = '';
+
+        $(".passenger-row-item").each(function(index){
+
+            let name =
+                $(this)
+                .find("input[name='passengerNames']")
+                .val();
+
+            let age =
+                $(this)
+                .find("input[name='passengerAges']")
+                .val();
+
+            let gender =
+                $(this)
+                .find("select[name='passengerGenders']")
+                .val();
+
+            let country =
+                $(this)
+                .find("select[name='passengerCountries']")
+                .val() || 'India';
+
+            let berth =
+                $(this)
+                .find("select[name='passengerBerths']")
+                .val();
+
+            let genderText = '';
+
+            if(gender === "M")
+                genderText = "Male";
+
+            else if(gender === "F")
+                genderText = "Female";
+
+            else
+                genderText = "Other";
+
+            let berthText = berth || 'No Preference';
+            if (berthText === "LB") berthText = "Lower";
+            else if (berthText === "MB") berthText = "Middle";
+            else if (berthText === "UB") berthText = "Upper";
+            else if (berthText === "SL") berthText = "Side Lower";
+            else if (berthText === "SU") berthText = "Side Upper";
+            else if (berthText === "WS") berthText = "Window Side";
+            else if (berthText === "AS") berthText = "Aisle";
+
+            html += `
+            <div class="review-passenger-row" style="padding: 8px 12px; font-size: 13px; color: #334155; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; gap: 8px;">
+                <span style="font-weight: bold; color: #334155; margin-right: 5px;">${index + 1}</span>
+                <strong style="color: #334155; margin-right: 8px; text-transform: uppercase;">${name.toUpperCase()}</strong>
+                <span style="color: #475569;">${age} yrs | ${genderText} | ${country} | ${berthText}</span>
+            </div>
+            `;
+        });
+
+        if (html !== '') {
+            $("#reviewPassengerContainer").html(html);
+            $("#reviewPassengerContainer .review-passenger-row:last").css("border-bottom", "none");
+        } else {
+            $("#reviewPassengerContainer").html('<div style="padding: 10px 0; color: #64748b;">No passengers added.</div>');
+        }
+    }
+
+    function calculateDuration(startTime, endTime) {
+
+        const start = startTime.split(":");
+        const end = endTime.split(":");
+
+        let startMinutes =
+            parseInt(start[0]) * 60 +
+            parseInt(start[1]);
+
+        let endMinutes =
+            parseInt(end[0]) * 60 +
+            parseInt(end[1]);
+
+        if (endMinutes < startMinutes) {
+            endMinutes += 24 * 60;
+        }
+
+        let diff = endMinutes - startMinutes;
+
+        let hrs = Math.floor(diff / 60);
+        let mins = diff % 60;
+
+        return `${String(hrs).padStart(2,'0')}:${String(mins).padStart(2,'0')}`;
+    }
+
+    function updateSeatStatusColor(status) {
+
+        if (!status) return;
+
+        let badge =
+            $("#liveSeatStatus");
+        let badgeTop =
+            $("#liveSeatStatusTop");
+
+        badge.text(status);
+        badgeTop.text(status);
+
+        status = status.toUpperCase();
+
+        let bg = "";
+        let color = "#fff";
+
+        // AVAILABLE
+        if (status.includes("AVAILABLE") || status.includes("AVBL")) {
+            bg = "#16a34a";
+        }
+
+        // RAC
+        else if (status.includes("RAC")) {
+            bg = "#ea580c";
+        }
+
+        // WL
+        else if (
+            status.includes("WL") ||
+            status.includes("WAIT")
+        ) {
+            bg = "#dc2626";
+        }
+
+        // CNF
+        else if (
+            status.includes("CNF") ||
+            status.includes("CONFIRMED")
+        ) {
+            bg = "#2563eb";
+        }
+
+        else {
+            bg = "#64748b";
+        }
+
+        badge.css({
+            background: bg,
+            color: color
+        });
+        badgeTop.css({
+            background: bg,
+            color: color
+        });
+    }
+
+    });
+
+    function refreshCaptcha() {
+
+        const img =
+            document.getElementById("captchaImg");
+
+        img.style.opacity = "0.4";
+
+        img.src =
+            "/captcha?ts=" + new Date().getTime();
+
+        img.onload = () => {
+
+            img.style.opacity = "1";
+
+        };
+    }
+
+</script>
+
+<style>
+    /* Global Page Wrapper and Layout */
+    .checkout-wrapper {
+        background: #f4f7fb;
+        min-height: 100vh;
+        padding: 15px 20px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    .booking-layout {
+        display: grid !important;
+        grid-template-columns: 1fr 320px !important;
+        gap: 15px !important;
+        max-width: 1200px !important;
+        margin: 0 auto !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    .booking-left {
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+
+    .booking-right {
+        width: 320px !important;
+        min-width: 320px !important;
+    }
+
+    .booking-card {
+        background: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 4px !important;
+        padding: 12px 15px !important;
+        margin-bottom: 12px !important;
+        box-shadow: none !important;
+        box-sizing: border-box !important;
+    }
+
+    .booking-card h2 {
+        font-size: 14px !important;
+        font-weight: 700 !important;
+        color: #0f2954 !important;
+        border-bottom: 1px solid #cbd5e1 !important;
+        padding-bottom: 5px !important;
+        margin-top: 0 !important;
+        margin-bottom: 10px !important;
+    }
+
+    /* TOP STEPPER */
+    .booking-steps {
+        display: flex !important;
+        justify-content: center !important;
+        align-items: flex-start !important;
+        gap: 0 !important;
+        margin: 15px auto 25px auto !important;
+        padding: 0 !important;
+        background: transparent !important;
+        border: none !important;
+        max-width: 600px !important;
+    }
+
+    .step-item {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        position: relative !important;
+        z-index: 2 !important;
+        width: 120px !important;
+    }
+
+    .step-circle {
+        width: 24px !important;
+        height: 24px !important;
+        border-radius: 50% !important;
+        background: #cbd5e1 !important;
+        color: #475569 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-weight: 700 !important;
+        font-size: 12px !important;
+        margin-bottom: 6px !important;
+        border: 2px solid transparent !important;
+        transition: .3s !important;
+    }
+
+    .step-item.active .step-circle {
+        background: #fb792b !important;
+        color: white !important;
+    }
+
+    .step-label {
+        font-size: 11px !important;
+        font-weight: 600 !important;
+        color: #64748b !important;
+        text-align: center !important;
+    }
+
+    .step-item.active .step-label {
+        color: #0f2954 !important;
+    }
+
+    .step-line {
+        height: 2px !important;
+        background: #cbd5e1 !important;
+        flex-grow: 1 !important;
+        margin-top: 11px !important;
+        z-index: 1 !important;
+    }
+
+    .step-line.completed {
+        background: #fb792b !important;
+    }
+
+    /* IRCTC Warning Banner */
+    .irctc-warning-banner {
+        background-color: #fdf6ec !important;
+        border: 1px solid #f5dab1 !important;
+        border-left: 5px solid #fb792b !important;
+        color: #b88230 !important;
+        padding: 8px 12px !important;
+        font-size: 11px !important;
+        font-weight: 600 !important;
+        border-radius: 4px 4px 0 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        max-width: 1200px !important;
+        margin: 0 auto !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Compact Train Card */
+    .irctc-compact-train-card {
+        background: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 0 0 4px 4px !important;
+        border-top: none !important;
+        padding: 12px 15px !important;
+        margin-bottom: 12px !important;
+        box-shadow: none !important;
+        max-width: 1200px !important;
+        margin: 0 auto 12px auto !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    .irctc-train-header {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        margin-bottom: 10px !important;
+    }
+
+    .irctc-train-title {
+        font-size: 14px !important;
+        font-weight: 700 !important;
+        color: #1f2d3d !important;
+    }
+
+    .irctc-route-row {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: flex-start !important;
+        margin-bottom: 10px !important;
+    }
+
+    .irctc-route-station-info {
+        display: flex !important;
+        flex-direction: column !important;
+        width: 35% !important;
+    }
+
+    .irctc-route-station-info.text-right {
+        text-align: right !important;
+        align-items: flex-end !important;
+    }
+
+    .irctc-route-time {
+        font-size: 15px !important;
+        font-weight: 700 !important;
+        color: #1f2d3d !important;
+    }
+
+    .irctc-route-station-name {
+        font-size: 13px !important;
+        color: #334155 !important;
+        margin-top: 2px !important;
+    }
+
+    .irctc-route-date {
+        font-size: 11px !important;
+        color: #64748b !important;
+        margin-top: 2px !important;
+    }
+
+    .irctc-route-duration-container {
+        width: 30% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding-top: 5px !important;
+    }
+
+    .irctc-route-duration {
+        font-size: 12px !important;
+        color: #64748b !important;
+        font-weight: 600 !important;
+        margin-bottom: 4px !important;
+    }
+
+    .irctc-route-line-graphic {
+        width: 100% !important;
+        height: 1px !important;
+        background: #cbd5e1 !important;
+        position: relative !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+    }
+
+    .irctc-circle-dot {
+        width: 5px !important;
+        height: 5px !important;
+        background: #cbd5e1 !important;
+        border-radius: 50% !important;
+    }
+
+    .irctc-class-quota-row {
+        margin-bottom: 10px !important;
+        text-align: center !important;
+    }
+
+    .irctc-class-quota-badge {
+        font-size: 12px !important;
+        background: #f1f5f9 !important;
+        color: #334155 !important;
+        padding: 4px 8px !important;
+        border-radius: 4px !important;
+        font-weight: 600 !important;
+        display: inline-block !important;
+    }
+
+    .irctc-boarding-change-section {
+        border-top: 1px solid #e2e8f0 !important;
+        padding-top: 10px !important;
+        margin-top: 10px !important;
+    }
+
+    .irctc-boarding-title {
+        font-size: 11px !important;
+        font-weight: bold !important;
+        color: #64748b !important;
+        margin-bottom: 6px !important;
+    }
+
+    .irctc-boarding-dropdown-trigger {
+        background: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 4px !important;
+        padding: 6px 12px !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        cursor: pointer !important;
+        width: 100% !important;
+        text-align: left !important;
+        box-sizing: border-box !important;
+    }
+
+    .irctc-boarding-station-text {
+        font-size: 12px !important;
+        color: #334155 !important;
+    }
+
+    .irctc-boarding-note {
+        font-size: 11px !important;
+        color: #64748b !important;
+        margin-top: 6px !important;
+        font-style: italic !important;
+    }
+
+    /* Co-branded benefits & Notes cards */
+    .irctc-cobranded-card {
+        padding: 10px 15px !important;
+        margin-bottom: 12px !important;
+    }
+
+    .cobranded-header {
+        display: flex !important;
+        justify-content: flex-start !important;
+        align-items: center !important;
+        gap: 20px !important;
+        flex-wrap: wrap !important;
+        font-size: 13px !important;
+    }
+
+    .cobranded-options {
+        display: flex !important;
+        gap: 15px !important;
+        align-items: center !important;
+    }
+
+    .cobranded-radio-label {
+        display: flex !important;
+        align-items: center !important;
+        gap: 4px !important;
+        cursor: pointer !important;
+        font-size: 12px !important;
+        font-weight: 500 !important;
+    }
+
+    .cobranded-radio-label input[type="radio"] {
+        margin: 0 !important;
+        accent-color: #fb792b !important;
+    }
+
+    .highlight-orange {
+        color: #fb792b !important;
+        font-weight: bold !important;
+    }
+
+    .cobranded-subtext {
+        font-size: 11px !important;
+        color: #fb792b !important;
+        margin-top: 4px !important;
+        font-weight: 500 !important;
+    }
+
+    .irctc-notes-card {
+        background-color: #fdf6ec !important;
+        border: 1px solid #f5dab1 !important;
+        border-left: 5px solid #fb792b !important;
+        padding: 10px 15px !important;
+        margin-bottom: 12px !important;
+    }
+
+    .notes-title {
+        font-size: 13px !important;
+        font-weight: bold !important;
+        color: #b88230 !important;
+        margin-bottom: 4px !important;
+    }
+
+    .notes-list {
+        margin: 0 !important;
+        padding-left: 20px !important;
+        font-size: 12px !important;
+        color: #b88230 !important;
+        line-height: 1.5 !important;
+    }
+
+    /* Passenger input rows styling */
+    .catering-notice {
+        color: #16a34a !important;
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        margin-bottom: 12px !important;
+    }
+
+    .passenger-row-item {
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        margin-bottom: 8px !important;
+        width: 100% !important;
+        background: #ffffff !important;
+        border-bottom: 1px solid #f1f5f9 !important;
+        padding-bottom: 8px !important;
+        box-sizing: border-box !important;
+    }
+
+    .passenger-row-item:last-child {
+        border-bottom: none !important;
+        padding-bottom: 0 !important;
+    }
+
+    .passenger-field {
+        height: 32px !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 4px !important;
+        padding: 0 8px !important;
+        font-size: 13px !important;
+        box-sizing: border-box !important;
+        outline: none !important;
+        background: #ffffff !important;
+        color: #333 !important;
+        transition: border-color 0.2s !important;
+    }
+
+    .passenger-field:focus {
+        border-color: #2563eb !important;
+    }
+
+    .passenger-field.p-name {
+        flex: 3 !important;
+        min-width: 150px !important;
+    }
+
+    .passenger-field.p-age {
+        flex: 0.6 !important;
+        width: 50px !important;
+        min-width: 45px !important;
+        text-align: center !important;
+    }
+
+    .passenger-field.p-gender {
+        flex: 1.2 !important;
+        min-width: 80px !important;
+        appearance: auto !important;
+    }
+
+    .passenger-field.p-country {
+        flex: 1.2 !important;
+        min-width: 80px !important;
+        appearance: auto !important;
+    }
+
+    .passenger-field.p-berth {
+        flex: 1.8 !important;
+        min-width: 110px !important;
+        appearance: auto !important;
+    }
+
+    .remove-passenger-btn {
+        background: transparent !important;
+        border: none !important;
+        color: #94a3b8 !important;
+        font-size: 16px !important;
+        cursor: pointer !important;
+        padding: 4px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        transition: color 0.2s !important;
+        margin-left: 2px !important;
+    }
+
+    .remove-passenger-btn:hover {
+        color: #ef4444 !important;
+    }
+
+    .add-passenger-links-container {
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        margin-top: 10px !important;
+    }
+
+    .link-divider {
+        color: #cbd5e1 !important;
+        font-size: 13px !important;
+    }
+
+    .add-btn {
+        background: transparent !important;
+        border: none !important;
+        color: #0078d7 !important;
+        font-weight: 600 !important;
+        font-size: 13px !important;
+        cursor: pointer !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        text-decoration: none !important;
+        display: inline-block !important;
+    }
+
+    .add-btn:hover {
+        color: #005fa3 !important;
+        text-decoration: underline !important;
+    }
+
+    .infant-notice {
+        font-size: 11px !important;
+        color: #64748b !important;
+        margin-top: 6px !important;
+        font-weight: 500 !important;
+    }
+
+    /* Contact Details section styles */
+    .irctc-contact-section {
+        border-top: 1px solid #cbd5e1 !important;
+        padding-top: 12px !important;
+        margin-top: 12px !important;
+    }
+
+    .contact-header {
+        font-size: 13px !important;
+        font-weight: bold !important;
+        color: #334155 !important;
+        margin-bottom: 4px !important;
+    }
+
+    .contact-subtext {
+        font-size: 11px !important;
+        color: #64748b !important;
+        margin-bottom: 8px !important;
+    }
+
+    .contact-inputs {
+        display: flex !important;
+        gap: 10px !important;
+        align-items: center !important;
+        margin-bottom: 8px !important;
+    }
+
+    .mobile-input-wrapper {
+        display: flex !important;
+        align-items: center !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 4px !important;
+        overflow: hidden !important;
+        height: 32px !important;
+    }
+
+    .country-code {
+        background: #f1f5f9 !important;
+        padding: 0 8px !important;
+        font-size: 13px !important;
+        color: #475569 !important;
+        display: flex !important;
+        align-items: center !important;
+        height: 100% !important;
+        border-right: 1px solid #cbd5e1 !important;
+    }
+
+    .mobile-field {
+        border: none !important;
+        height: 100% !important;
+        padding: 0 8px !important;
+        font-size: 13px !important;
+        width: 120px !important;
+        outline: none !important;
+    }
+
+    .gst-row {
+        display: flex !important;
+        gap: 10px !important;
+        align-items: center !important;
+    }
+
+    .gst-toggle-btn {
+        background: #f1f5f9 !important;
+        border: 1px solid #cbd5e1 !important;
+        color: #475569 !important;
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        padding: 0 10px !important;
+        height: 32px !important;
+        border-radius: 4px !important;
+        cursor: pointer !important;
+    }
+
+    .gst-toggle-btn:hover {
+        background: #e2e8f0 !important;
+    }
+
+    .gst-field {
+        height: 32px !important;
+        width: 200px !important;
+    }
+
+    /* Next / Back navigation buttons */
+    .step-navigation {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        margin-top: 15px !important;
+    }
+
+    .next-btn {
+        height: 36px !important;
+        padding: 0 20px !important;
+        border: none !important;
+        border-radius: 4px !important;
+        background: #fb792b !important;
+        color: white !important;
+        font-weight: 600 !important;
+        font-size: 13px !important;
+        cursor: pointer !important;
+    }
+
+    .next-btn:hover {
+        background: #e0651c !important;
+    }
+
+    .back-btn {
+        height: 36px !important;
+        padding: 0 20px !important;
+        border: none !important;
+        border-radius: 4px !important;
+        background: #cbd5e1 !important;
+        color: #334155 !important;
+        font-weight: 600 !important;
+        font-size: 13px !important;
+        cursor: pointer !important;
+    }
+
+    .back-btn:hover {
+        background: #b8c5d6 !important;
+    }
+
+    /* Fare Summary Redesign */
+    .premium-summary {
+        background: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 4px !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+        overflow: hidden !important;
+        position: sticky !important;
+        top: 15px !important;
+    }
+
+    .summary-header {
+        background: #f8fafc !important;
+        border-bottom: 1px solid #cbd5e1 !important;
+        padding: 8px 12px !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        margin: 0 !important;
+    }
+
+    .summary-header h2 {
+        font-size: 13px !important;
+        font-weight: bold !important;
+        color: #334155 !important;
+        margin: 0 !important;
+        border-bottom: none !important;
+        padding-bottom: 0 !important;
+    }
+
+    .live-fare-box {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    .live-fare-row {
+        padding: 8px 12px !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        font-size: 13px !important;
+        color: #334155 !important;
+        font-weight: 500 !important;
+        border-bottom: 1px solid #e2e8f0 !important;
+    }
+
+    .live-fare-row:last-child {
+        border-bottom: none !important;
+    }
+
+    .live-total-row {
+        background: #0f2954 !important;
+        color: #ffffff !important;
+        padding: 10px 12px !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        font-size: 14px !important;
+        font-weight: bold !important;
+        border-bottom: none !important;
+    }
+
+    .live-total-row span {
+        color: #ffffff !important;
+    }
+
+    .live-total-row strong {
+        color: #ffffff !important;
+        font-size: 16px !important;
+    }
+
+    /* STEP 2: REVIEW JOURNEY STYLES */
+    .modern-review-wrapper {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 15px !important;
+    }
+
+    .modern-review-top {
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 4px !important;
+        padding: 15px !important;
+        background: #fff !important;
+    }
+
+    .review-train-header {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        margin-bottom: 15px !important;
+    }
+
+    .review-train-name {
+        font-size: 15px !important;
+        font-weight: 700 !important;
+        color: #0f172a !important;
+    }
+
+    .live-seat-status {
+        padding: 6px 12px !important;
+        border-radius: 20px !important;
+        font-size: 12px !important;
+        font-weight: 800 !important;
+        color: white !important;
+        min-width: 100px !important;
+        text-align: center !important;
+    }
+
+    .review-route-line {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 15px !important;
+    }
+
+    .review-station {
+        width: 40% !important;
+    }
+
+    .review-time {
+        font-size: 18px !important;
+        font-weight: 800 !important;
+        color: #0f172a !important;
+        margin-bottom: 4px !important;
+    }
+
+    .review-station-name {
+        font-size: 13px !important;
+        font-weight: 700 !important;
+        color: #334155 !important;
+    }
+
+    .review-center {
+        flex: 1 !important;
+        text-align: center !important;
+    }
+
+    .review-duration {
+        font-size: 12px !important;
+        color: #2563eb !important;
+        font-weight: 700 !important;
+        margin-bottom: 4px !important;
+    }
+
+    .review-line {
+        height: 2px !important;
+        background: #2563eb !important;
+        border-radius: 2px !important;
+    }
+
+    .modern-boarding-box {
+        border: 1px solid #dbeafe !important;
+        background: #eff6ff !important;
+        border-radius: 4px !important;
+        padding: 12px 15px !important;
+    }
+
+    .modern-boarding-title {
+        font-size: 13px !important;
+        font-weight: 700 !important;
+        color: #1d4ed8 !important;
+        margin-bottom: 6px !important;
+    }
+
+    .modern-boarding-content {
+        font-size: 13px !important;
+        font-weight: 600 !important;
+        color: #0f172a !important;
+        line-height: 1.5 !important;
+    }
+
+    .modern-passenger-section {
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 4px !important;
+        padding: 12px 15px !important;
+    }
+
+    .modern-passenger-title {
+        font-size: 13px !important;
+        font-weight: 700 !important;
+        margin-bottom: 10px !important;
+        color: #0f172a !important;
+    }
+
+    .review-passenger-card {
+        display: flex !important;
+        gap: 12px !important;
+        align-items: center !important;
+        padding: 10px 12px !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 4px !important;
+        margin-top: 8px !important;
+        background: #f8fafc !important;
+    }
+
+    .review-passenger-number {
+        width: 28px !important;
+        height: 28px !important;
+        border-radius: 50% !important;
+        background: #2563eb !important;
+        color: white !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-weight: 700 !important;
+        font-size: 12px !important;
+    }
+
+    .review-passenger-details {
+        display: flex !important;
+        flex-direction: column !important;
+    }
+
+    .review-passenger-details strong {
+        color: #0f172a !important;
+        font-size: 13px !important;
+    }
+
+    .review-passenger-details span {
+        margin-top: 2px !important;
+        color: #64748b !important;
+        font-size: 12px !important;
+    }
+
+    .review-captcha-box {
+        margin-top: 15px !important;
+    }
+
+    .captcha-payment-wrapper {
+        display: flex !important;
+        align-items: center !important;
+        gap: 12px !important;
+        flex-wrap: wrap !important;
+    }
+
+    .captcha-left {
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+    }
+
+    .captcha-image {
+        height: 36px !important;
+        width: 110px !important;
+        object-fit: cover !important;
+        border-radius: 4px !important;
+        border: 1px solid #cbd5e1 !important;
+        background: #fff !important;
+    }
+
+    .captcha-refresh-btn {
+        width: 32px !important;
+        height: 32px !important;
+        border: none !important;
+        border-radius: 4px !important;
+        background: #fb792b !important;
+        color: white !important;
+        font-size: 16px !important;
+        font-weight: 700 !important;
+        cursor: pointer !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    .captcha-refresh-btn:hover {
+        background: #e0651c !important;
+    }
+
+    .captcha-input-wrapper {
+        flex: 1 !important;
+        min-width: 150px !important;
+    }
+
+    .captcha-payment-input {
+        width: 100% !important;
+        height: 32px !important;
+        border-radius: 4px !important;
+        border: 1px solid #cbd5e1 !important;
+        padding: 0 10px !important;
+        font-size: 13px !important;
+        font-weight: 500 !important;
+        background: #fff !important;
+        box-sizing: border-box !important;
+    }
+
+    .captcha-payment-input:focus {
+        outline: none !important;
+        border-color: #2563eb !important;
+    }
+
+    /* STEP 3: PAYMENT BOX */
+    .payment-box {
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 4px !important;
+        padding: 12px 15px !important;
+        margin-bottom: 15px !important;
+        background: #fff !important;
+    }
+
+    .payment-title {
+        font-size: 14px !important;
+        font-weight: 700 !important;
+        margin-bottom: 10px !important;
+        color: #0f172a !important;
+    }
+
+    .payment-option {
+        display: flex !important;
+        align-items: flex-start !important;
+        gap: 10px !important;
+        padding: 10px !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 4px !important;
+        margin-bottom: 10px !important;
+        cursor: pointer !important;
+        transition: .2s !important;
+        box-sizing: border-box !important;
+    }
+
+    .payment-option:hover {
+        background: #f8fafc !important;
+        border-color: #2563eb !important;
+    }
+
+    .payment-option input {
+        margin-top: 3px !important;
+    }
+
+    .payment-name {
+        font-weight: 700 !important;
+        color: #0f172a !important;
+        margin-bottom: 2px !important;
+        font-size: 13px !important;
+    }
+
+    .payment-desc {
+        font-size: 12px !important;
+        color: #64748b !important;
+    }
+
+    .pay-btn {
+        height: 36px !important;
+        padding: 0 20px !important;
+        border: none !important;
+        background: #fb792b !important;
+        color: white !important;
+        font-size: 13px !important;
+        border-radius: 4px !important;
+        font-weight: 600 !important;
+        cursor: pointer !important;
+        transition: background 0.2s ease !important;
+    }
+
+    .pay-btn:hover {
+        background: #e0651c !important;
+    }
+
+    /* OTP MODAL */
+    #otpOverlay {
+        position: fixed !important;
+        inset: 0 !important;
+        background: rgba(15, 23, 42, 0.6) !important;
+        backdrop-filter: blur(4px) !important;
+        -webkit-backdrop-filter: blur(4px) !important;
+        display: none;
+        align-items: center !important;
+        justify-content: center !important;
+        z-index: 9999999 !important;
+    }
+
+    .otp-modal {
+        background: #ffffff !important;
+        border-radius: 12px !important;
+        padding: 25px !important;
+        width: 100% !important;
+        max-width: 380px !important;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+        box-sizing: border-box !important;
+        position: relative !important;
+        border: 1px solid #e2e8f0 !important;
+    }
+
+    .otp-top {
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        margin-bottom: 15px !important;
+    }
+
+    .otp-icon {
+        width: 50px !important;
+        height: 50px !important;
+        background: #eff6ff !important;
+        color: #2563eb !important;
+        border-radius: 50% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 24px !important;
+        box-shadow: none !important;
+    }
+
+    .otp-close-btn {
+        position: absolute !important;
+        top: 15px !important;
+        right: 15px !important;
+        width: 28px !important;
+        height: 28px !important;
+        background: #f1f5f9 !important;
+        border: none !important;
+        border-radius: 50% !important;
+        font-size: 13px !important;
+        cursor: pointer !important;
+        color: #64748b !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        transition: all 0.2s ease !important;
+    }
+
+    .otp-close-btn:hover {
+        background: #e2e8f0 !important;
+        color: #0f172a !important;
+    }
+
+    .otp-header {
+        font-size: 18px !important;
+        font-weight: 800 !important;
+        color: #0f2954 !important;
+        margin-bottom: 4px !important;
+        text-align: center !important;
+    }
+
+    .otp-subtitle {
+        font-size: 12px !important;
+        color: #64748b !important;
+        margin-bottom: 15px !important;
+        text-align: center !important;
+    }
+
+    .otp-mobile {
+        font-size: 12px !important;
+        color: #1e3a8a !important;
+        background: #eff6ff !important;
+        border: 1px dashed #bfdbfe !important;
+        padding: 8px 12px !important;
+        border-radius: 6px !important;
+        text-align: center !important;
+        margin-bottom: 15px !important;
+        font-weight: 600 !important;
+    }
+
+    #otpInput {
+        width: 100% !important;
+        height: 42px !important;
+        border: 1.5px solid #cbd5e1 !important;
+        border-radius: 6px !important;
+        padding: 0 10px !important;
+        font-size: 18px !important;
+        font-weight: 700 !important;
+        text-align: center !important;
+        letter-spacing: 6px !important;
+        box-sizing: border-box !important;
+        outline: none !important;
+        background: #f8fafc !important;
+        transition: all 0.2s ease !important;
+    }
+
+    #otpInput:focus {
+        border-color: #fb792b !important;
+        background: #ffffff !important;
+        box-shadow: 0 0 0 3px rgba(251, 121, 43, 0.15) !important;
+    }
+
+    .otp-timer-wrapper {
+        font-size: 12px !important;
+        color: #64748b !important;
+        margin-top: 10px !important;
+        text-align: center !important;
+        font-weight: 600 !important;
+    }
+
+    #otpTimer {
+        color: #ef4444 !important;
+        font-weight: 700 !important;
+    }
+
+    .otp-actions {
+        display: flex !important;
+        flex-direction: row !important;
+        gap: 10px !important;
+        margin-top: 15px !important;
+    }
+
+    .otp-verify-btn {
+        flex: 1 !important;
+        height: 38px !important;
+        background: #fb792b !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 6px !important;
+        font-weight: 700 !important;
+        font-size: 13px !important;
+        cursor: pointer !important;
+        transition: all 0.2s ease !important;
+    }
+
+    .otp-verify-btn:hover {
+        background: #e0651c !important;
+    }
+
+    .otp-resend-btn {
+        flex: 1 !important;
+        height: 38px !important;
+        background: #e2e8f0 !important;
+        color: #475569 !important;
+        border: none !important;
+        border-radius: 6px !important;
+        font-weight: 600 !important;
+        font-size: 12px !important;
+        cursor: pointer !important;
+        transition: all 0.2s ease !important;
+    }
+
+    .otp-resend-btn:hover {
+        background: #cbd5e1 !important;
+    }
+
+    .otp-footer {
+        font-size: 10px !important;
+        color: #94a3b8 !important;
+        margin-top: 15px !important;
+        text-align: center !important;
+        line-height: 1.4 !important;
+    }
+
+    /* SIDEBAR ROUTE STYLES */
+    .route-sidebar {
+        position: fixed !important;
+        right: -700px !important;
+        top: 0 !important;
+        height: 100vh !important;
+        width: 90% !important;
+        max-width: 670px !important;
+        background: #ffffff !important;
+        border-left: 1px solid #cbd5e1 !important;
+        z-index: 99999 !important;
+        transition: right 0.3s ease !important;
+        box-shadow: -2px 0 8px rgba(0,0,0,0.1) !important;
+        display: flex !important;
+        flex-direction: column !important;
+    }
+
+    .route-sidebar.open {
+        right: 0 !important;
+    }
+
+    .sidebar-header {
+        padding: 12px 15px !important;
+        border-bottom: 1px solid #cbd5e1 !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        background: #f8fafc !important;
+    }
+
+    .sidebar-title {
+        margin: 0 !important;
+        font-size: 14px !important;
+        font-weight: bold !important;
+        color: #0f2954 !important;
+    }
+
+    .sidebar-close {
+        background: transparent !important;
+        border: none !important;
+        font-size: 20px !important;
+        cursor: pointer !important;
+        color: #64748b !important;
+    }
+
+    .sidebar-content {
+        padding: 15px !important;
+        overflow-y: auto !important;
+        flex: 1 !important;
+    }
+
+    /* General lists & items */
+    .boarding-station-list {
+        display: none;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 4px !important;
+        max-height: 250px !important;
+        overflow-y: auto !important;
+        background: white !important;
+    }
+
+    .boarding-station-item {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        padding: 8px 12px !important;
+        border-bottom: 1px solid #e2e8f0 !important;
+        cursor: pointer !important;
+        transition: background 0.2s !important;
+    }
+
+    .boarding-station-item:hover {
+        background: #f1f5f9 !important;
+    }
+
+    .boarding-station-item.active {
+        background: #dbeafe !important;
+    }
+
+    .boarding-item-name {
+        font-size: 13px !important;
+        font-weight: 700 !important;
+        color: #0f172a !important;
+    }
+
+    .boarding-item-time {
+        font-size: 11px !important;
+        color: #64748b !important;
+        margin-top: 2px !important;
+    }
+
+    .boarding-select-circle {
+        width: 14px !important;
+        height: 14px !important;
+        border-radius: 50% !important;
+        border: 2px solid #cbd5e1 !important;
+        box-sizing: border-box !important;
+    }
+
+    .boarding-station-item.active .boarding-select-circle {
+        background: #2563eb !important;
+        border-color: #2563eb !important;
+    }
+
+    /* Redundant train details card in Step 2 review journey hidden */
+    .modern-review-top {
+        display: none !important;
+    }
+
+    /* Journey Summary Card */
+    .journey-summary-card {
+        background: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 4px !important;
+        margin-bottom: 15px !important;
+        overflow: hidden !important;
+    }
+    .journey-summary-card .summary-header {
+        background: #0f2954 !important;
+    }
+    .journey-summary-card .summary-header h2 {
+        color: #ffffff !important;
+        font-size: 14px !important;
+    }
+
+    /* OTP overlay style overrides for perfect z-index and centering */
+    .otp-overlay {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        background: rgba(2, 6, 23, 0.8) !important;
+        backdrop-filter: blur(6px) !important;
+        -webkit-backdrop-filter: blur(6px) !important;
+        z-index: 99999999 !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-sizing: border-box !important;
+    }
+
+    .otp-modal {
+        position: relative !important;
+        z-index: 100000000 !important;
+    }
+
+    #toastContainer {
+        z-index: 100000001 !important;
+    }
+</style>
