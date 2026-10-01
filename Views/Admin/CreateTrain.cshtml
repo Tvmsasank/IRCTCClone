@@ -1,4 +1,4 @@
-﻿@model IRCTCClone.Models.Train
+@model IRCTCClone.Models.Train
 
 @{
     ViewData["Title"] = "Add New Train";
@@ -35,7 +35,7 @@
             <div class="card-body">
                 <h5 class="fw-bold mb-3">Train Details</h5>
 
-                <div class="row mb-2"> 
+                <div class="row mb-3"> 
                     <div class="col-md-4">
                         <label class="form-label">Train Number</label>
                         <input asp-for="Number" class="form-control" required />
@@ -56,15 +56,43 @@
                             }
                         </select>
                     </div>
-                    <div class="row mb-2">
-                        <div class="col-md-6">
-                            <label class="form-label">Service Start Date (Optional)</label>
-                            <input asp-for="ServiceStartDate" type="date" class="form-control" />
+                </div>
+
+                <!-- 📅 SERVICE DATES (BORDERED, COMPACT, WITH FLATPICKR CALENDAR) -->
+                <div class="service-dates-box mb-3">
+                    <div class="service-dates-header">
+                        <i class="bi bi-calendar-range me-2"></i>
+                        <span>Service Validity Period (Optional)</span>
+                        <small class="text-muted fw-normal ms-2" style="font-size: 11.5px;">&mdash; For seasonal/special trains only</small>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-sm-6">
+                            <label class="form-label small fw-semibold text-secondary mb-1">Service Start Date</label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text"><i class="bi bi-calendar-event"></i></span>
+                                <input type="text"
+                                       id="createServiceStartDate"
+                                       name="ServiceStartDate"
+                                       class="form-control flatpickr-service-date"
+                                       placeholder="DD-MM-YYYY"
+                                       autocomplete="off" />
+                                <button type="button" class="btn btn-clear-date" onclick="clearServiceDateField('createServiceStartDate')" title="Clear Start Date">&times;</button>
+                            </div>
                         </div>
 
-                        <div class="col-md-6">
-                            <label class="form-label">Service End Date (Optional)</label>
-                            <input asp-for="ServiceEndDate" type="date" class="form-control" />
+                        <div class="col-sm-6">
+                            <label class="form-label small fw-semibold text-secondary mb-1">Service End Date</label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text"><i class="bi bi-calendar-event"></i></span>
+                                <input type="text"
+                                       id="createServiceEndDate"
+                                       name="ServiceEndDate"
+                                       class="form-control flatpickr-service-date"
+                                       placeholder="DD-MM-YYYY"
+                                       autocomplete="off" />
+                                <button type="button" class="btn btn-clear-date" onclick="clearServiceDateField('createServiceEndDate')" title="Clear End Date">&times;</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -105,15 +133,23 @@
                         <label class="form-label">Duration</label>
                         <input asp-for="Duration" class="form-control" placeholder="e.g. 00:00" required />
                     </div>
-                    <!-- Add this field to your Add Train HTML Form -->
-                    <div class="form-group mb-3">
-                        <label class="form-label" style="font-weight:600;">Coach Composition Order</label>
-                        <input type="text"
-                               name="CoachPositions"
-                               class="form-control"
-                               placeholder="e.g. S1,S2,S3,B1,B2,A1"/>
-                        <small class="text-muted">Enter comma-separated coach codes (e.g. S1,S2 = Sleeper, B1,B2 = AC 3 Tier, A1 = AC 2 Tier)</small>
+                </div>
+
+                <!-- Add this field to your Add Train HTML Form -->
+                <div class="form-group mb-3" style="max-width: 750px;">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label fw-bold small text-muted mb-0">Coach Composition Order</label>
+                        <button type="button" class="coach-suggest-badge" id="btnAutoSuggestCoachesCreate">
+                            ⚡ Auto-Suggest Coaches from Classes
+                        </button>
                     </div>
+                    <input type="text"
+                           id="createCoachPositionsInput"
+                           name="CoachPositions"
+                           class="form-control form-control-sm"
+                           placeholder="e.g. S1,S2,S3,B1,B2,A1 or C1,C2,C3,EC1"/>
+                    <small class="text-muted d-block mt-1" style="font-size: 11.5px;">Enter comma-separated coach codes (e.g. S1,S2 = Sleeper, B1,B2 = AC 3 Tier, A1 = AC 2 Tier, C1..C10, E1, E2 = Shatabdi)</small>
+                </div>
                     <div class="mt-3">
                         <label class="form-label"><strong>Runs On</strong></label>
 
@@ -129,11 +165,15 @@
 
                         </div>
                     </div>
-                </div>
 
                 <hr />
                 <div id="classSection">
-                    <h5 class="fw-bold mb-3">Train Classes</h5>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="fw-bold mb-0">Train Classes</h5>
+                        <button type="button" id="btnSyncSeatsCreate" class="btn btn-outline-info btn-sm py-1 px-2" style="font-size: 12px;">
+                            🔄 Recalculate Seats from Coaches
+                        </button>
+                    </div>
                     <table class="table table-bordered align-middle" id="classTable">
                         <thead class="table-light">
                             <tr>
@@ -145,9 +185,9 @@
                         </thead>
                         <tbody>
                             <tr>
-                                <td><input name="classCodes" class="form-control" placeholder="e.g. 1A, 2A, SL" required /></td>
-                                <td><input name="BookingCode" class="form-control" placeholder="e.g. H, A, S" required /></td>
-                                <td><input name="seats" type="number" class="form-control" placeholder="Seats" required /></td>
+                                <td><input name="classCodes" class="form-control class-code-input" placeholder="e.g. 1A, 2A, SL" required /></td>
+                                <td><input name="BookingCode" class="form-control booking-code-input" placeholder="e.g. H, A, S" required /></td>
+                                <td><input name="seats" type="number" class="form-control seats-input" placeholder="Seats" required /></td>
                                 <td><button type="button" class="btn btn-danger btn-sm remove-row">X</button></td>
                             </tr>
                         </tbody>
@@ -243,15 +283,187 @@
         });
 
         document.addEventListener("DOMContentLoaded", function () {
+            // --- 📅 INIT FLATPICKR CALENDARS FOR SERVICE DATES ---
+            let startFp = null;
+            let endFp = null;
+
+            if (typeof flatpickr !== 'undefined') {
+                startFp = flatpickr("#createServiceStartDate", {
+                    dateFormat: "Y-m-d",
+                    altInput: true,
+                    altFormat: "d-M-Y",
+                    allowInput: true,
+                    disableMobile: true,
+                    onChange: function (selectedDates) {
+                        if (selectedDates.length > 0 && endFp) {
+                            endFp.set("minDate", selectedDates[0]);
+                        }
+                    }
+                });
+
+                endFp = flatpickr("#createServiceEndDate", {
+                    dateFormat: "Y-m-d",
+                    altInput: true,
+                    altFormat: "d-M-Y",
+                    allowInput: true,
+                    disableMobile: true
+                });
+            }
+
+            window.clearServiceDateField = function (fieldId) {
+                const input = document.getElementById(fieldId);
+                if (input && input._flatpickr) {
+                    input._flatpickr.clear();
+                } else if (input) {
+                    input.value = "";
+                }
+            };
+
+            // --- 🚆 AUTO-SUGGEST COACH COMPOSITION & SEATS ---
+            const btnSuggest = document.getElementById("btnAutoSuggestCoachesCreate");
+            const btnSync = document.getElementById("btnSyncSeatsCreate");
+            const coachInput = document.getElementById("createCoachPositionsInput");
+
+            function getClassesFromTable() {
+                const codes = [];
+                document.querySelectorAll(".class-code-input").forEach(inp => {
+                    const val = inp.value.trim().toUpperCase();
+                    if (val) codes.push(val);
+                });
+                return codes;
+            }
+
+            function generateStandardComposition(codes) {
+                const trainName = (document.querySelector("input[name='Name']")?.value || "").toUpperCase();
+                const comp = [];
+                const has = (key) => codes.some(c => c.includes(key));
+
+                // 🚂 Always start with Locomotive Engine
+                comp.push("ENG");
+
+                if (trainName.includes("VANDE") || trainName.includes("VB")) {
+                    comp.push("DTC");
+                    for (let i = 1; i <= 6; i++) comp.push("C" + i);
+                    if (has("EC")) comp.push("E1", "E2");
+                    for (let i = 7; i <= 12; i++) comp.push("C" + i);
+                    comp.push("DTC");
+                } else if (trainName.includes("SHATABDI") || (has("CC") && has("EC"))) {
+                    comp.push("EOG");
+                    for (let i = 1; i <= 6; i++) comp.push("C" + i);
+                    if (has("EC")) comp.push("E1", "E2");
+                    for (let i = 7; i <= 10; i++) comp.push("C" + i);
+                    comp.push("EOG");
+                } else if (trainName.includes("RAJDHANI") || trainName.includes("DURONTO")) {
+                    comp.push("EOG");
+                    if (has("1A") || has("FIRST")) comp.push("H1");
+                    if (has("2A") || has("2 TIER")) comp.push("A1", "A2", "A3");
+                    if (has("3A") || has("3 TIER")) comp.push("B1", "B2", "B3", "B4", "B5", "B6");
+                    if (has("3E") || has("ECONOMY")) comp.push("M1", "M2");
+                    if (has("SL") || has("SLEEPER")) comp.push("S1", "S2", "S3", "S4");
+                    comp.push("EOG");
+                } else {
+                    // Standard Mail / Express / Superfast Lineup (with front GN, mid AC/Sleeper, rear GN and EOG)
+                    comp.push("GN", "GN");
+
+                    if (has("1A") || has("FIRST")) comp.push("H1");
+                    if (has("2A") || has("2 TIER")) comp.push("A1", "A2", "A3");
+                    if (has("3A") || has("3 TIER")) comp.push("B1", "B2", "B3", "B4", "B5");
+                    if (has("3E") || has("ECONOMY")) comp.push("M1");
+
+                    if (has("SL") || has("SLEEPER")) {
+                        comp.push("SE1");
+                        for (let i = 1; i <= 6; i++) comp.push("S" + i);
+                    } else if (codes.length === 0 || (!has("CC") && !has("2S"))) {
+                        comp.push("SE1", "S1", "S2", "S3", "S4", "S5", "S6");
+                    }
+
+                    if (has("CC") || has("CHAIR")) comp.push("C1", "C2", "C3");
+
+                    comp.push("GN", "GN", "EOG");
+                }
+
+                return comp.join(",");
+            }
+
+            function syncSeatsFromComposition() {
+                const compStr = coachInput.value.trim();
+                if (!compStr) return;
+
+                const coaches = compStr.split(",").map(c => c.trim().toUpperCase()).filter(c => c);
+                const counts = {};
+                coaches.forEach(c => {
+                    const prefix = c.replace(/[0-9]/g, "");
+                    counts[prefix] = (counts[prefix] || 0) + 1;
+                });
+
+                document.querySelectorAll("#classTable tbody tr").forEach(row => {
+                    const codeInp = row.querySelector(".class-code-input");
+                    const seatsInp = row.querySelector(".seats-input");
+                    if (!codeInp || !seatsInp) return;
+
+                    const code = codeInp.value.toUpperCase();
+                    let coachCount = 0;
+                    let seatsPerCoach = 80;
+
+                    if (code.includes("SL") || code.includes("SLEEPER")) {
+                        coachCount = (counts["S"] || 0) + (counts["SE"] || 0);
+                        seatsPerCoach = 80; // Standard LHB Sleeper
+                    } else if (code.includes("3A") || (code.includes("3") && code.includes("TIER"))) {
+                        coachCount = counts["B"] || 0;
+                        seatsPerCoach = 72; // Standard LHB 3-Tier AC
+                    } else if (code.includes("3E") || code.includes("ECONOMY")) {
+                        coachCount = counts["M"] || 0;
+                        seatsPerCoach = 83; // Standard LHB 3E Economy
+                    } else if (code.includes("2A") || (code.includes("2") && code.includes("TIER"))) {
+                        coachCount = counts["A"] || 0;
+                        seatsPerCoach = 54; // Standard LHB 2-Tier AC
+                    } else if (code.includes("1A") || code.includes("FIRST")) {
+                        coachCount = counts["H"] || 0;
+                        seatsPerCoach = 24; // Full First AC
+                    } else if (code.includes("EC") || code.includes("EXEC")) {
+                        coachCount = counts["E"] || counts["EC"] || 0;
+                        seatsPerCoach = 56; // Standard Shatabdi EC
+                    } else if (code.includes("CC") || code.includes("CHAIR")) {
+                        coachCount = counts["C"] || 0;
+                        seatsPerCoach = 78; // Standard LHB Chair Car
+                    } else if (code.includes("2S") || code.includes("SECOND") || code.includes("GEN") || code.includes("GN")) {
+                        coachCount = (counts["GN"] || 0) + (counts["GS"] || 0) + (counts["D"] || 0);
+                        seatsPerCoach = 108; // Standard LHB Second Seating
+                    }
+
+                    if (coachCount > 0) {
+                        seatsInp.value = coachCount * seatsPerCoach;
+                    }
+                });
+            }
+
+            if (btnSuggest) {
+                btnSuggest.addEventListener("click", function () {
+                    const codes = getClassesFromTable();
+                    const suggested = generateStandardComposition(codes);
+                    if (suggested) {
+                        coachInput.value = suggested;
+                        syncSeatsFromComposition();
+                    }
+                });
+            }
+
+            if (btnSync) {
+                btnSync.addEventListener("click", function () {
+                    syncSeatsFromComposition();
+                });
+            }
+
+            // --- CLASS TABLE HANDLING ---
             const addBtn = document.getElementById("addClassRow");
             const tableBody = document.querySelector("#classTable tbody");
 
             addBtn.addEventListener("click", function () {
                 const newRow = document.createElement("tr");
                 newRow.innerHTML = `
-                    <td><input name="classCodes" class="form-control" placeholder="e.g. 1A, 2A, SL" required></td>
-                    <td><input name="BookingCode" class="form-control" placeholder="e.g. H, A, S" required></td>
-                    <td><input name="seats" type="number" class="form-control" placeholder="Seats" required></td>
+                    <td><input name="classCodes" class="form-control class-code-input" placeholder="e.g. 1A, 2A, SL" required></td>
+                    <td><input name="BookingCode" class="form-control booking-code-input" placeholder="e.g. H, A, S" required></td>
+                    <td><input name="seats" type="number" class="form-control seats-input" placeholder="Seats" required></td>
                     <td><button type="button" class="btn btn-danger btn-sm remove-row">X</button></td>
                 `;
                 tableBody.appendChild(newRow);
@@ -260,14 +472,11 @@
             // Delegate remove-row click
             tableBody.addEventListener("click", function (e) {
                 if (e.target.classList.contains("remove-row")) {
-
                     const totalRows = tableBody.querySelectorAll("tr").length;
-
                     if (totalRows <= 1) {
                         alert("Atleast one train class must be added.");
                         return;
                     }
-
                     if (confirm("Are you sure do you want to remove this class?")) {
                         e.target.closest("tr").remove();
                     }
@@ -275,7 +484,7 @@
             });
         });
 
-                // 🔥 Keep admin session alive
+        // 🔥 Keep admin session alive
         setInterval(() => {
             fetch('/Admin/KeepAlive', {
                 method: 'GET',

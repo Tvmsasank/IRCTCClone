@@ -276,6 +276,7 @@ $(function () {
 
             $list.show();
             $list.scrollTop(0);
+            $input.closest('.station-input-wrapper').addClass('focus-active has-dropdown-open');
         }
 
         // Typing triggers search
@@ -283,6 +284,7 @@ $(function () {
             const term = $input.val().trim();
             if (!term) {
                 $list.hide();
+                $input.closest('.station-input-wrapper').removeClass('has-dropdown-open');
                 if ($input.is('#fromStation')) $('#fromStationId').val('');
                 if ($input.is('#toStation')) $('#toStationId').val('');
                 return;
@@ -310,11 +312,18 @@ $(function () {
                 $('#toStationId').val(toId);
 
                 $list.hide();
+                $input.closest('.station-input-wrapper').removeClass('focus-active has-dropdown-open');
                 return;
             }
 
             // 🔥 NORMAL STATION
             selectItem($(this));
+        });
+
+        // Sync hover with active item (prevents dual highlights)
+        $list.on('mouseenter', '.autocomplete-item', function () {
+            $list.find('.autocomplete-item').removeClass('active');
+            $(this).addClass('active');
         });
 
         // Keyboard navigation
@@ -387,6 +396,7 @@ $(function () {
             $input.data('selected', true);
 
             $list.hide();
+            $input.closest('.station-input-wrapper').removeClass('focus-active has-dropdown-open');
 
             if ($input.is('#fromStation')) $('#fromStationId').val(id);
             if ($input.is('#toStation')) $('#toStationId').val(id);
@@ -396,6 +406,7 @@ $(function () {
         $(document).on('click', function (e) {
             if (!$(e.target).closest($input).length && !$(e.target).closest($list).length) {
                 $list.hide();
+                $input.closest('.station-input-wrapper').removeClass('focus-active has-dropdown-open');
             }
         });
 
@@ -673,54 +684,73 @@ function handleSearchSubmit(e) {
 }
 
 /*------------------------------------------------------------------------------------------*/
+// CLOSE AVAILABILITY PANEL
+function closeAvailabilityPanel(panelId, trainId) {
+    const panel = document.getElementById(panelId);
+    if (panel) {
+        panel.style.display = "none";
+        const parent = panel.closest(".train-card") || panel.parentElement;
+        if (parent) {
+            const boxes = parent.querySelectorAll(".class-box");
+            boxes.forEach(b => b.classList.remove("active"));
+        }
+    }
+}
+
+/*------------------------------------------------------------------------------------------*/
 // SEAT AVAILABILITY LOADER
-function openAvailability(classId, trainId) {
+function openAvailability(classId, trainId, fromStn, toStn, quotaParam, specificDate, panelId) {
 
     const isUserClick = true;
 
-    window.trainConnection.invoke("JoinTrain", trainId.toString())
-        .catch(err => console.error(err));
+    if (window.trainConnection && window.trainConnection.invoke) {
+        window.trainConnection.invoke("JoinTrain", trainId.toString())
+            .catch(err => console.error(err));
+    }
 
     const loader = document.getElementById("loadingModal");
-    loader.style.display = "flex";
+    if (loader) loader.style.display = "flex";
 
     const start = Date.now();
 
-    const panel = document.getElementById("panel-" + trainId);
-    panel.style.display = "block";
+    let target = null;
+    const panel = document.getElementById(panelId || ("panel-" + trainId));
+    if (panel) {
+        panel.style.display = "block";
 
-    const boxes = panel.parentElement.querySelectorAll(".class-box");
-    boxes.forEach(b => b.classList.remove("active"));
+        const parent = panel.parentElement;
+        const boxes = parent ? parent.querySelectorAll(".class-box") : document.querySelectorAll(`.class-box[data-train="${trainId}"]`);
+        boxes.forEach(b => b.classList.remove("active"));
 
-    const selectedBox = panel.parentElement.querySelector(
-        `.class-box[data-class="${classId}"]`
-    );
+        const selectedBox = parent ? parent.querySelector(
+            `.class-box[data-class="${classId}"]`
+        ) : document.querySelector(`.class-box[data-class="${classId}"][data-train="${trainId}"]`);
 
-    if (selectedBox) selectedBox.classList.add("active");
+        if (selectedBox) selectedBox.classList.add("active");
 
-    const cards = panel.querySelectorAll(".class-card");
-    cards.forEach(c => c.classList.remove("active"));
+        const cards = panel.querySelectorAll(".class-card");
+        cards.forEach(c => {
+            c.classList.remove("active");
+            c.classList.remove("booking-not-allowed-card");
+        });
 
-    const target = panel.querySelector(`.class-card[data-class="${classId}"]`);
+        target = panel.querySelector(`.class-card[data-class="${classId}"]`);
 
-    if (target) {
-        target.style.visibility = "hidden";   // hide entire card
-    }
+        if (target) {
+            target.style.visibility = "hidden";   // hide entire card
+            target.classList.add("active");
 
-    if (target) {
+            const status = target.querySelector(".class-status");
 
-        target.classList.add("active");
-
-        const status = target.querySelector(".class-status");
-
-        if (status) {
-            status.innerText = "Checking...";
-            status.style.color = "#555";
+            if (status) {
+                status.innerText = "Checking...";
+                status.style.color = "#555";
+            }
         }
     }
 
-    const travelDate = document.getElementById("journeyDatePicker").value;
-    const quota = document.getElementById("quota")?.value || "GENERAL";
+    const travelDate = specificDate || (target && target.querySelector("input[name='journeyDate']")?.value) || document.getElementById("journeyDatePicker")?.value || "";
+    const quota = quotaParam || document.getElementById("quota")?.value || "GENERAL";
     //const quota = new URLSearchParams(window.location.search).get("Quota") || "GENERAL";
 
     fetch(`/Booking/GetSeatAvailability?trainId=${trainId}&classId=${classId}&journeyDate=${travelDate}&quota=${quota}`)
@@ -731,7 +761,7 @@ function openAvailability(classId, trainId) {
             if (data.status === "BOOKING_NOT_ALLOWED") {
 
                 const elapsed = Date.now() - start;
-                const delay = Math.max(0, 1000 - elapsed);
+                const delay = Math.max(0, 500 - elapsed);
 
                 setTimeout(() => {
 
@@ -739,22 +769,32 @@ function openAvailability(classId, trainId) {
 
                     if (!target) return;
 
+                    target.classList.add("booking-not-allowed-card");
+
                     const statusEl = target.querySelector(".class-status");
                     const fareEl = target.querySelector(".class-fare");
                     const btnEl = target.querySelector(".book-btn");
+                    const lastUpdatedEl = target.querySelector(".last-updated");
 
                     // ✅ visible
                     target.style.visibility = "visible";
 
                     if (statusEl) {
-
                         statusEl.style.visibility = "visible";
-
-                        statusEl.innerText = "BOOKINGS are NOT ALLOWED at this TIME";
-
-                        statusEl.style.color = "red";
-
-                        statusEl.style.fontWeight = "bold";
+                        statusEl.innerHTML = `
+                            <div class="booking-not-allowed-box">
+                                <span class="booking-not-allowed-close" onclick="closeAvailabilityPanel('${panel ? panel.id : ''}', '${trainId}')">&times;</span>
+                                <div class="booking-not-allowed-msg">
+                                    BOOKINGs are NOT ALLOWED at this TIME
+                                </div>
+                                <div class="booking-not-allowed-sub">
+                                    Please check <a href="https://enquiry.indianrail.gov.in" target="_blank" class="ntes-link">NTES website</a> or <span class="ntes-link">NTES app</span> for actual time before boarding
+                                </div>
+                                <button type="button" class="book-now-disabled" disabled onclick="showToast('BOOKINGs are NOT ALLOWED at this TIME', 'error')">
+                                    Book Now
+                                </button>
+                            </div>
+                        `;
                     }
 
                     // ❌ hide fare
@@ -765,6 +805,16 @@ function openAvailability(classId, trainId) {
                     // ❌ hide button
                     if (btnEl) {
                         btnEl.style.display = "none";
+                    }
+
+                    // ❌ hide last updated
+                    if (lastUpdatedEl) {
+                        lastUpdatedEl.style.display = "none";
+                    }
+
+                    // 🔔 Show Error toast
+                    if (typeof showToast === 'function') {
+                        showToast("BOOKINGs are NOT ALLOWED at this TIME", "error");
                     }
 
                 }, delay);
@@ -982,10 +1032,13 @@ function openAvailability(classId, trainId) {
 
                 // 🟢 CURR_AVBL
                 if (status === "CURR_AVBL") {
-                    statusEl.innerText = "CURR_AVBL - " + count;
+                    statusEl.innerText = "CURR_AVBL-" + String(count).padStart(4, '0');
                     statusEl.style.fontWeight = "bold";
                     statusEl.style.color = "green";
-                    if (btnEl) btnEl.style.display = "inline-block";
+                    if (btnEl) {
+                        btnEl.style.display = "inline-block";
+                        btnEl.disabled = false;
+                    }
                     return;
                 }
 
@@ -1010,7 +1063,7 @@ function openAvailability(classId, trainId) {
                             btnEl.style.display = "none";
                         } else {
                             btnEl.style.display = "inline-block";
-                            btnEl.display = false;
+                            btnEl.disabled = false;
                         }
                     }
                 }
@@ -1081,7 +1134,15 @@ function openAvailability(classId, trainId) {
         })
 
         .catch(err => {
-            loader.style.display = "none";
+            if (loader) loader.style.display = "none";
+            if (target) {
+                target.style.visibility = "visible";
+                const statusEl = target.querySelector(".class-status");
+                if (statusEl) {
+                    statusEl.innerText = "Unable to fetch";
+                    statusEl.style.color = "red";
+                }
+            }
             console.error("Availability fetch error:", err);
         });
 }
@@ -1369,33 +1430,75 @@ function showError(message) {
     }, 10000);
 }*/
 
-function showToast(message, type = "error") {
+function dismissToast(toast) {
+    if (!toast || toast.classList.contains("toast-closing")) return;
+    toast.classList.add("toast-closing");
+    setTimeout(() => {
+        if (toast && toast.parentNode) {
+            toast.remove();
+        }
+    }, 350);
+}
 
-    const container = document.getElementById("toastContainer");
+function showToast(message, type = "error") {
+    if (!message || typeof message !== "string") return;
+
+    let container = document.getElementById("toastContainer");
+    if (!container) {
+        container = document.createElement("div");
+        container.id = "toastContainer";
+        document.body.appendChild(container);
+    }
+
+    // Deduplication: if identical message is already displayed, shake it and reset its timer
+    const existingToasts = container.querySelectorAll(".toast");
+    for (let t of existingToasts) {
+        const textDiv = t.querySelector(".toast-text-block div");
+        if (textDiv && textDiv.innerText.trim() === message.trim() && !t.classList.contains("toast-closing")) {
+            t.classList.remove("toast-shake");
+            void t.offsetWidth; // trigger reflow
+            t.classList.add("toast-shake");
+            if (t._dismissTimer) clearTimeout(t._dismissTimer);
+            t._dismissTimer = setTimeout(() => dismissToast(t), 3500);
+            return;
+        }
+    }
 
     const toast = document.createElement("div");
-
-    // ✅ Add type class
     toast.className = "toast " + type;
 
-    // ✅ Dynamic title
-    let title = type === "success" ? "Success!" : "Error!";
+    let title = type === "success" ? "Success!" : (type === "warning" ? "Warning!" : "Error!");
+    let iconHtml = type === "success" 
+        ? '<i class="bi bi-check-circle-fill toast-icon" style="color:#15803d; font-size:16px; margin-top:2px;"></i>'
+        : (type === "warning" 
+            ? '<i class="bi bi-exclamation-triangle-fill toast-icon" style="color:#b45309; font-size:16px; margin-top:2px;"></i>'
+            : '<i class="bi bi-x-circle-fill toast-icon" style="color:#991b1b; font-size:16px; margin-top:2px;"></i>');
 
     toast.innerHTML = `
         <span class="close-btn">&times;</span>
-        <strong>${title}</strong>
-        <div>${message}</div>
+        <div class="toast-inner-layout" style="display:flex; align-items:flex-start; gap:10px;">
+            ${iconHtml}
+            <div class="toast-text-block">
+                <strong>${title}</strong>
+                <div>${message}</div>
+            </div>
+        </div>
     `;
 
     container.appendChild(toast);
 
-    toast.querySelector(".close-btn").onclick = () => {
-        toast.remove();
-    };
+    const closeBtn = toast.querySelector(".close-btn");
+    if (closeBtn) {
+        closeBtn.onclick = (e) => {
+            e.stopPropagation();
+            dismissToast(toast);
+        };
+    }
 
-    setTimeout(() => {
-        toast.remove();
-    }, 10000);
+    // Auto-dismiss after 3.5 seconds with FIFO ordering
+    toast._dismissTimer = setTimeout(() => {
+        dismissToast(toast);
+    }, 3500);
 }
 
 $(document).on("input change", "input, select", function () {
@@ -1723,3 +1826,63 @@ $(document).on("click", ".fare-modal", function (e) {
 });
 
 /**/
+
+// ================= IRCTC IDLE SESSION TIMEOUT WATCHER =================
+(function () {
+    // Do not run on error page itself
+    if (window.location.pathname.toLowerCase().includes("/error")) {
+        return;
+    }
+
+    const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes inactivity
+    const MAX_IDLE_REDIRECT_MS = 7 * 60 * 1000; // 7 minutes automatic redirect
+    let lastActivity = Date.now();
+    let isIdle = false;
+
+    function resetActivity() {
+        if (!isIdle) {
+            lastActivity = Date.now();
+        }
+    }
+
+    ["mousemove", "mousedown", "keydown", "scroll", "touchstart"].forEach(evt => {
+        window.addEventListener(evt, resetActivity, { passive: true });
+    });
+
+    // Check idle status periodically
+    setInterval(function () {
+        const inactiveDuration = Date.now() - lastActivity;
+        if (inactiveDuration >= IDLE_TIMEOUT_MS) {
+            isIdle = true;
+        }
+        if (inactiveDuration >= MAX_IDLE_REDIRECT_MS) {
+            window.location.href = "/Error";
+        }
+    }, 5000);
+
+    // Intercept search, booking, submit, or loading buttons when idle
+    document.addEventListener("click", function (e) {
+        if (isIdle || (Date.now() - lastActivity >= IDLE_TIMEOUT_MS)) {
+            const target = e.target.closest("button, .btn, .book-btn, input[type='submit'], .search-btn, a[href], .class-box, .tab-btn");
+            if (target) {
+                // If it's an explicit login link or error link, allow it
+                const href = target.getAttribute("href");
+                if (href && (href.includes("/Account/Login") || href.includes("/Error"))) {
+                    return;
+                }
+                e.preventDefault();
+                e.stopPropagation();
+                window.location.href = "/Error";
+            }
+        }
+    }, true);
+
+    // Also intercept form submits when idle
+    document.addEventListener("submit", function (e) {
+        if (isIdle || (Date.now() - lastActivity >= IDLE_TIMEOUT_MS)) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.location.href = "/Error";
+        }
+    }, true);
+})();

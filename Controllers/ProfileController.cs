@@ -119,53 +119,119 @@ namespace IRCTCClone.Controllers
             {
                 conn.Open();
 
+                // Query authentic registration username from Usrs table
+                string authenticUsername = "";
+                string sessionIrctcUser = User.FindFirstValue("IRCTCUsername") ?? HttpContext.Session.GetString("irctc_username") ?? "";
+                try
+                {
+                    using (var uCmd = new SqlCommand(@"
+                        SELECT TOP 1 Username, FullName FROM Usrs 
+                        WHERE LOWER(LTRIM(RTRIM(Email))) = LOWER(LTRIM(RTRIM(@UserId))) 
+                           OR LOWER(LTRIM(RTRIM(Username))) = LOWER(LTRIM(RTRIM(@UserId)))
+                           OR (@SessionUser <> '' AND (LOWER(LTRIM(RTRIM(Username))) = LOWER(LTRIM(RTRIM(@SessionUser))) OR LOWER(LTRIM(RTRIM(Email))) = LOWER(LTRIM(RTRIM(@SessionUser)))))", conn))
+                    {
+                        uCmd.Parameters.AddWithValue("@UserId", userId ?? "");
+                        uCmd.Parameters.AddWithValue("@SessionUser", sessionIrctcUser ?? "");
+                        using (var uReader = uCmd.ExecuteReader())
+                        {
+                            if (uReader.Read())
+                            {
+                                if (uReader["Username"] != DBNull.Value && !string.IsNullOrWhiteSpace(uReader["Username"].ToString()))
+                                {
+                                    authenticUsername = uReader["Username"].ToString().Trim();
+                                }
+                                if (uReader["FullName"] != DBNull.Value && !string.IsNullOrWhiteSpace(uReader["FullName"].ToString()))
+                                {
+                                    currentFullName = uReader["FullName"].ToString().Trim();
+                                }
+                            }
+                        }
+                    }
+                }
+                catch { }
+
+                if (string.IsNullOrWhiteSpace(authenticUsername))
+                {
+                    authenticUsername = !string.IsNullOrWhiteSpace(sessionIrctcUser) ? sessionIrctcUser : (!string.IsNullOrWhiteSpace(userId) && userId.Contains("@") ? userId.Split('@')[0] : userId);
+                }
+
+                // Clean up any historical hardcoded fallbacks in UserProfiles
+                try
+                {
+                    using (var cleanupCmd = new SqlCommand(@"
+                        UPDATE UserProfiles 
+                        SET MobileNumber = NULL, DateOfBirth = NULL, Address = NULL, Gender = NULL, IsAadhaarVerified = 0
+                        WHERE Email != 'venkatamanishashankt@gmail.com' AND (MobileNumber LIKE '%9000485456%' OR Address LIKE '%House no 3-2-63%')", conn))
+                    {
+                        cleanupCmd.ExecuteNonQuery();
+                    }
+                }
+                catch { }
+
                 // 1. Fetch or initialize UserProfile
-                using (var cmd = new SqlCommand("SELECT * FROM UserProfiles WHERE UserId = @UserId", conn))
+                using (var cmd = new SqlCommand("SELECT * FROM UserProfiles WHERE UserId = @UserId OR Email = @UserId", conn))
                 {
                     cmd.Parameters.AddWithValue("@UserId", userId);
                     using (var reader = cmd.ExecuteReader())
                     {
                         if (reader.Read())
                         {
+                            string profUsername = !string.IsNullOrWhiteSpace(authenticUsername) ? authenticUsername : (reader["Username"] != DBNull.Value ? reader["Username"].ToString().Trim() : (!string.IsNullOrWhiteSpace(userId) && userId.Contains("@") ? userId.Split('@')[0] : userId));
+
                             viewModel.Profile = new UserProfile
                             {
                                 Id = Convert.ToInt32(reader["Id"]),
                                 UserId = reader["UserId"].ToString(),
-                                Username = reader["Username"] != DBNull.Value ? reader["Username"].ToString() : (userId.Contains("@") ? userId.Split('@')[0] : userId),
+                                Username = profUsername,
                                 FullName = reader["FullName"] != DBNull.Value && !string.IsNullOrWhiteSpace(reader["FullName"].ToString()) ? reader["FullName"].ToString() : currentFullName,
                                 Email = reader["Email"] != DBNull.Value ? reader["Email"].ToString() : userId,
-                                MobileNumber = reader["MobileNumber"] != DBNull.Value ? reader["MobileNumber"].ToString() : "+91 9000485456",
-                                DateOfBirth = reader["DateOfBirth"] != DBNull.Value ? Convert.ToDateTime(reader["DateOfBirth"]) : new DateTime(2002, 2, 13),
-                                Gender = reader["Gender"] != DBNull.Value ? reader["Gender"].ToString() : "Male",
-                                Country = reader["Country"] != DBNull.Value ? reader["Country"].ToString() : "India",
-                                Address = reader["Address"] != DBNull.Value ? reader["Address"].ToString() : "House no 3-2-63/2/276P, street no 17, bhavani nagar, Mallapur, nacharam, Hyderabad 500076, TELANGANA, 500076",
-                                IsAadhaarVerified = reader["IsAadhaarVerified"] != DBNull.Value ? Convert.ToBoolean(reader["IsAadhaarVerified"]) : true,
-                                AadhaarNumber = reader["AadhaarNumber"] != DBNull.Value ? reader["AadhaarNumber"].ToString() : "XXXXXXXX1234",
+                                MobileNumber = reader["MobileNumber"] != DBNull.Value && !string.IsNullOrWhiteSpace(reader["MobileNumber"].ToString()) ? reader["MobileNumber"].ToString() : null,
+                                DateOfBirth = reader["DateOfBirth"] != DBNull.Value ? Convert.ToDateTime(reader["DateOfBirth"]) : (DateTime?)null,
+                                Gender = reader["Gender"] != DBNull.Value && !string.IsNullOrWhiteSpace(reader["Gender"].ToString()) ? reader["Gender"].ToString() : null,
+                                Country = reader["Country"] != DBNull.Value && !string.IsNullOrWhiteSpace(reader["Country"].ToString()) ? reader["Country"].ToString() : "India",
+                                Address = reader["Address"] != DBNull.Value && !string.IsNullOrWhiteSpace(reader["Address"].ToString()) ? reader["Address"].ToString() : null,
+                                IsAadhaarVerified = reader["IsAadhaarVerified"] != DBNull.Value ? Convert.ToBoolean(reader["IsAadhaarVerified"]) : false,
+                                AadhaarNumber = reader["AadhaarNumber"] != DBNull.Value && !string.IsNullOrWhiteSpace(reader["AadhaarNumber"].ToString()) ? reader["AadhaarNumber"].ToString() : null,
                                 WalletBalance = reader["WalletBalance"] != DBNull.Value ? Convert.ToDecimal(reader["WalletBalance"]) : 0.00m,
-                                LastPasswordUpdate = reader["LastPasswordUpdate"] != DBNull.Value ? Convert.ToDateTime(reader["LastPasswordUpdate"]) : DateTime.Now.AddDays(-140)
+                                LastPasswordUpdate = reader["LastPasswordUpdate"] != DBNull.Value ? Convert.ToDateTime(reader["LastPasswordUpdate"]) : (DateTime?)null
                             };
                         }
                         else
                         {
-                            // Default mock/initial profile if not created yet
+                            // Initial profile if not created yet
                             viewModel.Profile = new UserProfile
                             {
                                 UserId = userId,
-                                Username = userId.Contains("@") ? userId.Split('@')[0] : userId,
+                                Username = !string.IsNullOrWhiteSpace(authenticUsername) ? authenticUsername : (userId.Contains("@") ? userId.Split('@')[0] : userId),
                                 FullName = currentFullName,
                                 Email = userId,
-                                MobileNumber = "+91 9000485456",
-                                DateOfBirth = new DateTime(2002, 2, 13),
-                                Gender = "Male",
+                                MobileNumber = null,
+                                DateOfBirth = null,
+                                Gender = null,
                                 Country = "India",
-                                Address = "House no 3-2-63/2/276P, street no 17, bhavani nagar, Mallapur, nacharam, Hyderabad 500076, TELANGANA, 500076",
-                                IsAadhaarVerified = true,
-                                AadhaarNumber = "XXXXXXXX1234",
+                                Address = null,
+                                IsAadhaarVerified = false,
+                                AadhaarNumber = null,
                                 WalletBalance = 0.00m,
-                                LastPasswordUpdate = DateTime.Now.AddDays(-140)
+                                LastPasswordUpdate = null
                             };
                         }
                     }
+                }
+
+                // Sync UserProfiles username with authentic username
+                if (!string.IsNullOrWhiteSpace(authenticUsername))
+                {
+                    try
+                    {
+                        using (var syncCmd = new SqlCommand("UPDATE UserProfiles SET Username = @Username WHERE (UserId = @UserId OR Email = @UserId) AND (Username IS NULL OR Username != @Username)", conn))
+                        {
+                            syncCmd.Parameters.AddWithValue("@Username", authenticUsername);
+                            syncCmd.Parameters.AddWithValue("@UserId", userId);
+                            syncCmd.ExecuteNonQuery();
+                        }
+                    }
+                    catch { }
                 }
 
                 // 2. Fetch Master Passengers
@@ -256,7 +322,7 @@ namespace IRCTCClone.Controllers
                         ELSE
                         BEGIN
                             INSERT INTO UserProfiles (UserId, Username, FullName, Email, MobileNumber, DateOfBirth, Gender, Country, Address, IsAadhaarVerified, WalletBalance)
-                            VALUES (@UserId, @Username, @FullName, @Email, @MobileNumber, @DateOfBirth, @Gender, @Country, @Address, 1, 0.00);
+                            VALUES (@UserId, @Username, @FullName, @Email, @MobileNumber, @DateOfBirth, @Gender, @Country, @Address, 0, 0.00);
                         END
                     ";
 
@@ -268,7 +334,7 @@ namespace IRCTCClone.Controllers
                         cmd.Parameters.AddWithValue("@Email", (object)model.Email ?? userId);
                         cmd.Parameters.AddWithValue("@MobileNumber", (object)model.MobileNumber ?? DBNull.Value);
                         cmd.Parameters.AddWithValue("@DateOfBirth", (object)model.DateOfBirth ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@Gender", (object)model.Gender ?? "Male");
+                        cmd.Parameters.AddWithValue("@Gender", (object)model.Gender ?? DBNull.Value);
                         cmd.Parameters.AddWithValue("@Country", (object)model.Country ?? "India");
                         cmd.Parameters.AddWithValue("@Address", (object)model.Address ?? DBNull.Value);
 

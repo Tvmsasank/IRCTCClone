@@ -91,6 +91,74 @@
 
             var cleanFrom = CleanStation(fromStation);
             var cleanTo = CleanStation(toStation);
+
+            string GetClassDisplayName(string code) {
+                if (string.IsNullOrEmpty(code)) return "";
+                string upper = code.ToUpper();
+                if (upper.Contains("(1A)") || upper == "1A" || upper.Contains("FIRST CLASS")) return "AC First Class (1A)";
+                if (upper.Contains("(2S)") || upper == "2S" || upper.Contains("SECOND SITTING")) return "Second Sitting (2S)";
+                if (upper.Contains("(3E)") || upper == "3E" || upper.Contains("3 ECONOMY") || upper.Contains("3RD ECONOMY")) return "AC 3 Economy (3E)";
+                if (upper.Contains("(SL)") || upper == "SL" || upper.Contains("SLEEPER")) return "Sleeper (SL)";
+                if (upper.Contains("(2A)") || upper == "2A" || upper.Contains("2 TIER")) return "AC 2 Tier (2A)";
+                if (upper.Contains("(3A)") || upper == "3A" || upper.Contains("3 TIER")) return "AC 3 Tier (3A)";
+                if (upper.Contains("(CC)") || upper == "CC" || (upper.Contains("CHAIR CAR") && !upper.Contains("EXEC"))) return "AC Chair car (CC)";
+                if (upper.Contains("(EC)") || upper == "EC" || upper.Contains("EXECUTIVE") || upper.Contains("EXEC. CHAIR")) return "Exec. Chair Car (EC)";
+                if (upper.Contains("(EA)") || upper == "EA" || upper.Contains("ANUBHUTI")) return "Anubhuti Class (EA)";
+                if (upper.Contains("(EV)") || upper == "EV" || upper.Contains("VISTADOME AC")) return "Vistadome AC (EV)";
+                if (upper.Contains("(VS)") || upper == "VS" || upper.Contains("VISTADOME NON")) return "Vistadome Non AC (VS)";
+                return code;
+            }
+
+            string GetClassShortCode(string code) {
+                if (string.IsNullOrEmpty(code)) return "";
+                string upper = code.ToUpper();
+                if (upper.Contains("(1A)") || upper == "1A") return "1A";
+                if (upper.Contains("(2S)") || upper == "2S") return "2S";
+                if (upper.Contains("(3E)") || upper == "3E") return "3E";
+                if (upper.Contains("(SL)") || upper == "SL") return "SL";
+                if (upper.Contains("(2A)") || upper == "2A") return "2A";
+                if (upper.Contains("(3A)") || upper == "3A") return "3A";
+                if (upper.Contains("(CC)") || upper == "CC") return "CC";
+                if (upper.Contains("(EC)") || upper == "EC") return "EC";
+                if (upper.Contains("(EA)") || upper == "EA") return "EA";
+                if (upper.Contains("(EV)") || upper == "EV") return "EV";
+                if (upper.Contains("(VS)") || upper == "VS") return "VS";
+                if (code.Contains("(") && code.Contains(")")) {
+                    int s = code.IndexOf("(") + 1;
+                    int e = code.IndexOf(")");
+                    return code.Substring(s, e - s).Trim().ToUpper();
+                }
+                return code.Trim().ToUpper();
+            }
+
+            var classOrder = new List<string> { "1A", "2S", "3E", "SL", "2A", "3A", "CC", "EC", "EA", "EV", "VS" };
+
+            var availableClasses = Model?
+                .Where(t => t.Classes != null)
+                .SelectMany(t => t.Classes)
+                .GroupBy(c => GetClassShortCode(c.Code))
+                .Select(g => new {
+                    ShortCode = g.Key,
+                    FullName = GetClassDisplayName(g.First().Code)
+                })
+                .Where(x => !string.IsNullOrEmpty(x.ShortCode))
+                .OrderBy(x => {
+                    int idx = classOrder.IndexOf(x.ShortCode);
+                    return idx >= 0 ? idx : 99;
+                })
+                .ToList();
+
+            var availableTypes = new[]
+            {
+                new { Type = "rajdhani", Name = "Rajdhani", Dot = "rajdhani" },
+                new { Type = "shatabdi", Name = "Shatabdi", Dot = "shatabdi" },
+                new { Type = "duronto", Name = "Duronto", Dot = "duronto" },
+                new { Type = "vande-bharat", Name = "Vande Bharat", Dot = "vande" },
+                new { Type = "amrit-bharat", Name = "Amrit Bharat", Dot = "amrit" },
+                new { Type = "garib-rath", Name = "Garib Rath", Dot = "garib" },
+                new { Type = "special", Name = "Special Trains", Dot = "special" },
+                new { Type = "normal", Name = "Other Trains", Dot = "normal" }
+            }.ToList();
         }
 
         @{
@@ -123,45 +191,40 @@
         }
 
         <!-- ✅ STICKY RESULTS HEADER -->
-        <div class="sticky-top-block">
+        <div class="sticky-top-block" id="stickyTopBlock">
+
+            <!-- 📱 Mobile Compact Route Summary Bar (<= 991px, matching official IRCTC) -->
+            <div class="mobile-search-compact-bar" id="mobileSearchCompactBar" onclick="toggleMobileModifySearch()">
+                <div class="mobile-summary-left">
+                    <a href="/" class="mobile-back-btn" onclick="event.stopPropagation();" title="Back to Home">
+                        <i class="bi bi-arrow-left"></i>
+                    </a>
+                    <div class="mobile-summary-text-group">
+                        <span class="summary-stns">@cleanFrom TO @cleanTo</span>
+                        <span class="summary-date">| @(((DateTime)journeyDate).ToString("ddd, dd MMM"))</span>
+                    </div>
+                </div>
+                <button type="button" class="mobile-edit-pencil-btn" id="mobileEditPencilBtn" aria-label="Modify Search">
+                    <i class="bi bi-pencil-fill"></i>
+                </button>
+            </div>
 
             <!-- 1️⃣ Route / Date selector -->
-            <div class="route-search-bar">
-                <div class="search-summary">
-
-@*                     <form method="post" action="/Train/SmartSearch">
-                        <input type="text"
-                               name="query"
-                               placeholder="Try: Hyderabad to Chennai tomorrow AC"
-                               class="form-control"
-                               style="margin-bottom:10px;" />
-
-                        <button type="submit" class="btn btn-primary">
-                            🔍 Smart Search
-                        </button>
-
-                                            <form method="get" action="/Train/SmartSearch" style="margin-bottom:10px;">
-                            <input type="text" name="query" placeholder="Try: Hyderabad to Chennai tomorrow AC"
-                                    style="padding:10px; width:300px; border-radius:6px;" />
-    
-                            <button type="submit" class="btn btn-primary">Smart Search</button>
-                        </form>
-
-                    </form>
-
- *@                    
+            <div class="route-search-bar" id="routeSearchBarContainer">
+                <div class="search-summary uniform-modify-bar">
                     <form id="modifySearchForm" method="post" action="/Train/TrainResults" novalidate>
-
-
-                        <div style="display:flex; align-items:center; gap:10px;">
+                        <div class="modify-search-fields">
 
                             <!-- FROM STATION -->
-                            <div class="station-box1">
+                            <div class="station-box1 uniform-input-wrapper">
+                                <i class="bi bi-cursor-fill input-field-icon"></i>
                                 <input type="text"
                                        id="fromStation"
                                        name="fromStation"
+                                       class="uniform-search-input"
                                        value="@fromStation"
                                        autocomplete="off"
+                                       placeholder="From Station"
                                        required />
 
                                 <input type="hidden"
@@ -169,18 +232,24 @@
                                        name="fromStationId"
                                        value="@userfromid" />
 
-                                <div id="fromStationList" class="autocomplete-list-trainresults-page"></div>
+                                <div id="fromStationList" class="autocomplete-list-trainresults-page" style="display:none;"></div>
                             </div>
 
-                            <span class="arrow" id="swapStationsNew" style="cursor: pointer;">⇄</span>
+                            <!-- SWAP BUTTON -->
+                            <button type="button" class="uniform-swap-btn" id="swapStationsNew" title="Swap Stations">
+                                ⇄
+                            </button>
 
                             <!-- TO STATION -->
-                            <div class="station-box2">
+                            <div class="station-box2 uniform-input-wrapper">
+                                <i class="bi bi-geo-alt-fill input-field-icon"></i>
                                 <input type="text"
                                        id="toStation"
                                        name="toStation"
+                                       class="uniform-search-input"
                                        value="@toStation"
                                        autocomplete="off"
+                                       placeholder="To Station"
                                        required />
 
                                 <input type="hidden"
@@ -188,21 +257,26 @@
                                        name="toStationId"
                                        value="@usertoid" />
 
-                                <div id="toStationList" class="autocomplete-list-trainresults-page"></div>
+                                <div id="toStationList" class="autocomplete-list-trainresults-page" style="display:none;"></div>
                             </div>
 
                             <!-- DATE -->
-                            <input type="date"
-                                   id="journeyDatePicker"
-                                   name="journeyDate"
-                                   value="@journey"
-                                   min="@minDate"
-                                   max="@maxDate" />
+                            <div class="uniform-input-wrapper uniform-date-wrapper">
+                                <i class="bi bi-calendar3 input-field-icon" style="cursor: pointer; pointer-events: auto;"></i>
+                                <input type="text"
+                                       id="journeyDatePicker"
+                                       name="journeyDate"
+                                       class="uniform-search-input uniform-date-input"
+                                       value="@journey"
+                                       placeholder="DD-MM-YYYY"
+                                       autocomplete="off"
+                                       style="cursor: pointer;" />
+                            </div>
 
                             <!-- CLASSES DROPDOWN-->
-                            <div class="quota-wrapper">
-                                <label class="quota-label"></label>
-                                <select id="classFilterDropdown" name="classCode" class="quota-dropdown">
+                            <div class="uniform-input-wrapper uniform-select-wrapper uniform-class-wrapper">
+                                <i class="bi bi-briefcase-fill input-field-icon"></i>
+                                <select id="classFilterDropdown" name="classCode" class="uniform-search-input uniform-select-input">
                                     <option value="ALL" selected="@(ViewBag.classCode == null || ViewBag.classCode == "ALL")">All Classes</option>
                                     <option value="EA" selected="@(ViewBag.classCode == "EA")">Anubhuti Class (EA)</option>
                                     <option value="1A" selected="@(ViewBag.classCode == "1A")">AC First Class (1A)</option>
@@ -218,9 +292,9 @@
                             </div>
 
                             <!-- QUOTA -->
-                            <div class="quota-wrapper">
-                                <label class="quota-label"></label>
-                                <select name="quota" class="quota-dropdown">
+                            <div class="uniform-input-wrapper uniform-select-wrapper uniform-quota-wrapper">
+                                <i class="bi bi-grid-3x3-gap-fill input-field-icon"></i>
+                                <select name="quota" id="modifyQuotaDropdown" class="uniform-search-input uniform-select-input">
                                     <option value="GENERAL" selected="@(ViewBag.Quota?.ToString() == "GENERAL")">GENERAL</option>
                                     <option value="LADIES" selected="@(ViewBag.Quota?.ToString() == "LADIES")">LADIES</option>
                                     <option value="SENIOR" selected="@(ViewBag.Quota?.ToString() == "SENIOR")">LOWER BERTH/SENIOR CITIZEN</option>
@@ -232,92 +306,266 @@
                             </div>
 
                             <!-- MODIFY BUTTON -->
-                            <button type="submit" class="modify-btn">
+                            <button type="submit" class="modify-btn uniform-modify-btn">
                                 Modify Search
                             </button>
 
+                        </div>
+
+                        <!-- 3 CONCESSION CHECKBOXES ROW (BELOW INPUTS, CENTERED) -->
+                        <div class="modify-search-options">
+                            <label class="concession-checkbox-label">
+                                <input type="checkbox" id="chkFlexibleWithDate" name="flexibleWithDate" value="true" @(ViewBag.FlexibleWithDate == true ? "checked" : "") />
+                                <span>Flexible With Date</span>
+                            </label>
+
+                            <label class="concession-checkbox-label">
+                                <input type="checkbox" id="chkDisabilityConcession" name="pwdConcession" value="true" @(ViewBag.PwdConcession == true ? "checked" : "") />
+                                <span>Person With Disability Concession</span>
+                            </label>
+
+                            <label class="concession-checkbox-label">
+                                <input type="checkbox" id="chkRailwayPassConcession" name="railwayPassConcession" value="true" @(ViewBag.RailwayPassConcession == true ? "checked" : "") />
+                                <span>Railway Pass Concession</span>
+                            </label>
                         </div>
                     </form>
                 </div>
             </div>
         </div>
 
+        <!-- 📱 Mobile Action Bar: Sort By & Filter (Matching official IRCTC media_1789704347765.jpg) -->
+        <div class="mobile-action-bar">
+            <div class="mobile-action-left">
+                <button type="button" class="mobile-sort-btn" id="mobileSortBtn" onclick="toggleMobileSortMenu()">
+                    <span>Sort By</span>
+                    <i class="bi bi-caret-down-fill ms-1" style="font-size: 10px;"></i>
+                </button>
+                <div class="mobile-day-nav">
+                    <button type="button" class="mobile-day-btn" onclick="navigateDay(-1)" title="Previous Day">
+                        <i class="bi bi-chevron-left"></i>
+                    </button>
+                    <span class="mobile-day-text">@(((DateTime)journeyDate).ToString("dd MMM"))</span>
+                    <button type="button" class="mobile-day-btn" onclick="navigateDay(1)" title="Next Day">
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="mobile-action-right">
+                <button type="button" class="mobile-filter-funnel-btn" onclick="toggleMobileFilterDrawer()" aria-label="Refine Results" title="Refine Results">
+                    <i class="bi bi-funnel-fill"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Mobile Sort Dropdown Menu -->
+        <div id="mobileSortMenu" class="mobile-sort-dropdown" style="display:none;">
+            <div class="mobile-sort-item @(ViewBag.CurrentSort == "DUR_SHORT" ? "active" : "")" onclick="applySort('DUR_SHORT')">
+                <span>Duration <small class="text-muted ms-1">Shortest First</small></span>
+            </div>
+            <div class="mobile-sort-item @(ViewBag.CurrentSort == "DUR_LONG" ? "active" : "")" onclick="applySort('DUR_LONG')">
+                <span>Duration <small class="text-muted ms-1">Longest First</small></span>
+            </div>
+            <div class="mobile-sort-item @(ViewBag.CurrentSort == "DEP_EARLY" ? "active" : "")" onclick="applySort('DEP_EARLY')">
+                <span>Departure <small class="text-muted ms-1">Early First</small></span>
+            </div>
+            <div class="mobile-sort-item @(ViewBag.CurrentSort == "DEP_LATE" ? "active" : "")" onclick="applySort('DEP_LATE')">
+                <span>Departure <small class="text-muted ms-1">Late First</small></span>
+            </div>
+            <div class="mobile-sort-item @(ViewBag.CurrentSort == "ARR_EARLY" ? "active" : "")" onclick="applySort('ARR_EARLY')">
+                <span>Arrival <small class="text-muted ms-1">Early First</small></span>
+            </div>
+            <div class="mobile-sort-item @(ViewBag.CurrentSort == "ARR_LATE" ? "active" : "")" onclick="applySort('ARR_LATE')">
+                <span>Arrival <small class="text-muted ms-1">Late First</small></span>
+            </div>
+        </div>
+
+        <div class="mobile-filter-backdrop" id="mobileFilterBackdrop" onclick="toggleMobileFilterDrawer()"></div>
+
         <div class="results-main-layout">
             <!-- Left Column: Refine Results Sidebar -->
-            <aside class="refine-sidebar">
+            <aside class="refine-sidebar" id="refineSidebar">
                 <div class="sidebar-filter-card">
                     <div class="filter-header">
-                        <h3>Refine Results</h3>
-                        <button type="button" class="clear-filter-btn" onclick="resetAllFilters()">Reset All</button>
+                        <div class="filter-header-left">
+                            <i class="bi bi-funnel"></i>
+                            <h3>Refine Results</h3>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <button type="button" class="clear-filter-btn" onclick="resetAllFilters()">Reset All</button>
+                            <button type="button" class="mobile-filter-close-btn" onclick="toggleMobileFilterDrawer()" aria-label="Close filters">&times;</button>
+                        </div>
                     </div>
                     
-                    <!-- Journey Class Filters -->
-                    <div class="filter-section">
-                        <h4>JOURNEY CLASS</h4>
-                        <div class="filter-options-grid">
-                            <label class="filter-checkbox-label">
-                                <input type="checkbox" class="class-filter-cb" value="1A" checked /> AC First Class (1A)
-                            </label>
-                            <label class="filter-checkbox-label">
-                                <input type="checkbox" class="class-filter-cb" value="2A" checked /> AC 2 Tier (2A)
-                            </label>
-                            <label class="filter-checkbox-label">
-                                <input type="checkbox" class="class-filter-cb" value="3A" checked /> AC 3 Tier (3A)
-                            </label>
-                            <label class="filter-checkbox-label">
-                                <input type="checkbox" class="class-filter-cb" value="3E" checked /> AC 3 Economy (3E)
-                            </label>
-                            <label class="filter-checkbox-label">
-                                <input type="checkbox" class="class-filter-cb" value="CC" checked /> AC Chair car (CC)
-                            </label>
-                            <label class="filter-checkbox-label">
-                                <input type="checkbox" class="class-filter-cb" value="EC" checked /> Exec. Chair Car (EC)
-                            </label>
-                            <label class="filter-checkbox-label">
-                                <input type="checkbox" class="class-filter-cb" value="SL" checked /> Sleeper (SL)
-                            </label>
-                            <label class="filter-checkbox-label">
-                                <input type="checkbox" class="class-filter-cb" value="2S" checked /> Second Sitting (2S)
-                            </label>
+                    <!-- 1. JOURNEY CLASS (COLLAPSIBLE ACCORDION) -->
+                    <div class="refine-accordion open" id="acc-class">
+                        <div class="accordion-header" onclick="toggleAccordion('acc-class')">
+                            <span class="acc-title">Journey Class</span>
+                            <div class="acc-actions">
+                                <a href="javascript:void(0)" onclick="event.stopPropagation(); toggleSectionSelectAll('class')" id="selAll-class" class="acc-link">Deselect All</a>
+                                <i class="bi bi-chevron-down acc-chevron"></i>
+                            </div>
+                        </div>
+                        <div class="accordion-body">
+                            <div class="filter-options-grid-2col">
+                                @if (availableClasses != null && availableClasses.Any())
+                                {
+                                    @foreach (var cls in availableClasses)
+                                    {
+                                        <label class="filter-checkbox-label">
+                                            <input type="checkbox" class="class-filter-cb" value="@cls.ShortCode" checked />
+                                            <span>@cls.FullName</span>
+                                        </label>
+                                    }
+                                }
+                                else
+                                {
+                                    <div style="font-size:11px; color:#64748b; padding:4px;">No classes available</div>
+                                }
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Train Type Filters -->
-                    <div class="filter-section">
-                        <h4>TRAIN TYPE</h4>
-                        <div class="filter-options-list">
-                            <label class="filter-checkbox-label">
-                                <input type="checkbox" class="type-filter-cb" value="vande-bharat" checked />
-                                <span class="legend-color-dot vande"></span> Vande Bharat
-                            </label>
-                            <label class="filter-checkbox-label">
-                                <input type="checkbox" class="type-filter-cb" value="amrit-bharat" checked />
-                                <span class="legend-color-dot amrit"></span> Amrit Bharat
-                            </label>
-                            <label class="filter-checkbox-label">
-                                <input type="checkbox" class="type-filter-cb" value="rajdhani" checked />
-                                <span class="legend-color-dot rajdhani"></span> Rajdhani
-                            </label>
-                            <label class="filter-checkbox-label">
-                                <input type="checkbox" class="type-filter-cb" value="shatabdi" checked />
-                                <span class="legend-color-dot shatabdi"></span> Shatabdi
-                            </label>
-                            <label class="filter-checkbox-label">
-                                <input type="checkbox" class="type-filter-cb" value="garib-rath" checked />
-                                <span class="legend-color-dot garib"></span> Garib Rath
-                            </label>
-                            <label class="filter-checkbox-label">
-                                <input type="checkbox" class="type-filter-cb" value="duronto" checked />
-                                <span class="legend-color-dot duronto"></span> Duronto
-                            </label>
-                            <label class="filter-checkbox-label">
-                                <input type="checkbox" class="type-filter-cb" value="special" checked />
-                                <span class="legend-color-dot special"></span> Special
-                            </label>
-                            <label class="filter-checkbox-label">
-                                <input type="checkbox" class="type-filter-cb" value="normal" checked />
-                                <span class="legend-color-dot normal"></span> Other Trains
-                            </label>
+                    <!-- 2. TRAIN TYPE (COLLAPSIBLE ACCORDION) -->
+                    <div class="refine-accordion open" id="acc-type">
+                        <div class="accordion-header" onclick="toggleAccordion('acc-type')">
+                            <span class="acc-title">Train Type</span>
+                            <div class="acc-actions">
+                                <a href="javascript:void(0)" onclick="event.stopPropagation(); toggleSectionSelectAll('type')" id="selAll-type" class="acc-link">Deselect All</a>
+                                <i class="bi bi-chevron-down acc-chevron"></i>
+                            </div>
+                        </div>
+                        <div class="accordion-body">
+                            <div class="filter-options-grid-2col">
+                                @if (availableTypes != null && availableTypes.Any())
+                                {
+                                    @foreach (var ttype in availableTypes)
+                                    {
+                                        <label class="filter-checkbox-label">
+                                            <input type="checkbox" class="type-filter-cb" value="@ttype.Type" checked />
+                                            <span><span class="legend-color-dot @ttype.Dot"></span> @ttype.Name</span>
+                                        </label>
+                                    }
+                                }
+                                else
+                                {
+                                    <div style="font-size:11px; color:#64748b; padding:4px;">No train types available</div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. DEPARTURE TIME (COLLAPSIBLE ACCORDION) -->
+                    <div class="refine-accordion open" id="acc-deptime">
+                        <div class="accordion-header" onclick="toggleAccordion('acc-deptime')">
+                            <span class="acc-title">Departure Time</span>
+                            <div class="acc-actions">
+                                <a href="javascript:void(0)" onclick="event.stopPropagation(); toggleSectionSelectAll('deptime')" id="selAll-deptime" class="acc-link">Deselect All</a>
+                                <i class="bi bi-chevron-down acc-chevron"></i>
+                            </div>
+                        </div>
+                        <div class="accordion-body">
+                            <div class="time-slot-grid">
+                                <label class="time-slot-card">
+                                    <input type="checkbox" class="dep-time-cb" value="early_morning" checked />
+                                    <div class="time-slot-content">
+                                        <div class="slot-time">00:00 - 06:00</div>
+                                        <div class="slot-label"><i class="bi bi-moon-stars"></i> Early Morning</div>
+                                    </div>
+                                </label>
+                                <label class="time-slot-card">
+                                    <input type="checkbox" class="dep-time-cb" value="morning" checked />
+                                    <div class="time-slot-content">
+                                        <div class="slot-time">06:00 - 12:00</div>
+                                        <div class="slot-label"><i class="bi bi-sun"></i> Morning</div>
+                                    </div>
+                                </label>
+                                <label class="time-slot-card">
+                                    <input type="checkbox" class="dep-time-cb" value="mid_day" checked />
+                                    <div class="time-slot-content">
+                                        <div class="slot-time">12:00 - 18:00</div>
+                                        <div class="slot-label"><i class="bi bi-brightness-high"></i> Mid Day</div>
+                                    </div>
+                                </label>
+                                <label class="time-slot-card">
+                                    <input type="checkbox" class="dep-time-cb" value="night" checked />
+                                    <div class="time-slot-content">
+                                        <div class="slot-time">18:00 - 24:00</div>
+                                        <div class="slot-label"><i class="bi bi-cloud-moon"></i> Night</div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 4. ARRIVAL TIME (COLLAPSIBLE ACCORDION) -->
+                    <div class="refine-accordion" id="acc-arrtime">
+                        <div class="accordion-header" onclick="toggleAccordion('acc-arrtime')">
+                            <span class="acc-title">Arrival Time</span>
+                            <div class="acc-actions">
+                                <a href="javascript:void(0)" onclick="event.stopPropagation(); toggleSectionSelectAll('arrtime')" id="selAll-arrtime" class="acc-link">Deselect All</a>
+                                <i class="bi bi-chevron-down acc-chevron"></i>
+                            </div>
+                        </div>
+                        <div class="accordion-body">
+                            <div class="time-slot-grid">
+                                <label class="time-slot-card">
+                                    <input type="checkbox" class="arr-time-cb" value="early_morning" checked />
+                                    <div class="time-slot-content">
+                                        <div class="slot-time">00:00 - 06:00</div>
+                                        <div class="slot-label"><i class="bi bi-moon-stars"></i> Early Morning</div>
+                                    </div>
+                                </label>
+                                <label class="time-slot-card">
+                                    <input type="checkbox" class="arr-time-cb" value="morning" checked />
+                                    <div class="time-slot-content">
+                                        <div class="slot-time">06:00 - 12:00</div>
+                                        <div class="slot-label"><i class="bi bi-sun"></i> Morning</div>
+                                    </div>
+                                </label>
+                                <label class="time-slot-card">
+                                    <input type="checkbox" class="arr-time-cb" value="mid_day" checked />
+                                    <div class="time-slot-content">
+                                        <div class="slot-time">12:00 - 18:00</div>
+                                        <div class="slot-label"><i class="bi bi-brightness-high"></i> Mid Day</div>
+                                    </div>
+                                </label>
+                                <label class="time-slot-card">
+                                    <input type="checkbox" class="arr-time-cb" value="night" checked />
+                                    <div class="time-slot-content">
+                                        <div class="slot-time">18:00 - 24:00</div>
+                                        <div class="slot-label"><i class="bi bi-cloud-moon"></i> Night</div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 5. FROM STATIONS (COLLAPSIBLE ACCORDION) -->
+                    <div class="refine-accordion" id="acc-fromstn">
+                        <div class="accordion-header" onclick="toggleAccordion('acc-fromstn')">
+                            <span class="acc-title">From Stations</span>
+                            <div class="acc-actions">
+                                <a href="javascript:void(0)" onclick="event.stopPropagation(); toggleSectionSelectAll('fromstn')" id="selAll-fromstn" class="acc-link">Deselect All</a>
+                                <i class="bi bi-chevron-down acc-chevron"></i>
+                            </div>
+                        </div>
+                        <div class="accordion-body">
+                            <div id="fromStationFilterOptions" class="filter-options-grid-2col"></div>
+                        </div>
+                    </div>
+
+                    <!-- 6. TO STATIONS (COLLAPSIBLE ACCORDION) -->
+                    <div class="refine-accordion" id="acc-tostn">
+                        <div class="accordion-header" onclick="toggleAccordion('acc-tostn')">
+                            <span class="acc-title">To Stations</span>
+                            <div class="acc-actions">
+                                <a href="javascript:void(0)" onclick="event.stopPropagation(); toggleSectionSelectAll('tostn')" id="selAll-tostn" class="acc-link">Deselect All</a>
+                                <i class="bi bi-chevron-down acc-chevron"></i>
+                            </div>
+                        </div>
+                        <div class="accordion-body">
+                            <div id="toStationFilterOptions" class="filter-options-grid-2col"></div>
                         </div>
                     </div>
                 </div>
@@ -325,10 +573,20 @@
 
             <!-- Right Column: Train list and headers -->
             <main class="train-results-column">
-                <!-- Results count -->
-                <div class="search-summary" style="margin-bottom: 10px;">
-                        @trainscount Results for
-                        <strong>@cleanFrom → @cleanTo</strong> | @journey
+                <!-- IRCTC-STYLE RESULTS TOP BAR -->
+                <div class="results-header-row">
+                    <div class="results-meta-title">
+                        <span id="trainResultCount" class="results-count-number">@trainscount</span> Results for
+                        <strong>@cleanFrom ➔ @cleanTo</strong> | @(((DateTime)journeyDate).ToString("ddd, dd MMM yyyy")) For Quota | @(ViewBag.Quota ?? "General")
+                    </div>
+                    <div class="day-nav-group">
+                        <button type="button" class="day-nav-btn prev-day" onclick="navigateDay(-1)">
+                            <i class="bi bi-chevron-left"></i> Previous Day
+                        </button>
+                        <button type="button" class="day-nav-btn next-day" onclick="navigateDay(1)">
+                            Next Day <i class="bi bi-chevron-right"></i>
+                        </button>
+                    </div>
                 </div>
 
                 <!-- SORT BY BAR -->
@@ -383,14 +641,15 @@
                     </div>
                 </div>
 
-        <div id="noTrainMessage"
-             style="display:none; margin:15px 0; font-weight:600; color:#d9534f; text-align: center">
-        </div>
-
         <div class="table-wrapper">
             <!-- RIGHT: Train Results -->
             <div class="train-results">
                 <div class="train-card-list">
+
+                    <div id="noTrainMessage"
+                         style="display:none; padding:48px 20px; font-weight:600; color:#d9534f; text-align: center; font-size:1.05rem;">
+                        No trains are available for the filter(s) you have selected.
+                    </div>
 
                     @if (!Model.Any())
                     {
@@ -491,24 +750,29 @@
                         }
 
 
+                        double depHour = departureDateTime.TimeOfDay.TotalHours;
+                        double arrHour = arrivalDateTime.TimeOfDay.TotalHours;
+                        string fromStnCode = !string.IsNullOrEmpty(t.FSM) ? t.FSM : cleanFrom;
+                        string toStnCode = !string.IsNullOrEmpty(t.TSM) ? t.TSM : cleanTo;
+
                         <div class="train-card @trainClass" 
                                 data-train-type="@trainType"
-                                data-classes="@string.Join(",", t.Classes.Select(c => 
-                                    c.Code.Contains("(") 
-                                        ? c.Code.Substring(c.Code.IndexOf("(")+1, c.Code.IndexOf(")") - c.Code.IndexOf("(") - 1) 
-                                        : c.Code
-                                ))">
+                                data-dep-hour="@depHour.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)"
+                                data-arr-hour="@arrHour.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)"
+                                data-duration="@((int)duration.TotalMinutes)"
+                                data-from-station="@fromStnCode"
+                                data-to-station="@toStnCode"
+                                data-classes="@string.Join(",", t.Classes.Select(c => GetClassShortCode(c.Code)))">
 
                             <!-- Header -->
                             <div class="train-card-header">
 
-                                <div>
-                                    <strong>@t.Number.ToString("D5") - @t.Name</strong><br />
-
+                                <div class="train-title-block">
+                                    <strong class="train-name-text">@t.Number.ToString("D5") - @t.Name</strong>
                                     @if (t.NextRunDate.Date != journeyDate.Date)
                                     {
                                         <span class="next-run-badge">
-                                            Next available: @t.NextRunDate.ToString("ddd, dd MMM")
+                                            Next: @t.NextRunDate.ToString("ddd, dd MMM")
                                         </span>
                                     }
                                 </div>
@@ -535,16 +799,15 @@
                                     }
                                 }
 
-                                <div class="runs-on">
-                                Runs On :
-
-                                <span class="@(shifted[1] ? "day-active" : "day-off")">M</span>
-                                <span class="@(shifted[2] ? "day-active" : "day-off")">T</span>
-                                <span class="@(shifted[3] ? "day-active" : "day-off")">W</span>
-                                <span class="@(shifted[4] ? "day-active" : "day-off")">T</span>
-                                <span class="@(shifted[5] ? "day-active" : "day-off")">F</span>
-                                <span class="@(shifted[6] ? "day-active" : "day-off")">S</span>
-                                <span class="@(shifted[0] ? "day-active" : "day-off")">S</span>
+                                <div class="runs-on desktop-runs-on">
+                                    Runs On:
+                                    <span class="@(shifted[1] ? "day-active" : "day-off")">M</span>
+                                    <span class="@(shifted[2] ? "day-active" : "day-off")">T</span>
+                                    <span class="@(shifted[3] ? "day-active" : "day-off")">W</span>
+                                    <span class="@(shifted[4] ? "day-active" : "day-off")">T</span>
+                                    <span class="@(shifted[5] ? "day-active" : "day-off")">F</span>
+                                    <span class="@(shifted[6] ? "day-active" : "day-off")">S</span>
+                                    <span class="@(shifted[0] ? "day-active" : "day-off")">S</span>
                                 </div>
 
                                 <div class="train-actions">
@@ -553,76 +816,93 @@
                                     @if (t.HasAlerts)
                                     {
                                         <span class="alert-icon"
-                                                onclick="loadTrainAlerts(@t.Id)"
-                                                style="cursor:pointer; color:red; margin-left:8px;">
+                                              onclick="loadTrainAlerts(@t.Id)"
+                                              style="cursor:pointer; color:red; margin-left:8px;">
                                             ⚠️
                                         </span>
                                     }
 
-                                    <!-- Train Schedule -->
+                                    <!-- Train Schedule with 📍 Pin (Prominent on mobile, just like official IRCTC) -->
                                     <a href="#"
-                                        class="train-link view-route"
-                                        data-train-id="@t.Id"
-                                        data-train-name="@t.Name"
-                                        data-train-number="@t.Number"
-                                        data-from="@t.FSM"
-                                        data-to="@t.TSM">
-
+                                       class="train-link view-route"
+                                       data-train-id="@t.Id"
+                                       data-train-name="@t.Name"
+                                       data-train-number="@t.Number"
+                                       data-from="@t.FSM"
+                                       data-to="@t.TSM"
+                                       title="View Train Schedule">
                                         <span class="route-text">Train Schedule</span>
-                                        <i class="bi bi-geo-alt route-icon"></i>
+                                        <i class="bi bi-geo-alt-fill route-pin-icon"></i>
                                     </a>
 
                                 </div>
                             </div>
 
                             <!-- ARR/DEP Body -->
-                                <div class="train-card-body">
+                            <div class="train-card-body">
 
-                                    <!-- DEPARTURE -->
-                                    <div class="time-block">
-                                        <div class="time">@departureDateTime.ToString("HH:mm") | <span style="font-weight: bold">@t.FSM</span> | @departureDateTime.ToString("ddd, dd MMM")</div>
-                                        <div class="station"></div>
-                                        <div class="date"></div>
+                                <!-- DEPARTURE -->
+                                <div class="time-block departure">
+                                    <div class="time-val">@departureDateTime.ToString("HH:mm")</div>
+                                    <div class="station-val">
+                                        @IRCTCClone.Helpers.CityLandmarkHelper.RenderBadge(t.FSM, "16px")
+                                        <span>@t.FSM</span>
                                     </div>
-
-                                    <!-- DURATION -->
-                                    <div class="duration-block">
-                                        <span>--- @t.Duration ---</span>
-                                    </div>
-
-                                    <!-- ARRIVAL -->
-                                    <div class="time-block arrival">
-                                        <div class="time">@arrivalDateTime.ToString("HH:mm") | <span style="font-weight: bold">@t.TSM</span> | @arrivalDateTime.ToString("ddd, dd MMM")</div>
-                                        <div class="station"></div>
-                                        <div class="date"></div>
-                                    </div>
-
-                                </div>                            
-
-                                <!------------------- CLASSES --------------------->
-
-                                <div class="class-compact">
-
-                                    @foreach (var c in t.Classes)
-                                    {
-
-                                        var demandText = DemandPredictionHelper.GetDemandTag(c.SeatsAvailable);
-                                        var demandClass = DemandPredictionHelper.GetDemandClass(c.SeatsAvailable);
-
-                                        <div class="class-box"
-                                             data-class="@c.Id"
-                                             onclick="openAvailability('@c.Id','@t.Id','@t.FromStationId','@t.ToStationId','@ViewBag.Quota')">
-
-                                            <div class="class-title">@c.Code</div>
-
-                                            <div class="class-refresh">
-                                                Refresh <i class="bi bi-arrow-repeat"></i>
-                                            </div>
-
-                                        </div>
-                                    }
-
+                                    <div class="date-val">@departureDateTime.ToString("ddd, dd MMM")</div>
                                 </div>
+
+                                <!-- DURATION & RUNS ON -->
+                                <div class="duration-block">
+                                    <div class="duration-pill">
+                                        <span class="dur-dash"></span>
+                                        <span class="dur-val">@t.Duration</span>
+                                        <span class="dur-dash"></span>
+                                    </div>
+                                    <div class="runs-on-mini mobile-runs-on">
+                                        <span class="@(shifted[1] ? "day-active" : "day-off")">M</span>
+                                        <span class="@(shifted[2] ? "day-active" : "day-off")">T</span>
+                                        <span class="@(shifted[3] ? "day-active" : "day-off")">W</span>
+                                        <span class="@(shifted[4] ? "day-active" : "day-off")">T</span>
+                                        <span class="@(shifted[5] ? "day-active" : "day-off")">F</span>
+                                        <span class="@(shifted[6] ? "day-active" : "day-off")">S</span>
+                                        <span class="@(shifted[0] ? "day-active" : "day-off")">S</span>
+                                    </div>
+                                </div>
+
+                                <!-- ARRIVAL -->
+                                <div class="time-block arrival">
+                                    <div class="time-val">@arrivalDateTime.ToString("HH:mm")</div>
+                                    <div class="station-val">
+                                        @IRCTCClone.Helpers.CityLandmarkHelper.RenderBadge(t.TSM, "16px")
+                                        <span>@t.TSM</span>
+                                    </div>
+                                    <div class="date-val">@arrivalDateTime.ToString("ddd, dd MMM")</div>
+                                </div>
+
+                            </div>                            
+
+                            <!------------------- CLASSES --------------------->
+                            <div class="class-compact">
+
+                                @foreach (var c in t.Classes)
+                                {
+                                    var classDisplayName = GetClassDisplayName(c.Code);
+
+                                    <div class="class-box"
+                                         data-class="@c.Id"
+                                         data-class-code="@GetClassShortCode(c.Code)"
+                                         onclick="openAvailability('@c.Id','@t.Id','@t.FromStationId','@t.ToStationId','@ViewBag.Quota')">
+
+                                        <div class="class-title">@classDisplayName</div>
+
+                                        <div class="class-refresh">
+                                            Refresh <i class="bi bi-arrow-repeat refresh-icon"></i>
+                                        </div>
+
+                                    </div>
+                                }
+
+                            </div>
 
                                 <div class="availability-panel" id="panel-@t.Id">
 
@@ -649,7 +929,7 @@
                                                     <!-- YOUR FULL ORIGINAL FORM -->
                                                     <form method="get"
                                                           action="/Booking/PrepareCheckout"
-                                                          class="class-card @(c.index == 0 ? "active" : "")"
+                                                          class="class-card @(c.index == 0 ? "active" : "") @(!t.IsBookingAllowed ? "booking-not-allowed-card" : "")"
                                                           data-class="@c.value.Id" 
                                                           data-train="@t.Id">
 
@@ -793,36 +1073,43 @@
 
                                                         <div class="class-code">@c.value.Code</div>
 
-                                                        <div class="class-fare">
-                                                        ₹@(quota == "TATKAL" ? (int)finalFare : (int)c.value.TotalFare)
+                                                        @if (t.IsBookingAllowed)
+                                                        {
+                                                            <div class="class-fare">
+                                                            ₹@(quota == "TATKAL" ? (int)finalFare : (int)c.value.TotalFare)
 
-                                                            <span class="fare-info">
-                                                                <i class="bi bi-info-circle fare-toggle"></i>
+                                                                <span class="fare-info">
+                                                                    <i class="bi bi-info-circle fare-toggle" title="View Fare Details"></i>
 
-                                                                <div class="fare-modal">
-                                                                    <div class="fare-modal-body">
+                                                                    <div class="fare-modal">
+                                                                        <div class="fare-modal-body">
+                                                                            <div class="fare-modal-header">
+                                                                                <span>Fare Breakup</span>
+                                                                                <button type="button" class="fare-modal-close" onclick="this.closest('.fare-modal').classList.remove('show'); event.stopPropagation();">&times;</button>
+                                                                            </div>
+                                                                            <div class="fare-row"><span>Base Fare</span><strong>₹@c.value.BasicFare</strong></div>
+                                                                            <div class="fare-row"><span>Reservation Charge</span><span>₹@c.value.ReservationCharge</span></div>
+                                                                            <div class="fare-row"><span>Superfast Charge</span><span>₹@c.value.SuperfastCharge</span></div>
+                                                                            <div class="fare-row"><span>GST</span><span>₹@c.value.GSTAmount</span></div>
 
-                                                                        <strong>Base Fare</strong> : ₹@c.value.BasicFare <br />
-                                                                        Reservation Charge : ₹@c.value.ReservationCharge <br />
-                                                                        Superfast Charge : ₹@c.value.SuperfastCharge <br />
-                                                                        GST : ₹@c.value.GSTAmount <br />
+                                                                            @if (quota == "TATKAL")
+                                                                            {
+                                                                                <div class="fare-row" style="color:#d97706; font-weight:600;">
+                                                                                    <span>Tatkal Charge</span><span>₹@tatkalCharge</span>
+                                                                                </div>
+                                                                            }
 
-                                                                        @if (quota == "TATKAL")
-                                                                        {
-                                                                            <span style="color:#d97706; font-weight:600;">
-                                                                                Tatkal Charge : ₹@tatkalCharge
-                                                                            </span>
-                                                                        }
+                                                                            <hr class="fare-divider" />
 
-                                                                        <hr />
-
-                                                                        <strong>Total Fare</strong> : ₹@(quota == "TATKAL" ? finalFare : c.value.TotalFare)
-
-                                                                    </div>
-                                                                </div>                                                        
-                                                            </span>
-                                                        </div>
-
+                                                                            <div class="fare-row fare-total-row">
+                                                                                <strong>Total Fare</strong>
+                                                                                <strong class="fare-total-val">₹@(quota == "TATKAL" ? finalFare : c.value.TotalFare)</strong>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>                                                        
+                                                                </span>
+                                                            </div>
+                                                        }
 
                                                         @{
                                                             bool isTatkal = quota == "TATKAL";
@@ -849,6 +1136,21 @@
                                                                 seatStatus = "CHART PREPARED";
                                                                 seatColor = "#ea580c";
                                                             }
+                                                            else if (t.IsFirstChartPrepared)
+                                                            {
+                                                                // First Chart prepared (8 hrs to 30 mins before departure)
+                                                                // Current booking opens for vacant seats until final charting window
+                                                                if (remaining > 0)
+                                                                {
+                                                                    seatStatus = "CURR_AVBL-" + remaining.ToString("D4");
+                                                                    seatColor = "green";
+                                                                }
+                                                                else
+                                                                {
+                                                                    seatStatus = "CHART PREPARED";
+                                                                    seatColor = "#ea580c";
+                                                                }
+                                                            }
                                                             else if (remaining > 0)
                                                             {
                                                                 seatStatus = "AVAILABLE - " + remaining;
@@ -870,42 +1172,76 @@
                                                                 seatColor = "gray";
                                                             }
 
-                                                            if (isTatkal && !isTatkalOpen && !t.IsDeparted && !t.IsChartPrepared)
+                                                            bool isFirstAc = classCode == "1A" || classCode.Contains("1A") || classCode.Contains("EA") || classCode.Contains("FIRST AC");
+                                                            if (isTatkal && isFirstAc)
+                                                            {
+                                                                seatStatus = isTatkalOpen ? "NOT AVAILABLE" : "NOT AVAILABLE#";
+                                                                seatColor = "#64748b";
+                                                            }
+                                                            else if (isTatkal && !isTatkalOpen && !t.IsDeparted && !t.IsChartPrepared && !t.IsFirstChartPrepared)
                                                             {
                                                                 seatStatus += "#";
                                                             }
+
+                                                            bool canBookThisClass = !t.IsDeparted && !t.IsChartPrepared && (!t.IsFirstChartPrepared || remaining > 0) && (seatStatus != "NOT AVAILABLE" && !seatStatus.StartsWith("CHART PREPARED"));
                                                         }
 
-                                                        <div class="class-status" style="color:@seatColor; font-weight:700;">
-                                                            @seatStatus
-                                                        </div>
-
-                                                        <input type="hidden" name="seatStatus" value="@seatStatus" />
-
-                                                        @if (!t.IsDeparted && !t.IsChartPrepared)
+                                                        @if (!t.IsBookingAllowed)
                                                         {
-                                                            <button type="submit" class="book-btn">
-                                                                Book
-                                                            </button>
+                                                            <div class="class-status booking-not-allowed-box">
+                                                                <span class="booking-not-allowed-close" onclick="closeAvailabilityPanel('panel-@t.Id', '@t.Id')">&times;</span>
+                                                                <div class="booking-not-allowed-msg">
+                                                                    BOOKINGs are NOT ALLOWED at this TIME
+                                                                </div>
+                                                                <div class="booking-not-allowed-sub">
+                                                                    @if (t.ServiceStartDate.HasValue)
+                                                                    {
+                                                                        <span>Booking opens on @t.ServiceStartDate.Value.AddDays(-3).ToString("dd-MMM-yyyy") (3 days before service start date)</span>
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        <span>Please check <a href="https://enquiry.indianrail.gov.in" target="_blank" class="ntes-link">NTES website</a> or <span class="ntes-link">NTES app</span> for actual time before boarding</span>
+                                                                    }
+                                                                </div>
+                                                                <button type="button" class="book-now-disabled" disabled>
+                                                                    Book Now
+                                                                </button>
+                                                            </div>
+                                                            <input type="hidden" name="seatStatus" value="BOOKINGs are NOT ALLOWED at this TIME" />
                                                         }
                                                         else
                                                         {
-                                                            <button type="button" class="book-btn" style="display:none;" disabled>
-                                                                Book
-                                                            </button>
-                                                            <div class="chart-prepared-badge" style="display:inline-block; padding: 4px 10px; background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; border-radius:6px; font-size:12px; font-weight:700; margin-top:6px;">
-                                                                <i class="fa-solid fa-lock"></i> @(t.IsDeparted ? "Train Departed" : "Charting Done")
+                                                            <div class="class-status" style="color:@seatColor; font-weight:700;">
+                                                                @seatStatus
                                                             </div>
-                                                        }
+
+                                                            <input type="hidden" name="seatStatus" value="@seatStatus" />
+
+                                                            @if (canBookThisClass)
+                                                            {
+                                                                <button type="submit" class="book-btn">
+                                                                    Book
+                                                                </button>
+                                                            }
+                                                            else
+                                                            {
+                                                                <button type="button" class="book-btn" style="display:none;" disabled>
+                                                                    Book
+                                                                </button>
+                                                                <div class="chart-prepared-badge" style="display:inline-block; padding: 4px 10px; background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; border-radius:6px; font-size:12px; font-weight:700; margin-top:6px;">
+                                                                    <i class="fa-solid fa-lock"></i> @(t.IsDeparted ? "Train Departed" : (t.IsChartPrepared || (t.IsFirstChartPrepared && remaining <= 0) ? "Charting Done" : "Not Available"))
+                                                                </div>
+                                                            }
 
                                                             <!-- 🔴 OVERLAY -->
-                                                        <div class="chart-overlay" style="display:none;">
-                                                            CHART PREPARED
-                                                        </div>
+                                                            <div class="chart-overlay" style="display:none;">
+                                                                CHART PREPARED
+                                                            </div>
 
-                                                        <div class="last-updated" style="font-size:12px; color:#666; margin-top:4px;">
-                                                            Updated just now
-                                                        </div>
+                                                            <div class="last-updated" style="font-size:12px; color:#666; margin-top:4px;">
+                                                                Updated just now
+                                                            </div>
+                                                        }
 
                                                     </form>
                                                 }
@@ -1042,15 +1378,22 @@
                                                     ₹@c.BaseFare
 
                                                     <span class="fare-info">
-                                                        <i class="bi bi-info-circle"></i>
+                                                        <i class="bi bi-info-circle fare-toggle" title="View Fare Details"></i>
 
                                                         <div class="fare-modal">
                                                             <div class="fare-modal-body">
-                                                                <strong>Base Fare</strong> : ₹@baseFare <br />
-                                                                Reservation Charge : ₹@reservationCharge <br />
-                                                                Superfast Charge : ₹@trainCharge <br />
-                                                                <hr />
-                                                                <strong>Total Fare</strong> : ₹@c.BaseFare
+                                                                <div class="fare-modal-header">
+                                                                    <span>Fare Breakup</span>
+                                                                    <button type="button" class="fare-modal-close" onclick="this.closest('.fare-modal').classList.remove('show'); event.stopPropagation();">&times;</button>
+                                                                </div>
+                                                                <div class="fare-row"><span>Base Fare</span><strong>₹@baseFare</strong></div>
+                                                                <div class="fare-row"><span>Reservation Charge</span><span>₹@reservationCharge</span></div>
+                                                                <div class="fare-row"><span>Superfast Charge</span><span>₹@trainCharge</span></div>
+                                                                <hr class="fare-divider" />
+                                                                <div class="fare-row fare-total-row">
+                                                                    <strong>Total Fare</strong>
+                                                                    <strong class="fare-total-val">₹@c.BaseFare</strong>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </span>
@@ -1096,22 +1439,262 @@
                             </div>
      *@
 
-                                <button class="map-btn" onclick="openMap('@t.MapUrl')">
-                                    🗺 Route Map
-                                </button>
-
-                                <div class="live-status-container">
-                                    <a href="#"
-                                       class="live-status-btn"
-                                       onclick="handleLiveStatus(event, '@t.Number')">
-                                       Live Status
-                                    </a>                                
+                                <!-- TRAIN CARD FOOTER (PERFECTLY ALIGNED) -->
+                                <div class="train-card-footer">
+                                    <div class="train-card-footer-left">
+                                        <span class="ntes-notice">
+                                            Please check NTES website or NTES app for actual time before boarding
+                                        </span>
+                                    </div>
+                                    <div class="train-card-footer-right">
+                                        <button type="button" class="footer-btn route-map-btn" onclick="openMap('@t.MapUrl')">
+                                            <i class="bi bi-map"></i> Route Map
+                                        </button>
+                                        <a href="#" class="footer-btn live-status-pill" onclick="handleLiveStatus(event, '@t.Number')">
+                                            <span class="live-dot-pulse"></span> Live Status
+                                        </a>
+                                    </div>
                                 </div>
 
                             </div>
                         }
                     }
                 </div>
+
+                @if (ViewBag.FlexibleWithDate == true && ViewBag.AlternateTrains != null && ((List<Train>)ViewBag.AlternateTrains).Count > 0)
+                {
+                    var altTrains = (List<Train>)ViewBag.AlternateTrains;
+                    <div class="alternate-trains-container" id="alternateTrainsContainer">
+                        <div class="alternate-trains-banner">
+                            <h3>Alternate Trains</h3>
+                        </div>
+
+                        @foreach (var alt in altTrains)
+                        {
+                            DateTime altJD = alt.NextRunDate;
+                            DateTime altDepartureDateTime = altJD.Add(alt.Departure);
+
+                            var altParts = (alt.Duration ?? "00:00").Split(":");
+                            int altH = 0, altM = 0;
+                            if (altParts.Length > 0) int.TryParse(altParts[0], out altH);
+                            if (altParts.Length > 1) int.TryParse(altParts[1], out altM);
+                            TimeSpan altDuration = new TimeSpan(altH, altM, 0);
+                            DateTime altArrivalDateTime = altDepartureDateTime.Add(altDuration);
+
+                            string altTrainClass = "train-express";
+                            string altNameUpper = (alt.Name ?? "").ToUpper();
+                            if (altNameUpper.Contains("VANDE BHARAT")) { altTrainClass = "train-vande-bharat"; }
+                            else if (altNameUpper.Contains("RAJDHANI")) { altTrainClass = "train-rajdhani"; }
+                            else if (altNameUpper.Contains("SHATABDI")) { altTrainClass = "train-shatabdi"; }
+                            else if (altNameUpper.Contains("AMRIT BHARAT") || altNameUpper.Contains("AMRITBHARAT")) { altTrainClass = "train-amrit-bharat"; }
+
+                            string uniquePanelId = "alt-panel-" + alt.Id + "-" + alt.NextRunDate.ToString("yyyyMMdd");
+
+                            <div class="train-card alternate-train-card @altTrainClass"
+                                 data-train-id="@alt.Id"
+                                 data-train-date="@alt.NextRunDate.ToString("yyyy-MM-dd")"
+                                 data-train-type="@altTrainClass.Replace("train-", "")"
+                                 data-dep-hour="@altDepartureDateTime.TimeOfDay.TotalHours.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)"
+                                 data-arr-hour="@altArrivalDateTime.TimeOfDay.TotalHours.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)"
+                                 data-from-station="@alt.FSM"
+                                 data-to-station="@alt.TSM"
+                                 data-classes="@string.Join(",", alt.Classes.Select(c => GetClassShortCode(c.Code)))">
+                                <!-- TOP HEADER -->
+                                <div class="train-card-header">
+                                    <div class="train-title-block">
+                                        <span class="train-name">@alt.Name (@alt.Number)</span>
+                                        <div class="runs-on-wrapper">
+                                            <span class="runs-title">Runs On:</span>
+                                            <span class="day @(alt.RunMon ? "active" : "")">M</span>
+                                            <span class="day @(alt.RunTue ? "active" : "")">T</span>
+                                            <span class="day @(alt.RunWed ? "active" : "")">W</span>
+                                            <span class="day @(alt.RunThu ? "active" : "")">T</span>
+                                            <span class="day @(alt.RunFri ? "active" : "")">F</span>
+                                            <span class="day @(alt.RunSat ? "active" : "")">S</span>
+                                            <span class="day @(alt.RunSun ? "active" : "")">S</span>
+                                        </div>
+                                    </div>
+                                    <div class="train-schedule-block">
+                                        <a href="#"
+                                           class="train-link view-route"
+                                           data-train-id="@alt.Id"
+                                           data-train-name="@alt.Name"
+                                           data-train-number="@alt.Number"
+                                           data-from="@alt.FSM"
+                                           data-to="@alt.TSM"
+                                           title="View Train Schedule">
+                                            <span class="route-text">Train Schedule</span>
+                                            <i class="bi bi-geo-alt-fill route-pin-icon"></i>
+                                        </a>
+                                    </div>
+                                </div>
+
+                                <!-- ROUTE & TIMING -->
+                                <div class="train-card-body">
+                                    <!-- DEPARTURE -->
+                                    <div class="time-block departure">
+                                        <div class="time-val">@altDepartureDateTime.ToString("HH:mm")</div>
+                                        <div class="station-val">
+                                            @IRCTCClone.Helpers.CityLandmarkHelper.RenderBadge(alt.FSM, "16px")
+                                            <span>@alt.FSM</span>
+                                        </div>
+                                        <div class="date-val text-primary" style="font-weight:700;">@altDepartureDateTime.ToString("ddd, dd MMM")</div>
+                                    </div>
+
+                                    <!-- DURATION -->
+                                    <div class="duration-block">
+                                        <div class="duration-line"></div>
+                                        <div class="duration-text">@(alt.Durations ?? alt.Duration)</div>
+                                    </div>
+
+                                    <!-- ARRIVAL -->
+                                    <div class="time-block arrival">
+                                        <div class="time-val">@altArrivalDateTime.ToString("HH:mm")</div>
+                                        <div class="station-val">
+                                            @IRCTCClone.Helpers.CityLandmarkHelper.RenderBadge(alt.TSM, "16px")
+                                            <span>@alt.TSM</span>
+                                        </div>
+                                        <div class="date-val text-primary" style="font-weight:700;">@altArrivalDateTime.ToString("ddd, dd MMM")</div>
+                                    </div>
+                                </div>
+
+                                <!-- CLASS BOXES -->
+                                <div class="class-compact">
+                                    @foreach (var c in alt.Classes)
+                                    {
+                                        var classDisplayName = GetClassDisplayName(c.Code);
+                                        <div class="class-box"
+                                             data-class="@c.Id"
+                                             data-class-code="@GetClassShortCode(c.Code)"
+                                             onclick="openAvailability('@c.Id','@alt.Id','@alt.FromStationId','@alt.ToStationId','@ViewBag.Quota','@alt.NextRunDate.ToString("yyyy-MM-dd")','@uniquePanelId')">
+                                            <div class="class-title">@classDisplayName</div>
+                                            <div class="class-refresh">
+                                                Refresh <i class="bi bi-arrow-repeat refresh-icon"></i>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+
+                                <!-- AVAILABILITY PANEL -->
+                                <div class="availability-panel" id="@uniquePanelId">
+                                    <div class="train-card-classes">
+                                        <div class="class-panels">
+                                            @foreach (var c in alt.Classes.Select((value, index) => new { value, index }))
+                                            {
+                                                int remaining = c.value.SeatsAvailable;
+                                                string altSeatStatus = remaining > 0 ? "AVAILABLE - " + remaining : "AVAILABLE";
+
+                                                <form method="get"
+                                                      action="/Booking/PrepareCheckout"
+                                                      class="class-card @(c.index == 0 ? "active" : "") @(!alt.IsBookingAllowed ? "booking-not-allowed-card" : "")"
+                                                      data-class="@c.value.Id" 
+                                                      data-train="@alt.Id">
+
+                                                    <input type="hidden" name="trainId" value="@alt.Id" />
+                                                    <input type="hidden" name="trainName" value="@alt.Name" />
+                                                    <input type="hidden" name="classId" value="@c.value.Id" />
+                                                    <input type="hidden" name="classCode" value="@c.value.Code" />
+                                                    <input type="hidden" name="fare" value="@((int)c.value.TotalFare)" />
+                                                    <input type="hidden" name="quota" value="@ViewBag.Quota" />
+                                                    <input type="hidden" name="journeyDate" value="@alt.NextRunDate.ToString("yyyy-MM-dd")" />
+                                                    <input type="hidden" name="Departure" value="@altDepartureDateTime.ToString("HH:mm")" />
+                                                    <input type="hidden" name="Arrival" value="@altArrivalDateTime.ToString("HH:mm")" />
+                                                    <input type="hidden" name="Duration" value="@alt.Duration" />
+                                                    <input type="hidden" name="FromStationId" value="@userfromid" />
+                                                    <input type="hidden" name="ToStationId" value="@usertoid" />
+                                                    <input type="hidden" name="FSM" value="@alt.FSM" />
+                                                    <input type="hidden" name="TSM" value="@alt.TSM" />
+                                                    <input type="hidden" name="FromStation" value="@fromStation" />
+                                                    <input type="hidden" name="ToStation" value="@toStation" />
+                                                    <input type="hidden" name="numPassengers" value="1" />
+
+                                                    @if (alt.IsBookingAllowed)
+                                                    {
+                                                        <div class="fare-section">
+                                                            <span class="fare-main">₹@c.value.TotalFare</span>
+                                                        </div>
+                                                        <div class="class-status" style="color:green; font-weight:700;">
+                                                            @altSeatStatus
+                                                        </div>
+                                                        <input type="hidden" name="seatStatus" value="@altSeatStatus" />
+
+                                                        <button type="submit" class="book-btn">
+                                                            Book Now
+                                                        </button>
+                                                    }
+                                                    else
+                                                    {
+                                                        <div class="class-status booking-not-allowed-box">
+                                                            <span class="booking-not-allowed-close" onclick="closeAvailabilityPanel('@uniquePanelId', '@alt.Id')">&times;</span>
+                                                            <div class="booking-not-allowed-msg">
+                                                                BOOKINGs are NOT ALLOWED at this TIME
+                                                            </div>
+                                                            <div class="booking-not-allowed-sub">
+                                                                @if (alt.ServiceStartDate.HasValue)
+                                                                {
+                                                                    <span>Booking opens on @alt.ServiceStartDate.Value.AddDays(-3).ToString("dd-MMM-yyyy") (3 days before service start date)</span>
+                                                                }
+                                                                else
+                                                                {
+                                                                    <span>Please check <a href="https://enquiry.indianrail.gov.in" target="_blank" class="ntes-link">NTES website</a> or <span class="ntes-link">NTES app</span> for actual time before boarding</span>
+                                                                }
+                                                            </div>
+                                                            <button type="button" class="book-now-disabled" disabled>
+                                                                Book Now
+                                                            </button>
+                                                        </div>
+                                                        <input type="hidden" name="seatStatus" value="BOOKINGs are NOT ALLOWED at this TIME" />
+                                                    }
+                                                </form>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- FOOTER -->
+                                <div class="train-card-footer">
+                                    <div class="train-card-footer-left">
+                                        <span class="ntes-notice">
+                                            Please check NTES website or NTES app for actual time before boarding
+                                        </span>
+                                    </div>
+                                    <div class="train-card-footer-right">
+                                        @if (alt.Classes.Any())
+                                        {
+                                            var firstCls = alt.Classes.First();
+                                            <form method="get" action="/Booking/PrepareCheckout" style="display:inline-block; margin:0;">
+                                                <input type="hidden" name="trainId" value="@alt.Id" />
+                                                <input type="hidden" name="trainName" value="@alt.Name" />
+                                                <input type="hidden" name="classId" value="@firstCls.Id" />
+                                                <input type="hidden" name="classCode" value="@firstCls.Code" />
+                                                <input type="hidden" name="fare" value="@((int)firstCls.TotalFare)" />
+                                                <input type="hidden" name="quota" value="@ViewBag.Quota" />
+                                                <input type="hidden" name="journeyDate" value="@alt.NextRunDate.ToString("yyyy-MM-dd")" />
+                                                <input type="hidden" name="Departure" value="@altDepartureDateTime.ToString("HH:mm")" />
+                                                <input type="hidden" name="Arrival" value="@altArrivalDateTime.ToString("HH:mm")" />
+                                                <input type="hidden" name="Duration" value="@alt.Duration" />
+                                                <input type="hidden" name="FromStationId" value="@userfromid" />
+                                                <input type="hidden" name="ToStationId" value="@usertoid" />
+                                                <input type="hidden" name="FSM" value="@alt.FSM" />
+                                                <input type="hidden" name="TSM" value="@alt.TSM" />
+                                                <input type="hidden" name="FromStation" value="@fromStation" />
+                                                <input type="hidden" name="ToStation" value="@toStation" />
+                                                <input type="hidden" name="numPassengers" value="1" />
+                                                <input type="hidden" name="seatStatus" value="AVAILABLE" />
+                                                <button type="submit" class="footer-btn" style="background:#f37021; color:#fff; font-weight:700; border:none; padding:7px 18px; border-radius:5px; cursor:pointer;">
+                                                    Book Now
+                                                </button>
+                                            </form>
+                                        }
+                                        <button type="button" class="footer-btn route-map-btn" onclick="openMap('@alt.MapUrl')">
+                                            <i class="bi bi-map"></i> Route Map
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
             </div>
         </div>
             </main>
@@ -1130,22 +1713,22 @@
 
     @if (routeMismatch != null)
     {
-        <div class="modal-overlay">
-            <div class="modal-box">
+        <div class="modal-overlay" id="routeMismatchOverlay" style="display: flex !important; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(3px); align-items: center; justify-content: center; z-index: 25000; padding: 16px;">
+            <div class="modal-box" style="background: #ffffff; border-radius: 14px; box-shadow: 0 12px 32px rgba(0,0,0,0.3); max-width: 360px; width: 100%; padding: 20px 22px; text-align: center; border: 1px solid rgba(0,0,0,0.06);">
 
-                <h3 class="modal-title">Confirmation</h3>
+                <h4 class="modal-title" style="color: #0f172a; font-size: 1.1rem; font-weight: 700; margin: 0 0 12px 0; display: flex; align-items: center; justify-content: center; gap: 7px;">
+                    <i class="fa-solid fa-circle-question" style="color: #0f172a; font-size: 1.15rem;"></i>
+                    <span>Route Confirmation</span>
+                </h4>
 
-                <div class="popmodal">
-                    You searched trains from
-                    <strong>@searchedFrom</strong> to
-                    <strong>@searchedTo</strong>,<br />
-                    but the selected train runs from
-                    <strong>@actualFrom</strong> to
-                    <strong>@actualTo</strong>.<br /><br />
-                    Do you want to continue booking with the actual route?
+                <div class="popmodal" style="font-size: 13.5px; color: #334155; line-height: 1.55; margin-bottom: 18px; text-align: justify; text-justify: inter-word;">
+                    You searched trains from <strong style="color: #0f172a;">@searchedFrom</strong> to <strong style="color: #0f172a;">@searchedTo</strong>, but the selected train runs from <strong style="color: #1d4ed8;">@actualFrom</strong> to <strong style="color: #1d4ed8;">@actualTo</strong>.
+                    <div style="margin-top: 10px; text-align: center; color: #1e293b; font-weight: 500;">
+                        Do you want to continue booking with the actual route?
+                    </div>
                 </div>
 
-                <div class="modalbutton">
+                <div class="modalbutton" style="display: flex; gap: 12px; justify-content: center; align-items: center;">
                     <a href="@Url.Action("Checkout", "Booking", new {
                         trainId = trainId,
                         classId = classId,
@@ -1154,8 +1737,12 @@
                         ToStationId = actualToId,
                         journeyDate = routeJourneyDate
                         })"
-                        class="btnmodal yes">✔ Yes</a>
-                    <a href="#" class="btnmodal no" id="closeRouteMismatch"><strong>X</strong> No</a>
+                        class="btnmodal yes" style="background: #16a34a; color: #ffffff; padding: 8px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(22,163,74,0.3); border: none; transition: background 0.15s ease;">
+                        <i class="fa-solid fa-check"></i> Yes, Continue
+                    </a>
+                    <a href="javascript:void(0);" class="btnmodal no" id="closeRouteMismatch" style="background: #ef4444; color: #ffffff; padding: 8px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(239,68,68,0.3); border: none; transition: background 0.15s ease;">
+                        <i class="fa-solid fa-xmark"></i> No
+                    </a>
                 </div>
 
             </div>
@@ -1187,20 +1774,16 @@
     </div>
 </div>
 
-<!-- ✅ Right Side Drawer -->
-    <div id="route-sidebar" class="route-sidebar">
-        <div class="sidebar-header">
-            <h4 class="sidebar-title">Train Route</h4>
-            <button class="sidebar-close" id="close-sidebar">&times;</button>
-        </div>
-
-        <div id="sidebar-content" class="sidebar-content">
-            <!-- AJAX Loaded Route -->
+    <!-- 🚆 Centered Train Schedule Modal (Option 2) -->
+    <div id="routeModalOverlay" class="route-modal-overlay" style="display:none;" role="dialog" aria-modal="true">
+        <div class="route-modal-container">
+            <div id="routeModalCard" class="route-modal-card">
+                <div id="routeModalContent">
+                    <!-- AJAX Loaded Content from TrainRoutePartial -->
+                </div>
+            </div>
         </div>
     </div>
-
-    <!-- Background Overlay -->
-    <div id="sidebar-overlay" class="sidebar-overlay"></div>
 
     <div id="smartBubble" onclick="openSmartSearch()">
     🤖
@@ -1228,6 +1811,41 @@
         </div>
     </div>
 
+    <!-- ♿ Person With Disability Concession Confirmation Modal -->
+    <div id="pwdConcessionModal" class="concession-modal-overlay" style="display:none;" role="dialog" aria-modal="true">
+        <div class="concession-modal-card">
+            <div class="concession-modal-header">
+                <h5>Confirmation</h5>
+                <button type="button" class="concession-modal-close" onclick="closePwdModal(false)" aria-label="Close">✖</button>
+            </div>
+            <div class="concession-modal-body">
+                <p>Specially abled availing the concession need to carry Photo Identity card issued by Railways which is to be produced for On board / off board verification during journey. Escort passengers also need to carry photo identity card mentioned at the time of booking.</p>
+            </div>
+            <div class="concession-modal-footer">
+                <button type="button" class="concession-btn-ok" onclick="closePwdModal(true)">
+                    <i class="bi bi-check-lg me-1"></i> OK
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 🎫 Railway Pass Concession Confirmation Modal -->
+    <div id="railwayPassModal" class="concession-modal-overlay" style="display:none;" role="dialog" aria-modal="true">
+        <div class="concession-modal-card">
+            <div class="concession-modal-header">
+                <h5>Confirmation</h5>
+                <button type="button" class="concession-modal-close" onclick="closeRailwayPassModal(false)" aria-label="Close">✖</button>
+            </div>
+            <div class="concession-modal-body">
+                <p>You are booking ticket in Railway Pass Concession. Do you want to continue?</p>
+            </div>
+            <div class="concession-modal-footer concession-modal-footer-two">
+                <button type="button" class="concession-btn-ok" onclick="closeRailwayPassModal(true)">OK</button>
+                <button type="button" class="concession-btn-cancel" onclick="closeRailwayPassModal(false)">Cancel</button>
+            </div>
+        </div>
+    </div>
+
 </section> 
 
 
@@ -1237,6 +1855,61 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
+        function openPwdModal() {
+            document.getElementById("pwdConcessionModal").style.display = "flex";
+        }
+
+        function closePwdModal(isConfirmed) {
+            document.getElementById("pwdConcessionModal").style.display = "none";
+            const cb = document.getElementById("chkDisabilityConcession");
+            if (cb) {
+                cb.checked = isConfirmed;
+                if (isConfirmed) {
+                    const quotaDropdown = document.getElementById("modifyQuotaDropdown");
+                    if (quotaDropdown) quotaDropdown.value = "PwD";
+                }
+            }
+        }
+
+        function openRailwayPassModal() {
+            document.getElementById("railwayPassModal").style.display = "flex";
+        }
+
+        function closeRailwayPassModal(isConfirmed) {
+            document.getElementById("railwayPassModal").style.display = "none";
+            const cb = document.getElementById("chkRailwayPassConcession");
+            if (cb) {
+                cb.checked = isConfirmed;
+                if (isConfirmed) {
+                    const quotaDropdown = document.getElementById("modifyQuotaDropdown");
+                    if (quotaDropdown) quotaDropdown.value = "DP";
+                }
+            }
+        }
+
+        $(document).on("change", "#chkDisabilityConcession", function () {
+            if (this.checked) {
+                openPwdModal();
+            }
+        });
+
+        $(document).on("change", "#chkRailwayPassConcession", function () {
+            if (this.checked) {
+                openRailwayPassModal();
+            }
+        });
+
+        $(document).on("click", "#pwdConcessionModal", function (e) {
+            if ($(e.target).is("#pwdConcessionModal")) {
+                closePwdModal(false);
+            }
+        });
+
+        $(document).on("click", "#railwayPassModal", function (e) {
+            if ($(e.target).is("#railwayPassModal")) {
+                closeRailwayPassModal(false);
+            }
+        });
 
         function openTrainAlertModal(id, number, name) {
 
@@ -1260,37 +1933,45 @@
             var trainNumber = $(this).data("train-number");
             var fromStation = $(this).data("from");
             var toStation = $(this).data("to");
-
-            var headerHtml = `
-                <div class="mobile-train-header">
-                    <strong>${trainNumber} - (${trainName})</strong>
-                    <div class="mobile-route">
-                        ${fromStation} → ${toStation}
-                    </div>
-                 </div>
-                 `;
-
-            $(".sidebar-title").html(headerHtml);
-
-            // $(".sidebar-title").text(`Train Route of ${trainNumber} - ${trainName}`);
-
-            // // ⛔ prevents global loader trigger
-            // if (typeof hideLoader === "function") {
-            //     hideLoader();
-            // }
-
-            // ✅ GET DATE FROM INPUT
             var journeyDate = $("#journeyDatePicker").val();
 
-            $.get("/Admin/GetTrainRoute", { trainId: trainId, journeyDate: journeyDate }, function (html) {
+            // Show immediate loading placeholder in modal card
+            $("#routeModalContent").html(`
+                <div class="schedule-modal-wrapper" style="height:100%; display:flex; flex-direction:column;">
+                    <div class="schedule-top-title-bar">
+                        <div class="top-title-left">
+                            <i class="bi bi-calendar3 text-primary me-2 fs-5"></i>
+                            <span class="top-title-main">Train Schedule</span>
+                            <span class="top-title-badge">Official Route Timetable</span>
+                        </div>
+                        <button type="button" class="btn-schedule-close" id="closeScheduleModal" title="Close">&times;</button>
+                    </div>
+                    <div class="schedule-train-banner">
+                        <div class="train-main-info">
+                            ${trainNumber ? `<span class="train-number-pill">${trainNumber}</span>` : ''}
+                            <span class="train-name-heading">${trainName || 'Train Schedule'}</span>
+                        </div>
+                    </div>
+                    <div class="schedule-empty-state" style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+                        <div class="spinner-border text-primary" role="status" style="width: 2.5rem; height: 2.5rem;"></div>
+                        <div class="mt-3 fw-bold" style="color: #1a4fa3; font-size: 1rem;">Loading Train Schedule...</div>
+                        <div class="text-muted small mt-1">${fromStation || ''} &rarr; ${toStation || ''}</div>
+                    </div>
+                </div>
+            `);
 
-                $("#sidebar-content").html(html);
+            $("#routeModalOverlay").addClass("active");
+            $("body").addClass("route-modal-open");
 
-                $("#sidebar-overlay").addClass("show");
-                $("#route-sidebar").addClass("open");
-
-                // $("#sidebar-overlay").fadeIn(200);
-                // $("#route-sidebar").css("right", "0");
+            $.get("/Admin/GetTrainRoute", { 
+                trainId: trainId, 
+                journeyDate: journeyDate,
+                trainNumber: trainNumber,
+                trainName: trainName,
+                fromStation: fromStation,
+                toStation: toStation
+            }, function (html) {
+                $("#routeModalContent").html(html);
             }).fail(function (xhr) {
                 if (xhr.status === 401) {
                     showToast("Login required to view schedule during Tatkal timings", "warning");
@@ -1299,25 +1980,35 @@
                     }, 1500);
                 } else {
                     showToast("Failed to fetch train route details.", "error");
+                    closeRouteModal();
                 }
             });
         });
 
-        $(document).on("click", "#close-sidebar, #sidebar-overlay", function () {
+        function closeRouteModal() {
+            $("#routeModalOverlay").removeClass("active");
+            $("body").removeClass("route-modal-open");
+        }
 
-            $("#route-sidebar").removeClass("open");
-            $("#sidebar-overlay").removeClass("show");
+        $(document).on("click", "#closeScheduleModal, .btn-schedule-close, #close-sidebar", function (e) {
+            e.preventDefault();
+            closeRouteModal();
+        });
 
-            // $("#route-sidebar").css("right", "-700px");
-            // $("#sidebar-overlay").fadeOut(200);
+        $(document).on("click", "#routeModalOverlay", function (e) {
+            if ($(e.target).closest("#routeModalCard").length === 0) {
+                closeRouteModal();
+            }
+        });
+
+        $(document).on("keydown", function (e) {
+            if (e.key === "Escape" && $("#routeModalOverlay").is(":visible")) {
+                closeRouteModal();
+            }
         });
 
         function changeDate(offset) {
-            let dateInput = document.getElementById("journeyDatePicker");
-            let date = new Date(dateInput.value);
-            date.setDate(date.getDate() + offset);
-            dateInput.valueAsDate = date;
-            submitDateChange();
+            navigateDay(offset);
         }
 
         function submitDateChange() {
@@ -1339,45 +2030,180 @@
         }
 
 
+        function toggleAccordion(accId) {
+            const acc = document.getElementById(accId);
+            if (acc) {
+                acc.classList.toggle('open');
+            }
+        }
+
+        function toggleSectionSelectAll(section) {
+            const selectorMap = {
+                'class': '.class-filter-cb',
+                'type': '.type-filter-cb',
+                'deptime': '.dep-time-cb',
+                'arrtime': '.arr-time-cb',
+                'fromstn': '.fromstn-filter-cb',
+                'tostn': '.tostn-filter-cb'
+            };
+            const selector = selectorMap[section];
+            if (!selector) return;
+
+            const cbs = document.querySelectorAll(selector);
+            const anyUnchecked = Array.from(cbs).some(cb => !cb.checked);
+            const newState = anyUnchecked; // if any unchecked, select all; else deselect all
+
+            cbs.forEach(cb => cb.checked = newState);
+
+            const link = document.getElementById('selAll-' + section);
+            if (link) {
+                link.innerText = newState ? 'Deselect All' : 'Select All';
+            }
+
+            filterTrains();
+        }
+
+        function updateSelectAllLabels() {
+            const sections = ['class', 'type', 'deptime', 'arrtime', 'fromstn', 'tostn'];
+            const selectorMap = {
+                'class': '.class-filter-cb',
+                'type': '.type-filter-cb',
+                'deptime': '.dep-time-cb',
+                'arrtime': '.arr-time-cb',
+                'fromstn': '.fromstn-filter-cb',
+                'tostn': '.tostn-filter-cb'
+            };
+
+            sections.forEach(sec => {
+                const cbs = document.querySelectorAll(selectorMap[sec]);
+                const link = document.getElementById('selAll-' + sec);
+                if (cbs.length > 0 && link) {
+                    const allChecked = Array.from(cbs).every(cb => cb.checked);
+                    link.innerText = allChecked ? 'Deselect All' : 'Select All';
+                }
+            });
+        }
+
+        function getTimeSlot(hour) {
+            if (hour >= 0 && hour < 6) return 'early_morning';
+            if (hour >= 6 && hour < 12) return 'morning';
+            if (hour >= 12 && hour < 18) return 'mid_day';
+            return 'night';
+        }
+
+        function populateStationFilters() {
+            const fromContainer = document.getElementById('fromStationFilterOptions');
+            const toContainer = document.getElementById('toStationFilterOptions');
+            if (!fromContainer || !toContainer) return;
+
+            const fromStations = new Set();
+            const toStations = new Set();
+
+            document.querySelectorAll('.train-card').forEach(card => {
+                const fromStn = card.dataset.fromStation;
+                const toStn = card.dataset.toStation;
+                if (fromStn) fromStations.add(fromStn);
+                if (toStn) toStations.add(toStn);
+            });
+
+            let fromHtml = '';
+            fromStations.forEach(stn => {
+                fromHtml += `
+                    <label class="filter-checkbox-label">
+                        <input type="checkbox" class="fromstn-filter-cb" value="${stn}" checked />
+                        <span>${stn}</span>
+                    </label>`;
+            });
+            fromContainer.innerHTML = fromHtml || '<div style="font-size:11px; color:#64748b; padding:4px;">Default Origin</div>';
+
+            let toHtml = '';
+            toStations.forEach(stn => {
+                toHtml += `
+                    <label class="filter-checkbox-label">
+                        <input type="checkbox" class="tostn-filter-cb" value="${stn}" checked />
+                        <span>${stn}</span>
+                    </label>`;
+            });
+            toContainer.innerHTML = toHtml || '<div style="font-size:11px; color:#64748b; padding:4px;">Default Destination</div>';
+
+            // Wire station checkbox change events
+            fromContainer.querySelectorAll('.fromstn-filter-cb').forEach(cb => cb.addEventListener('change', filterTrains));
+            toContainer.querySelectorAll('.tostn-filter-cb').forEach(cb => cb.addEventListener('change', filterTrains));
+        }
+
         function filterTrains() {
-            // Get all checked classes
-            const checkedClasses = [];
-            document.querySelectorAll('.class-filter-cb:checked').forEach(cb => {
-                checkedClasses.push(cb.value);
-            });
+            // Get all checked values
+            const checkedClasses = Array.from(document.querySelectorAll('.class-filter-cb:checked')).map(cb => cb.value);
+            const checkedTypes = Array.from(document.querySelectorAll('.type-filter-cb:checked')).map(cb => cb.value);
+            const checkedDepSlots = Array.from(document.querySelectorAll('.dep-time-cb:checked')).map(cb => cb.value);
+            const checkedArrSlots = Array.from(document.querySelectorAll('.arr-time-cb:checked')).map(cb => cb.value);
+            const checkedFromStns = Array.from(document.querySelectorAll('.fromstn-filter-cb:checked')).map(cb => cb.value);
+            const checkedToStns = Array.from(document.querySelectorAll('.tostn-filter-cb:checked')).map(cb => cb.value);
 
-            // Get all checked types
-            const checkedTypes = [];
-            document.querySelectorAll('.type-filter-cb:checked').forEach(cb => {
-                checkedTypes.push(cb.value);
-            });
+            // Total available checkboxes per category in DOM
+            const totalClassCbs = document.querySelectorAll('.class-filter-cb').length;
+            const totalTypeCbs = document.querySelectorAll('.type-filter-cb').length;
+            const totalDepCbs = document.querySelectorAll('.dep-time-cb').length;
+            const totalArrCbs = document.querySelectorAll('.arr-time-cb').length;
+            const totalFromCbs = document.querySelectorAll('.fromstn-filter-cb').length;
+            const totalToCbs = document.querySelectorAll('.tostn-filter-cb').length;
 
-            const trains = document.querySelectorAll('.train-card');
+            const trains = document.querySelectorAll('.train-card-list > .train-card');
             let visibleCount = 0;
 
             trains.forEach(train => {
                 const trainType = train.dataset.trainType;
-                
+                const depHour = parseFloat(train.dataset.depHour || 0);
+                const arrHour = parseFloat(train.dataset.arrHour || 0);
+                const fromStn = train.dataset.fromStation;
+                const toStn = train.dataset.toStation;
+
                 // Parse classes from train card (split by comma, clean whitespace)
                 let trainClassesStr = train.dataset.classes || '';
-                trainClassesStr = trainClassesStr.replace(/\s+/g, ''); // Remove spaces
+                trainClassesStr = trainClassesStr.replace(/\s+/g, '');
                 const trainClasses = trainClassesStr.split(',').filter(c => c.length > 0);
 
-                // A train is shown if:
-                // 1. Its trainType is checked AND
-                // 2. At least one of its classes is checked
-                const typeMatches = checkedTypes.includes(trainType);
-                const classMatches = trainClasses.some(c => checkedClasses.includes(c));
+                // 1. Class Match: In IRCTC standard, a train matches IF at least ONE of its classes is in checkedClasses.
+                // If user unchecks ALL classes, checkedClasses.length === 0, so NO train matches (0 results).
+                const classMatches = totalClassCbs === 0 ? true : (checkedClasses.length > 0 && trainClasses.some(c => checkedClasses.includes(c)));
 
-                if (typeMatches && classMatches) {
+                // 2. Type Match
+                const typeMatches = totalTypeCbs === 0 ? true : (checkedTypes.length > 0 && checkedTypes.includes(trainType));
+
+                // 3. Departure Time Match
+                const depSlot = getTimeSlot(depHour);
+                const depMatches = totalDepCbs === 0 ? true : (checkedDepSlots.length > 0 && checkedDepSlots.includes(depSlot));
+
+                // 4. Arrival Time Match
+                const arrSlot = getTimeSlot(arrHour);
+                const arrMatches = totalArrCbs === 0 ? true : (checkedArrSlots.length > 0 && checkedArrSlots.includes(arrSlot));
+
+                // 5. From Station Match
+                const fromMatches = totalFromCbs === 0 ? true : (checkedFromStns.length > 0 && checkedFromStns.includes(fromStn));
+
+                // 6. To Station Match
+                const toMatches = totalToCbs === 0 ? true : (checkedToStns.length > 0 && checkedToStns.includes(toStn));
+
+                if (classMatches && typeMatches && depMatches && arrMatches && fromMatches && toMatches) {
                     train.style.display = '';
                     visibleCount++;
+                    // In official IRCTC standard, matching trains keep all their class chips visible
+                    const classBoxes = train.querySelectorAll('.class-box');
+                    classBoxes.forEach(box => {
+                        box.style.display = '';
+                    });
                 } else {
                     train.style.display = 'none';
                 }
             });
 
-            // Show/Hide "no trains available" messages
+            // Update live result count in header
+            const resultCountEl = document.getElementById('trainResultCount');
+            if (resultCountEl) {
+                resultCountEl.textContent = visibleCount;
+            }
+
+            // Show/Hide "no trains available" messages matching official IRCTC exactly
             const msgBox = document.getElementById('noTrainMessage');
             const serverMsg = document.getElementById('noTrainMessageServer');
 
@@ -1385,40 +2211,163 @@
                 if (serverMsg) {
                     serverMsg.style.display = 'none';
                 }
-                
-                const fromStationRaw = '@TempData.Peek("FromStation")';
-                const toStationRaw   = '@TempData.Peek("ToStation")';
-                const journeyDate    = '@journey';
-
-                const route =
-                    cleanStationName(fromStationRaw) +
-                    ' → ' +
-                    cleanStationName(toStationRaw);
-
-                msgBox.innerHTML = `No trains available matching your selected filters for <strong>${route}</strong> on <strong>${journeyDate}</strong>`;
-                msgBox.style.display = 'block';
+                if (msgBox) {
+                    msgBox.innerHTML = '<span style="color:#d9534f; font-weight:600; font-size:1.05rem;">No trains are available for the filter(s) you have selected.</span>';
+                    msgBox.style.display = 'block';
+                }
             } else {
-                msgBox.style.display = 'none';
+                if (msgBox) {
+                    msgBox.style.display = 'none';
+                }
                 if (serverMsg) {
                     serverMsg.style.display = 'none';
                 }
             }
+
+            updateSelectAllLabels();
         }
 
-        // Setup event listeners for checkboxes
-        document.querySelectorAll('.class-filter-cb, .type-filter-cb').forEach(cb => {
+        // Setup event listeners for existing checkboxes
+        document.querySelectorAll('.class-filter-cb, .type-filter-cb, .dep-time-cb, .arr-time-cb').forEach(cb => {
             cb.addEventListener('change', filterTrains);
         });
 
+        // Navigate to Previous / Next Day
+        function navigateDay(offsetDays) {
+            if (window.fpResults && window.fpResults.selectedDates && window.fpResults.selectedDates.length > 0) {
+                const current = window.fpResults.selectedDates[0];
+                const targetDate = new Date(current);
+                targetDate.setDate(targetDate.getDate() + offsetDays);
+
+                const yyyy = targetDate.getFullYear();
+                const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
+                const dd = String(targetDate.getDate()).padStart(2, '0');
+                const newDateStr = `${yyyy}-${mm}-${dd}`;
+
+                if ("@minDate" && newDateStr < "@minDate") {
+                    alert('Date cannot be before ' + "@minDate");
+                    return;
+                }
+                if ("@maxDate" && newDateStr > "@maxDate") {
+                    alert('Date cannot be after ' + "@maxDate");
+                    return;
+                }
+
+                window.fpResults.setDate(targetDate, false);
+                const dateInput = document.getElementById('journeyDatePicker');
+                if (dateInput) dateInput.value = newDateStr;
+                submitDateChange();
+                return;
+            }
+
+            const dateInput = document.getElementById('journeyDatePicker');
+            if (!dateInput || !dateInput.value) return;
+
+            const parts = dateInput.value.split('-');
+            if (parts.length !== 3) return;
+            const y = parseInt(parts[0], 10);
+            const m = parseInt(parts[1], 10) - 1;
+            const d = parseInt(parts[2], 10);
+
+            const targetDate = new Date(y, m, d + offsetDays);
+
+            const yyyy = targetDate.getFullYear();
+            const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
+            const dd = String(targetDate.getDate()).padStart(2, '0');
+            const newDateStr = `${yyyy}-${mm}-${dd}`;
+
+            if (newDateStr < "@minDate") {
+                alert('Date cannot be before ' + "@minDate");
+                return;
+            }
+            if (newDateStr > "@maxDate") {
+                alert('Date cannot be after ' + "@maxDate");
+                return;
+            }
+
+            dateInput.value = newDateStr;
+            submitDateChange();
+        }
+
         function resetAllFilters() {
-            document.querySelectorAll('.class-filter-cb, .type-filter-cb').forEach(cb => {
+            document.querySelectorAll('.class-filter-cb, .type-filter-cb, .dep-time-cb, .arr-time-cb, .fromstn-filter-cb, .tostn-filter-cb').forEach(cb => {
                 cb.checked = true;
             });
             filterTrains();
         }
 
-        // Run once on load to ensure filters match checkbox state
-        document.addEventListener('DOMContentLoaded', filterTrains);
+        function toggleMobileFilterDrawer() {
+            const sidebar = document.getElementById('refineSidebar');
+            const backdrop = document.getElementById('mobileFilterBackdrop');
+            if (!sidebar) return;
+            const isOpen = sidebar.classList.contains('mobile-drawer-open');
+            if (isOpen) {
+                sidebar.classList.remove('mobile-drawer-open');
+                backdrop?.classList.remove('show');
+                document.body.classList.remove('drawer-open');
+            } else {
+                sidebar.classList.add('mobile-drawer-open');
+                backdrop?.classList.add('show');
+                document.body.classList.add('drawer-open');
+            }
+        }
+
+        function toggleMobileModifySearch() {
+            const block = document.getElementById('stickyTopBlock');
+            const icon = document.querySelector('#mobileEditPencilBtn i');
+            if (!block) return;
+            const isOpen = block.classList.contains('mobile-modify-open');
+            if (isOpen) {
+                block.classList.remove('mobile-modify-open');
+                if (icon) {
+                    icon.className = 'bi bi-pencil-fill';
+                }
+            } else {
+                block.classList.add('mobile-modify-open');
+                if (icon) {
+                    icon.className = 'bi bi-x-lg';
+                }
+            }
+        }
+
+        function toggleMobileSortMenu() {
+            const menu = document.getElementById('mobileSortMenu');
+            if (!menu) return;
+            menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+        }
+
+        // Close mobile sort menu when clicking outside
+        document.addEventListener('click', function (e) {
+            const btn = document.getElementById('mobileSortBtn');
+            const menu = document.getElementById('mobileSortMenu');
+            if (btn && menu && !btn.contains(e.target) && !menu.contains(e.target)) {
+                menu.style.display = 'none';
+            }
+        });
+
+        // Run once on load to populate stations and ensure filters match checkbox state
+        document.addEventListener('DOMContentLoaded', () => {
+            populateStationFilters();
+            filterTrains();
+
+            // Initialize Modern Flatpickr Calendar matching Home Page
+            if (typeof flatpickr !== 'undefined' && document.getElementById("journeyDatePicker")) {
+                window.fpResults = flatpickr("#journeyDatePicker", {
+                    dateFormat: "Y-m-d",
+                    altInput: true,
+                    altFormat: "d-m-Y",
+                    altInputClass: "uniform-search-input uniform-date-input",
+                    defaultDate: "@journey",
+                    minDate: "@minDate",
+                    maxDate: "@maxDate",
+                    disableMobile: true
+                });
+
+                document.querySelector(".uniform-date-wrapper .input-field-icon")?.addEventListener("click", function () {
+                    if (window.fpResults) window.fpResults.open();
+                });
+            }
+        });
 
         // document.getElementById("classFilterDropdown")
         // .addEventListener("change", function (e) {
@@ -1479,9 +2428,73 @@
         //     window.location.href = url.toString();
         // }
 
+        const sortLabels = {
+            'DUR_SHORT': 'Duration – Shortest First',
+            'DUR_LONG':  'Duration – Longest First',
+            'DEP_EARLY': 'Departure – Early First',
+            'DEP_LATE':  'Departure – Late First',
+            'ARR_EARLY': 'Arrival – Early First',
+            'ARR_LATE':  'Arrival – Late First'
+        };
+
         function applySort(sortType) {
-            fetch('/Train/SetSort?value=' + sortType)
-                .then(() => window.location.href = '/Train/TrainResults');
+            const list = document.querySelector('.train-card-list');
+            if (!list) return;
+
+            const cards = Array.from(list.querySelectorAll('.train-card'));
+            if (cards.length === 0) return;
+
+            cards.sort((a, b) => {
+                const depA = parseFloat(a.dataset.depHour) || 0;
+                const depB = parseFloat(b.dataset.depHour) || 0;
+                const arrA = parseFloat(a.dataset.arrHour) || 0;
+                const arrB = parseFloat(b.dataset.arrHour) || 0;
+                const durA = parseInt(a.dataset.duration) || 0;
+                const durB = parseInt(b.dataset.duration) || 0;
+
+                switch (sortType) {
+                    case 'DEP_EARLY': return depA - depB;
+                    case 'DEP_LATE':  return depB - depA;
+                    case 'ARR_EARLY': return arrA - arrB;
+                    case 'ARR_LATE':  return arrB - arrA;
+                    case 'DUR_SHORT': return durA - durB;
+                    case 'DUR_LONG':  return durB - durA;
+                    default: return 0;
+                }
+            });
+
+            cards.forEach(card => list.appendChild(card));
+
+            // Update desktop sort button label
+            const sortBtn = document.getElementById("sortBtn");
+            if (sortBtn && sortLabels[sortType]) {
+                sortBtn.innerText = sortLabels[sortType];
+            }
+
+            // Update active state in desktop sort menu
+            document.querySelectorAll("#sortMenu .sort-item").forEach(item => {
+                const fn = item.getAttribute("onclick") || "";
+                item.classList.toggle("selected", fn.includes("'" + sortType + "'"));
+            });
+
+            // Update active state in mobile sort menu
+            document.querySelectorAll("#mobileSortMenu .mobile-sort-item").forEach(item => {
+                const fn = item.getAttribute("onclick") || "";
+                item.classList.toggle("active", fn.includes("'" + sortType + "'"));
+            });
+
+            // Close desktop sort menu
+            const desktopMenu = document.getElementById("sortMenu");
+            if (desktopMenu) desktopMenu.style.display = "none";
+
+            // Close mobile sort menu
+            const mobileMenu = document.getElementById("mobileSortMenu");
+            if (mobileMenu) mobileMenu.style.display = "none";
+
+            // Save sort preference to session in background
+            try {
+                fetch('/Train/SetSort?value=' + sortType);
+            } catch (e) {}
         }
 
         function toggleSortMenu() {
@@ -1500,22 +2513,24 @@
         });
 
         function toggleFareModal(el){
-
-            // close other modals
+            // close other modals first
             document.querySelectorAll(".fare-modal")
-                .forEach(m => m.style.display="none");
+                .forEach(m => m.classList.remove("show"));
 
             const modal = el.querySelector(".fare-modal");
+            if (!modal) return;
 
-            modal.style.display = "block";
+            modal.classList.add("show");
 
             // click outside closes it
-            document.addEventListener("click", function handler(e){
-                if(!el.contains(e.target)){
-                    modal.style.display="none";
-                    document.removeEventListener("click", handler);
-                }
-            });
+            setTimeout(() => {
+                document.addEventListener("click", function handler(e){
+                    if(!el.contains(e.target)){
+                        modal.classList.remove("show");
+                        document.removeEventListener("click", handler);
+                    }
+                });
+            }, 0);
         }
 
         function handleLiveStatus(event, trainNo) {
@@ -1539,7 +2554,7 @@
         }
 
         document.addEventListener("click", function (e) {
-            if (e.target && e.target.id === "closeRouteMismatch") {
+            if (e.target && (e.target.id === "closeRouteMismatch" || e.target.closest("#closeRouteMismatch") || e.target.id === "closeRouteMismatchHeader" || e.target.closest("#closeRouteMismatchHeader"))) {
                 e.preventDefault();
 
                 fetch('/Train/ClearRouteMismatch', {
@@ -1547,7 +2562,8 @@
                 })
                 .then(res => {
                     if (res.ok) {
-                        document.querySelector(".modal-overlay").style.display = "none";
+                        const overlay = document.getElementById("routeMismatchOverlay");
+                        if (overlay) overlay.style.display = "none";
                     }
                 })
                 .catch(err => console.error(err));
@@ -1653,24 +2669,33 @@
                     let html = "";
 
                     if (!data || data.length === 0) {
-                        html = `<tr><td colspan="2">No updates available</td></tr>`;
+                        html = `<tr><td colspan="2" style="text-align:center; padding:18px; color:#64748b;">No updates available</td></tr>`;
                     } else {
-
                         data.forEach(a => {
+                            let badgeHtml = "";
+                            if (a.type === "Cancelled") {
+                                badgeHtml = `<span style="background:#fef2f2; color:#dc2626; border:1px solid #fca5a5; padding:3px 8px; border-radius:4px; font-weight:700; font-size:11.5px; display:inline-block;">Cancelled</span>`;
+                            } else if (a.type === "Skipped") {
+                                badgeHtml = `<span style="background:#fff7ed; color:#ea580c; border:1px solid #fdba74; padding:3px 8px; border-radius:4px; font-weight:700; font-size:11.5px; display:inline-block;">Skipped</span>`;
+                            } else if (a.type === "Diverted") {
+                                badgeHtml = `<span style="background:#eff6ff; color:#2563eb; border:1px solid #93c5fd; padding:3px 8px; border-radius:4px; font-weight:700; font-size:11.5px; display:inline-block;">Diverted</span>`;
+                            } else if (a.type === "Temporary Stop") {
+                                badgeHtml = `<span style="background:#f0fdf4; color:#16a34a; border:1px solid #86efac; padding:3px 8px; border-radius:4px; font-weight:700; font-size:11.5px; display:inline-block;">Temporary Stop</span>`;
+                            } else {
+                                badgeHtml = `<span style="font-weight:600;">${a.type || 'Update'}</span>`;
+                            }
 
-                            let color = "black";
-
-                            if (a.type === "Cancelled") color = "red";
-                            else if (a.type === "Skipped") color = "orange";
-                            else if (a.type === "Diverted") color = "blue";
-                            else if (a.type === "Temporary Stop") color = "green";
+                            let detailHtml = a.message || "";
+                            if (a.type === "Skipped" && a.station && a.dates) {
+                                detailHtml = `Skipped station: <strong style="color:#0f172a;">${a.station}</strong> (${a.dates})`;
+                            }
 
                             html += `
                                 <tr>
-                                    <td style="color:${color}; font-weight:600;">
-                                        ${a.type}
+                                    <td style="vertical-align:middle; width:120px;">
+                                        ${badgeHtml}
                                     </td>
-                                    <td>${a.message}</td>
+                                    <td style="vertical-align:middle; color:#1e293b; font-size:13.5px;">${detailHtml}</td>
                                 </tr>
                             `;
                         });
@@ -1693,6 +2718,124 @@
 </script>
 
     <style>
+
+        /* 🚆 Centered Train Schedule Modal (Option 2 - High Performance Framed) */
+        .route-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(15, 23, 42, 0.65);
+            z-index: 10050;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            box-sizing: border-box;
+            opacity: 0;
+            transition: opacity 0.15s ease-out;
+        }
+
+        .route-modal-overlay.active {
+            display: flex !important;
+            opacity: 1;
+        }
+
+        body.route-modal-open {
+            overflow: hidden !important;
+        }
+
+        .route-modal-container {
+            width: 95vw;
+            max-width: 1280px;
+            height: 86vh;
+            min-height: 560px;
+            max-height: 880px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-sizing: border-box;
+        }
+
+        .route-modal-card {
+            width: 100%;
+            height: 100%;
+            background: #ffffff;
+            border-radius: 18px;
+            border: 3px solid #cbd5e1;
+            padding: 16px 20px;
+            box-shadow: 0 25px 65px -10px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 0, 0, 0.08);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-sizing: border-box;
+            animation: modalPopAnim 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @@media (max-width: 768px) {
+            .route-modal-overlay {
+                padding: 6px !important;
+            }
+
+            .route-modal-container {
+                width: 98vw !important;
+                max-width: 98vw !important;
+                height: 94vh !important;
+                max-height: 94vh !important;
+                min-height: 0 !important;
+                padding: 0 !important;
+            }
+
+            .route-modal-card {
+                padding: 0 !important;
+                border-radius: 8px !important;
+                border: 1px solid #94a3b8 !important;
+                overflow: hidden !important;
+            }
+        }
+
+        #routeModalContent {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        @@keyframes modalPopAnim {
+            from {
+                opacity: 0;
+                transform: scale(0.97) translateY(6px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        /* 🏛️ Landmark Badges */
+        .landmark-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            vertical-align: middle;
+            margin: 0 4px;
+            transition: transform 0.15s ease;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .landmark-badge:hover {
+            transform: scale(1.22);
+        }
+
+        .landmark-badge img {
+            object-fit: contain;
+            border-radius: 50%;
+            filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2));
+            display: inline-block;
+        }
 
         .train-card-classes .class-code {
             display: none !important;
@@ -1740,6 +2883,36 @@
                 margin-top: 10px;
             }
 
+        .class-card.booking-not-allowed-card,
+        .availability-panel .class-card.booking-not-allowed-card,
+        .availability-panel .class-card.active.booking-not-allowed-card {
+            display: inline-block !important;
+            width: auto !important;
+            max-width: 520px !important;
+            min-width: 280px !important;
+            background: #fff5f5 !important;
+            border: 1.5px solid #fca5a5 !important;
+            border-radius: 8px !important;
+            padding: 12px 18px !important;
+            margin-top: 10px !important;
+            box-shadow: 0 2px 8px rgba(239, 68, 68, 0.08) !important;
+            position: relative !important;
+            cursor: default !important;
+            text-align: left !important;
+        }
+
+        .class-card.booking-not-allowed-card:hover {
+            transform: none !important;
+            box-shadow: 0 2px 8px rgba(239, 68, 68, 0.12) !important;
+            border-color: #f87171 !important;
+        }
+
+        .class-card.booking-not-allowed-card .class-code,
+        .class-card.booking-not-allowed-card .class-fare,
+        .class-card.booking-not-allowed-card .last-updated {
+            display: none !important;
+        }
+
         .class-panels {
             margin-top: 12px;
         }
@@ -1752,6 +2925,13 @@
 
         .availability-panel {
             display: none;
+            margin-top: 14px;
+            margin-bottom: 12px;
+        }
+
+        .departed-box {
+            margin-top: 14px !important;
+            margin-bottom: 12px !important;
         }
 
         .arrival{
@@ -1929,6 +3109,1320 @@
         .modal-body-scroll::-webkit-scrollbar-thumb {
             background: #ccc;
             border-radius: 10px;
+        }
+
+        /* ------------------------------------------------------------- */
+        /* REFINE RESULTS COLLAPSIBLE ACCORDION SIDEBAR (WHITE THEME)    */
+        /* ------------------------------------------------------------- */
+        .refine-sidebar {
+            flex: 0 0 310px;
+            width: 310px;
+            position: sticky;
+            top: 110px;
+            z-index: 100;
+        }
+
+        .sidebar-filter-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+            padding: 16px;
+        }
+
+        .filter-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 12px;
+            margin-bottom: 8px;
+        }
+
+        .filter-header-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #1a4fa3;
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        .filter-header-left h3 {
+            font-size: 15px;
+            font-weight: 700;
+            color: #1a4fa3;
+            margin: 0;
+        }
+
+        .clear-filter-btn {
+            background: none;
+            border: 1px solid #f97316;
+            color: #ea580c;
+            border-radius: 6px;
+            padding: 3px 10px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .clear-filter-btn:hover {
+            background: #fff7ed;
+            color: #c2410c;
+            text-decoration: none;
+        }
+
+        .refine-accordion {
+            border-bottom: 1px solid #f1f5f9;
+            padding: 9px 0;
+        }
+
+        .refine-accordion:last-child {
+            border-bottom: none;
+        }
+
+        .accordion-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+            padding: 3px 0;
+        }
+
+        .accordion-header:hover .acc-title {
+            color: #2563eb;
+        }
+
+        .acc-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #1e3a8a;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: color 0.15s;
+        }
+
+        .acc-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .acc-link {
+            font-size: 11px;
+            font-weight: 600;
+            color: #2563eb;
+            text-decoration: none;
+        }
+
+        .acc-link:hover {
+            text-decoration: underline;
+            color: #1d4ed8;
+        }
+
+        .acc-chevron {
+            font-size: 11px;
+            color: #64748b;
+            transition: transform 0.25s ease;
+        }
+
+        .refine-accordion.open .acc-chevron {
+            transform: rotate(180deg);
+        }
+
+        .accordion-body {
+            display: none;
+            padding-top: 8px;
+        }
+
+        .refine-accordion.open .accordion-body {
+            display: block;
+        }
+
+        .filter-options-grid-2col {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 7px 6px;
+        }
+
+        .filter-options-grid-2col .filter-checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11.5px;
+            font-weight: 500;
+            color: #334155;
+            cursor: pointer;
+            margin: 0;
+            line-height: 1.25;
+        }
+
+        .filter-options-grid-2col .filter-checkbox-label span {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .filter-options-grid-2col .filter-checkbox-label input[type="checkbox"] {
+            width: 15px;
+            height: 15px;
+            accent-color: #1a4fa3;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .time-slot-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 7px;
+        }
+
+        .time-slot-card {
+            display: block;
+            cursor: pointer;
+            margin: 0;
+            position: relative;
+        }
+
+        .time-slot-card input[type="checkbox"] {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            width: 13px;
+            height: 13px;
+            accent-color: #1a4fa3;
+            cursor: pointer;
+            z-index: 2;
+        }
+
+        .time-slot-content {
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 7px;
+            padding: 6px 4px 5px;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+
+        .time-slot-card:hover .time-slot-content {
+            border-color: #93c5fd;
+            background: #f0f7ff;
+        }
+
+        .time-slot-card input:checked + .time-slot-content {
+            background: #eff6ff;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 1px #2563eb;
+        }
+
+        .slot-time {
+            font-size: 11px;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .slot-label {
+            font-size: 10px;
+            color: #64748b;
+            margin-top: 2px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+        }
+
+        .time-slot-card input:checked + .time-slot-content .slot-label {
+            color: #1d4ed8;
+            font-weight: 600;
+        }
+
+        /* ------------------------------------------------------------- */
+        /* FULL SCREEN RESPONSIVE LAYOUT (MATCHING OFFICIAL IRCTC)      */
+        /* ------------------------------------------------------------- */
+        .results-page {
+            width: 100% !important;
+            max-width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            min-height: 100vh !important;
+            background: #f4f6f8 !important;
+        }
+
+        .sticky-top-block {
+            width: 100% !important;
+            margin-bottom: 12px !important;
+        }
+
+        /* 📱 MOBILE COMPACT MODIFY SEARCH BAR */
+        .mobile-search-compact-bar {
+            display: none;
+        }
+
+        .mobile-action-bar {
+            display: none;
+        }
+
+        .mobile-sort-dropdown {
+            display: none;
+        }
+
+        .mobile-runs-on {
+            display: none;
+        }
+
+        /* DESKTOP VIEW (>= 992px) */
+        @@media (min-width: 992px) {
+            .results-container {
+                width: 100% !important;
+                max-width: 100% !important;
+                padding: 10px 24px 40px !important;
+                margin: 0 !important;
+                border-radius: 0 !important;
+                box-shadow: none !important;
+                background: transparent !important;
+            }
+
+            .results-main-layout {
+                display: flex !important;
+                gap: 20px !important;
+                align-items: flex-start !important;
+                width: 100% !important;
+                margin-top: 10px !important;
+            }
+
+            .refine-sidebar {
+                flex: 0 0 290px !important;
+                width: 290px !important;
+                position: sticky !important;
+                top: 85px !important;
+                z-index: 100 !important;
+            }
+
+            .train-results-column {
+                flex: 1 1 auto !important;
+                min-width: 0 !important;
+                width: calc(100% - 310px) !important;
+            }
+
+            .modify-search-fields {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+
+            .mobile-filter-bar,
+            .mobile-filter-backdrop,
+            .mobile-filter-close-btn,
+            .mobile-search-compact-bar,
+            .mobile-action-bar,
+            .mobile-sort-dropdown,
+            .mobile-runs-on {
+                display: none !important;
+            }
+
+            .desktop-runs-on {
+                display: inline-flex !important;
+            }
+
+            .train-card {
+                width: 100% !important;
+                background: #ffffff !important;
+                border: 1px solid #e2e8f0 !important;
+                border-left-width: 5px !important;
+                border-left-style: solid !important;
+                border-left-color: #000000 !important;
+                border-radius: 8px !important;
+                padding: 16px 20px !important;
+                margin-bottom: 16px !important;
+                box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05) !important;
+                position: relative;
+                transition: box-shadow 0.2s ease, transform 0.2s ease;
+            }
+
+            .train-card.train-rajdhani { border-left-color: #bf0000 !important; }
+            .train-card.train-vande-bharat { border-left-color: #1976d2 !important; }
+            .train-card.train-shatabdi { border-left-color: #1976d2 !important; }
+            .train-card.train-amrit-bharat { border-left-color: #e03e00 !important; }
+            .train-card.train-garib-rath { border-left-color: #27F5A6 !important; }
+            .train-card.train-duronto { border-left-color: #F5C527 !important; }
+            .train-card.train-special, .train-card.spl-train { border-left-color: #A9F527 !important; }
+            .train-card.train-normal, .train-card.normal-train { border-left-color: #000000 !important; }
+
+            .train-card-header {
+                display: grid !important;
+                grid-template-columns: 1fr auto 1fr !important;
+                align-items: center !important;
+                border-bottom: 1px solid #f1f5f9;
+                padding-bottom: 10px;
+                gap: 12px;
+            }
+
+            .train-title-block {
+                text-align: left;
+                justify-self: start;
+            }
+
+            .desktop-runs-on {
+                display: inline-flex !important;
+                align-items: center;
+                justify-content: center;
+                justify-self: center;
+                gap: 5px;
+            }
+
+            .train-actions {
+                display: flex !important;
+                align-items: center;
+                justify-content: flex-end;
+                justify-self: end;
+                gap: 8px;
+            }
+
+            .view-route .route-text {
+                display: inline !important;
+            }
+
+            .route-pin-icon {
+                display: inline-block !important;
+                font-size: 13px !important;
+                margin-left: 3px !important;
+                color: #2563eb !important;
+            }
+
+            .train-card-body {
+                display: grid;
+                grid-template-columns: 1fr 160px 1fr;
+                align-items: center;
+                background: #f8fafc;
+                border-radius: 7px;
+                padding: 12px 18px;
+                margin: 12px 0;
+                border: 1px solid #f1f5f9;
+            }
+
+            .class-compact {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+                margin: 12px 0 10px;
+            }
+
+            .class-box {
+                background: #f8fafc;
+                border: 1px solid #cbd5e1;
+                border-radius: 7px;
+                padding: 8px 16px;
+                min-width: 140px;
+                cursor: pointer;
+                transition: all 0.15s ease;
+            }
+        }
+
+        /* Results Top Header Bar (Desktop) */
+        .results-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 10px 18px;
+            margin-bottom: 12px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+        }
+
+        .results-meta-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1e3a8a;
+        }
+
+        .results-count-number {
+            font-weight: 800;
+            color: #1d4ed8;
+            font-size: 15px;
+        }
+
+        .day-nav-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .day-nav-btn {
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            color: #1e293b;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 5px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .day-nav-btn:hover {
+            background: #eff6ff;
+            border-color: #2563eb;
+            color: #1d4ed8;
+        }
+
+        .runs-on {
+            font-size: 12px;
+            font-weight: 600;
+            color: #475569;
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+        }
+
+        .runs-on .day-active {
+            background: #1a4fa3;
+            color: #ffffff;
+            border-radius: 3px;
+            padding: 2px 6px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .runs-on .day-off {
+            color: #94a3b8;
+            border: 1px solid #e2e8f0;
+            border-radius: 3px;
+            padding: 1px 5px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .view-route {
+            color: #2563eb;
+            font-size: 13px;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .view-route:hover {
+            text-decoration: underline;
+            color: #1d4ed8;
+        }
+
+        .time-block .time-val {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .time-block .station-val {
+            font-size: 13px;
+            font-weight: 700;
+            color: #1a4fa3;
+        }
+
+        .time-block .date-val {
+            font-size: 12px;
+            color: #64748b;
+        }
+
+        .time-block.arrival {
+            text-align: right;
+        }
+
+        .duration-block {
+            text-align: center;
+            font-size: 13px;
+            font-weight: 600;
+            color: #64748b;
+        }
+
+        .class-box:hover {
+            border-color: #fb792b;
+            background: #fffaf5;
+        }
+
+        .class-box.active {
+            border-color: #ea580c;
+            background: #fff7ed;
+            box-shadow: 0 0 0 1px #ea580c;
+        }
+
+        .class-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .class-refresh {
+            font-size: 11px;
+            color: #64748b;
+            margin-top: 3px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* Train Card Footer - Perfectly Aligned Actions */
+        .train-card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid #f1f5f9;
+            padding-top: 10px;
+            margin-top: 12px;
+            width: 100%;
+        }
+
+        .train-card-footer-left .ntes-notice {
+            font-size: 11.5px;
+            color: #64748b;
+            font-style: italic;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .train-card-footer-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .footer-btn {
+            font-size: 12px;
+            font-weight: 600;
+            padding: 5px 14px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            text-decoration: none;
+            line-height: 1;
+        }
+
+        .other-dates-btn {
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            color: #334155;
+            font-weight: 700;
+            border-radius: 4px;
+        }
+
+        .other-dates-btn:hover {
+            background: #eff6ff;
+            border-color: #2563eb;
+            color: #1d4ed8;
+        }
+
+        .route-map-btn {
+            background: #ffffff;
+            border: 1px solid #2563eb;
+            color: #2563eb;
+        }
+
+        .route-map-btn:hover {
+            background: #eff6ff;
+            border-color: #1d4ed8;
+            color: #1d4ed8;
+            text-decoration: none;
+        }
+
+        .live-status-pill {
+            background: #fff5f5;
+            border: 1px solid #fca5a5;
+            color: #dc2626;
+        }
+
+        .live-status-pill:hover {
+            background: #fee2e2;
+            border-color: #ef4444;
+            color: #b91c1c;
+            text-decoration: none;
+        }
+
+        .live-dot-pulse {
+            width: 7px;
+            height: 7px;
+            background: #dc2626;
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
+            animation: liveDotBlink 1.5s infinite;
+        }
+
+        @@keyframes liveDotBlink {
+            0% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
+            }
+            70% {
+                transform: scale(1.1);
+                box-shadow: 0 0 0 6px rgba(220, 38, 38, 0);
+            }
+            100% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
+            }
+        }
+
+        /* Reset legacy absolute positioning styles if any leak from site.css */
+        .map-btn, .live-status-container {
+            position: static !important;
+            bottom: auto !important;
+            right: auto !important;
+        }
+
+        /* 📱 --------------------------------------------------------- */
+        /* MOBILE OVERHAUL (MATCHING OFFICIAL IRCTC MEDIA SCREEN BENCHMARK) */
+        /* ------------------------------------------------------------- */
+        @@media (max-width: 991px) {
+            .results-container {
+                width: 100% !important;
+                max-width: 100% !important;
+                padding: 8px 10px 40px !important;
+                margin: 0 !important;
+                background: transparent !important;
+            }
+
+            .sticky-top-block {
+                margin-bottom: 8px !important;
+            }
+
+            /* Sleek 44px Single-Line Compact Modify Search Bar */
+            .mobile-search-compact-bar {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: space-between !important;
+                background: #1a3b68 !important;
+                color: #ffffff !important;
+                padding: 10px 14px !important;
+                border-radius: 8px !important;
+                cursor: pointer !important;
+                user-select: none !important;
+                box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12) !important;
+                margin-bottom: 8px !important;
+            }
+
+            .mobile-summary-left {
+                display: flex !important;
+                align-items: center !important;
+                gap: 12px !important;
+                min-width: 0 !important;
+                flex: 1 !important;
+            }
+
+            .mobile-back-btn {
+                color: #ffffff !important;
+                font-size: 18px !important;
+                line-height: 1 !important;
+                display: flex !important;
+                align-items: center !important;
+                text-decoration: none !important;
+                padding: 4px !important;
+            }
+
+            .mobile-back-btn:hover {
+                color: #93c5fd !important;
+            }
+
+            .mobile-summary-text-group {
+                display: flex !important;
+                align-items: center !important;
+                gap: 6px !important;
+                white-space: nowrap !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+                font-size: 13.5px !important;
+                font-weight: 700 !important;
+                letter-spacing: 0.2px !important;
+            }
+
+            .mobile-summary-text-group .summary-stns {
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+            }
+
+            .mobile-summary-text-group .summary-date {
+                color: #bfdbfe !important;
+                font-weight: 600 !important;
+                font-size: 12px !important;
+                flex-shrink: 0 !important;
+            }
+
+            .mobile-edit-pencil-btn {
+                background: rgba(255, 255, 255, 0.18) !important;
+                border: 1px solid rgba(255, 255, 255, 0.3) !important;
+                color: #ffffff !important;
+                width: 32px !important;
+                height: 32px !important;
+                border-radius: 50% !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                font-size: 13px !important;
+                cursor: pointer !important;
+                flex-shrink: 0 !important;
+                transition: all 0.2s ease !important;
+            }
+
+            /* Collapsible Modify Search Form */
+            .route-search-bar {
+                display: none !important;
+                background: #ffffff !important;
+                border: 1px solid #cbd5e1 !important;
+                border-radius: 10px !important;
+                padding: 14px !important;
+                box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08) !important;
+                margin-bottom: 10px !important;
+            }
+
+            .sticky-top-block.mobile-modify-open .route-search-bar {
+                display: block !important;
+                animation: slideDownModify 0.22s ease-out !important;
+            }
+
+            @@keyframes slideDownModify {
+                from { opacity: 0; transform: translateY(-6px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+
+            .modify-search-fields {
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 10px !important;
+                width: 100% !important;
+            }
+
+            .modify-search-fields .station-box1,
+            .modify-search-fields .station-box2,
+            .modify-search-fields input[type="date"],
+            .modify-search-fields .quota-wrapper,
+            .modify-search-fields .modify-btn {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+
+            .modify-search-fields #swapStationsNew {
+                align-self: center !important;
+                transform: rotate(90deg) !important;
+                padding: 4px 10px !important;
+                font-size: 18px !important;
+                margin: -4px 0 !important;
+                color: #1a4fa3 !important;
+                cursor: pointer !important;
+            }
+
+            /* Mobile Action Bar: Sort By & Filter */
+            .mobile-action-bar {
+                display: flex !important;
+                justify-content: space-between !important;
+                align-items: center !important;
+                background: #ffffff !important;
+                border: 1px solid #e2e8f0 !important;
+                border-radius: 8px !important;
+                padding: 8px 12px !important;
+                margin-bottom: 10px !important;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+                position: relative !important;
+            }
+
+            .mobile-action-left {
+                display: flex !important;
+                align-items: center !important;
+                gap: 8px !important;
+            }
+
+            .mobile-sort-btn {
+                background: #1a3b68 !important;
+                color: #ffffff !important;
+                border: none !important;
+                padding: 6px 14px !important;
+                border-radius: 4px !important;
+                font-size: 13px !important;
+                font-weight: 700 !important;
+                cursor: pointer !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                gap: 4px !important;
+            }
+
+            .mobile-day-nav {
+                display: inline-flex !important;
+                align-items: center !important;
+                gap: 3px !important;
+                background: #f8fafc !important;
+                border: 1px solid #cbd5e1 !important;
+                border-radius: 6px !important;
+                padding: 2px 6px !important;
+            }
+
+            .mobile-day-btn {
+                background: none !important;
+                border: none !important;
+                color: #475569 !important;
+                font-size: 12px !important;
+                padding: 2px 4px !important;
+                cursor: pointer !important;
+                display: flex !important;
+                align-items: center !important;
+            }
+
+            .mobile-day-text {
+                font-size: 11.5px !important;
+                font-weight: 700 !important;
+                color: #1e293b !important;
+                padding: 0 4px !important;
+            }
+
+            .mobile-action-right {
+                display: flex !important;
+                align-items: center !important;
+                gap: 8px !important;
+            }
+
+            .mobile-filter-funnel-btn {
+                background: #ffffff !important;
+                border: 1px solid #cbd5e1 !important;
+                color: #1e293b !important;
+                width: 36px !important;
+                height: 36px !important;
+                border-radius: 6px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                font-size: 16px !important;
+                cursor: pointer !important;
+            }
+
+            .mobile-sort-dropdown {
+                position: absolute !important;
+                top: 100% !important;
+                left: 12px !important;
+                margin-top: 4px !important;
+                background: #ffffff !important;
+                border: 1px solid #cbd5e1 !important;
+                border-radius: 8px !important;
+                box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15) !important;
+                z-index: 10010 !important;
+                min-width: 220px !important;
+                overflow: hidden !important;
+            }
+
+            .mobile-sort-item {
+                padding: 10px 14px !important;
+                font-size: 13px !important;
+                font-weight: 600 !important;
+                color: #334155 !important;
+                border-bottom: 1px solid #f1f5f9 !important;
+                cursor: pointer !important;
+            }
+
+            .mobile-sort-item:last-child {
+                border-bottom: none !important;
+            }
+
+            .mobile-sort-item:hover, .mobile-sort-item.active {
+                background: #eff6ff !important;
+                color: #1d4ed8 !important;
+            }
+
+            /* Hide Desktop Headers on Mobile */
+            .results-header-row,
+            .sort-bar {
+                display: none !important;
+            }
+
+            /* Results Main Layout & Column Full Width Fix */
+            .results-main-layout {
+                display: block !important;
+                width: 100% !important;
+                margin: 0 !important;
+            }
+
+            .train-results-column {
+                width: 100% !important;
+                max-width: 100% !important;
+                flex: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+
+            /* Off-Canvas Refine Sidebar Drawer */
+            .refine-sidebar {
+                position: fixed !important;
+                top: 0 !important;
+                left: -360px !important;
+                width: min(340px, 88vw) !important;
+                height: 100vh !important;
+                background: #ffffff !important;
+                z-index: 10006 !important;
+                overflow-y: auto !important;
+                padding: 16px !important;
+                box-shadow: 15px 0 40px rgba(0, 0, 0, 0.25) !important;
+                transition: left 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important;
+                margin-bottom: 0 !important;
+            }
+
+            .refine-sidebar.mobile-drawer-open {
+                left: 0 !important;
+            }
+
+            .mobile-filter-backdrop {
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100vw !important;
+                height: 100vh !important;
+                background: rgba(0, 0, 0, 0.5) !important;
+                z-index: 10005 !important;
+                opacity: 0 !important;
+                pointer-events: none !important;
+                transition: opacity 0.3s ease !important;
+            }
+
+            .mobile-filter-backdrop.show {
+                opacity: 1 !important;
+                pointer-events: auto !important;
+            }
+
+            /* 🚄 Official IRCTC Mobile Train Cards */
+            .train-card {
+                padding: 0 0 12px 0 !important;
+                border-radius: 8px !important;
+                border: 1px solid #e2e8f0 !important;
+                border-left-width: 4px !important;
+                border-left-style: solid !important;
+                border-left-color: #000000 !important;
+                overflow: hidden !important;
+                margin-bottom: 14px !important;
+                width: 100% !important;
+                box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05) !important;
+                background: #ffffff !important;
+            }
+
+            .train-card.train-rajdhani { border-left-color: #bf0000 !important; }
+            .train-card.train-vande-bharat { border-left-color: #1976d2 !important; }
+            .train-card.train-shatabdi { border-left-color: #1976d2 !important; }
+            .train-card.train-amrit-bharat { border-left-color: #e03e00 !important; }
+            .train-card.train-garib-rath { border-left-color: #27F5A6 !important; }
+            .train-card.train-duronto { border-left-color: #F5C527 !important; }
+            .train-card.train-special, .train-card.spl-train { border-left-color: #A9F527 !important; }
+            .train-card.train-normal, .train-card.normal-train { border-left-color: #000000 !important; }
+
+            .train-card-header {
+                background: #f8fafc !important;
+                padding: 10px 14px !important;
+                border-bottom: 1px solid #e2e8f0 !important;
+                display: flex !important;
+                justify-content: space-between !important;
+                align-items: center !important;
+            }
+
+            .train-title-block .train-name-text {
+                font-size: 14.5px !important;
+                font-weight: 700 !important;
+                color: #0f172a !important;
+            }
+
+            .desktop-runs-on {
+                display: none !important;
+            }
+
+            .route-pin-icon {
+                font-size: 22px !important;
+                color: #1a73e8 !important;
+                display: inline-block !important;
+            }
+
+            .view-route .route-text {
+                display: none !important;
+            }
+
+            .train-card-body {
+                display: grid !important;
+                grid-template-columns: minmax(75px, 1fr) auto minmax(75px, 1fr) !important;
+                align-items: start !important;
+                padding: 12px 14px 6px 14px !important;
+                background: transparent !important;
+                margin: 0 !important;
+                border: none !important;
+                gap: 6px !important;
+            }
+
+            .time-block .time-val {
+                font-size: 20px !important;
+                font-weight: 800 !important;
+                color: #0f172a !important;
+                line-height: 1.1 !important;
+            }
+
+            .time-block .station-val {
+                font-size: 12.5px !important;
+                font-weight: 700 !important;
+                color: #334155 !important;
+                margin-top: 3px !important;
+                display: flex !important;
+                align-items: center !important;
+                gap: 3px !important;
+                word-break: break-word !important;
+            }
+
+            .time-block .date-val {
+                font-size: 11.5px !important;
+                color: #64748b !important;
+                margin-top: 2px !important;
+            }
+
+            .time-block.arrival {
+                text-align: right !important;
+            }
+
+            .time-block.arrival .station-val {
+                justify-content: flex-end !important;
+            }
+
+            .duration-block {
+                text-align: center !important;
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                gap: 3px !important;
+                padding: 0 4px !important;
+                min-width: 95px !important;
+            }
+
+            .duration-pill {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                gap: 6px !important;
+                font-size: 12.5px !important;
+                font-weight: 700 !important;
+                color: #334155 !important;
+            }
+
+            .dur-dash {
+                display: inline-block !important;
+                width: 16px !important;
+                height: 1.5px !important;
+                background: #94a3b8 !important;
+            }
+
+            /* Plain text runs-on days matching official IRCTC mobile (media_1789705892441.jpg) */
+            .mobile-runs-on {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                gap: 4px !important;
+                font-size: 11px !important;
+                font-weight: 700 !important;
+                margin-top: 3px !important;
+            }
+
+            .mobile-runs-on span {
+                background: transparent !important;
+                background-color: transparent !important;
+                border: none !important;
+                padding: 0 1px !important;
+                border-radius: 0 !important;
+                box-shadow: none !important;
+                display: inline-block !important;
+                font-size: 11px !important;
+                line-height: 1 !important;
+            }
+
+            .mobile-runs-on .day-active {
+                color: #0f172a !important;
+                font-weight: 800 !important;
+            }
+
+            .mobile-runs-on .day-off {
+                color: #cbd5e1 !important;
+                font-weight: 500 !important;
+            }
+
+            /* Horizontally Swipeable Class Availability Cards (Matching media_1789705892441.jpg) */
+            .class-compact {
+                display: flex !important;
+                flex-direction: row !important;
+                flex-wrap: nowrap !important;
+                overflow-x: auto !important;
+                -webkit-overflow-scrolling: touch !important;
+                gap: 8px !important;
+                padding: 2px 14px 8px 14px !important;
+                margin: 4px 0 12px !important;
+                width: 100% !important;
+                box-sizing: border-box !important;
+                scrollbar-width: none !important;
+            }
+
+            .class-compact::-webkit-scrollbar {
+                display: none !important;
+            }
+
+            .class-box {
+                flex: 0 0 140px !important;
+                min-width: 140px !important;
+                max-width: 140px !important;
+                background: #f8fafc !important;
+                border: 1px solid #cbd5e1 !important;
+                border-radius: 8px !important;
+                padding: 8px 12px !important;
+                box-sizing: border-box !important;
+                cursor: pointer !important;
+                transition: all 0.15s ease !important;
+            }
+
+            .class-box.active {
+                border-color: #ea580c !important;
+                background: #fff7ed !important;
+                box-shadow: 0 0 0 1.5px #ea580c !important;
+            }
+
+            .class-title {
+                font-size: 12.5px !important;
+                font-weight: 700 !important;
+                color: #1e293b !important;
+                white-space: nowrap !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+            }
+
+            .class-refresh {
+                font-size: 11px !important;
+                color: #64748b !important;
+                margin-top: 3px !important;
+                display: flex !important;
+                align-items: center !important;
+                gap: 4px !important;
+            }
+
+            .refresh-icon {
+                font-size: 12px !important;
+            }
+
+            /* Availability Panel & Status Message Cards (Separated with breathing room, "Set it down") */
+            .availability-panel {
+                padding: 0 14px !important;
+                margin-top: 14px !important;
+                margin-bottom: 12px !important;
+                width: 100% !important;
+                box-sizing: border-box !important;
+            }
+
+            .availability-panel .train-card-classes {
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+
+            .availability-panel .class-panels {
+                margin-top: 0 !important;
+            }
+
+            .availability-panel .departed-box {
+                margin-top: 14px !important;
+                margin-bottom: 10px !important;
+                border-radius: 8px !important;
+                padding: 12px 14px !important;
+            }
+
+            .availability-panel .class-card.active {
+                margin-top: 14px !important;
+                margin-bottom: 10px !important;
+                border-radius: 8px !important;
+                padding: 12px 14px !important;
+                display: block !important;
+                width: auto !important;
+                max-width: 280px !important;
+            }
+
+            /* Notice & Footer Buttons */
+            .train-card-footer {
+                flex-direction: column !important;
+                align-items: stretch !important;
+                gap: 8px !important;
+                padding: 8px 14px 0 !important;
+                margin-top: 6px !important;
+                border-top: 1px solid #f1f5f9 !important;
+            }
+
+            .train-card-footer-left .ntes-notice {
+                font-size: 11px !important;
+                color: #475569 !important;
+                line-height: 1.3 !important;
+                font-style: normal !important;
+            }
+
+            .train-card-footer-right {
+                display: flex !important;
+                align-items: center !important;
+                gap: 8px !important;
+                flex-wrap: wrap !important;
+                width: 100% !important;
+            }
+
+            .footer-btn {
+                font-size: 12px !important;
+                font-weight: 700 !important;
+                padding: 6px 14px !important;
+                border-radius: 4px !important;
+                cursor: pointer !important;
+            }
+
+            /* Mobile Centered Fare Breakup Dialog (Eliminates vertical stretching/clipping) */
+            .fare-modal {
+                position: fixed !important;
+                inset: 0 !important;
+                top: 0 !important;
+                left: 0 !important;
+                right: 0 !important;
+                bottom: 0 !important;
+                width: 100vw !important;
+                height: 100vh !important;
+                transform: none !important;
+                background: rgba(0, 0, 0, 0.6) !important;
+                backdrop-filter: blur(4px) !important;
+                -webkit-backdrop-filter: blur(4px) !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                z-index: 100050 !important;
+                border: none !important;
+                border-radius: 0 !important;
+                box-shadow: none !important;
+                padding: 16px !important;
+                box-sizing: border-box !important;
+                opacity: 0 !important;
+                pointer-events: none !important;
+                transition: opacity 0.25s ease !important;
+            }
+
+            .fare-modal.show {
+                opacity: 1 !important;
+                pointer-events: auto !important;
+            }
+
+            .fare-modal::before {
+                display: none !important;
+            }
+
+            .fare-modal-body {
+                background: #ffffff !important;
+                width: 100% !important;
+                max-width: 320px !important;
+                border-radius: 16px !important;
+                padding: 20px !important;
+                box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3) !important;
+                border: 1px solid #e2e8f0 !important;
+            }
         }
 
     </style>

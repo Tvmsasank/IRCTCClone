@@ -308,6 +308,22 @@ namespace IrctcClone.Controllers
         {
             // ✅ 1. Load the Train using the ID
             Train train = GetTrainById(id, trainType);   // we will write this function below
+            if (train != null && string.IsNullOrEmpty(train.CoachPositions))
+            {
+                using (var conn = new SqlConnection(_connectionString))
+                {
+                    conn.Open();
+                    using (var cpCmd = new SqlCommand("SELECT CoachPositions FROM Trains WHERE Id = @TrainId", conn))
+                    {
+                        cpCmd.Parameters.AddWithValue("@TrainId", id);
+                        var cpObj = cpCmd.ExecuteScalar();
+                        if (cpObj != null && cpObj != DBNull.Value)
+                        {
+                            train.CoachPositions = cpObj.ToString();
+                        }
+                    }
+                }
+            }
             ViewBag.Train = train;
             ViewBag.TrainId = id;
 
@@ -377,10 +393,6 @@ namespace IrctcClone.Controllers
                 }
             }
 
-            ViewBag.SkipDates = string.Join(",", skipDates);
-
-            ViewBag.CancelDates = string.Join(",", cancelDates);
-
             var tempRoutes = new List<dynamic>();
 
             using (var conn = new SqlConnection(_connectionString))
@@ -407,6 +419,23 @@ namespace IrctcClone.Controllers
                     }
                 }
             }
+
+            foreach (var temp in tempRoutes)
+            {
+                DateTime fDate = temp.FromDate;
+                DateTime tDate = temp.ToDate;
+                for (var d = fDate.Date; d <= tDate.Date; d = d.AddDays(1))
+                {
+                    string dateStr = d.ToString("yyyy-MM-dd");
+                    if (!skipDates.Contains(dateStr))
+                    {
+                        skipDates.Add(dateStr);
+                    }
+                }
+            }
+
+            ViewBag.SkipDates = string.Join(", ", skipDates.Where(d => !string.IsNullOrWhiteSpace(d)).Distinct());
+            ViewBag.CancelDates = string.Join(", ", cancelDates.Where(d => !string.IsNullOrWhiteSpace(d)).Distinct());
 
             ViewBag.Stations = stations;
 
@@ -453,8 +482,285 @@ namespace IrctcClone.Controllers
 
             ViewBag.IsCancelled = isCancelled;
 
+            // ✅ Load Temporary Stops for this train
+            var temporaryStops = new List<TrainTemporaryStop>();
+            try
+            {
+                using (var conn = new SqlConnection(_connectionString))
+                {
+                    conn.Open();
+                    EnsureTemporaryStopsSchema(conn);
+                    using (var cmd = new SqlCommand("spGetTemporaryStopsByTrainId", conn))
+                    {
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.AddWithValue("@TrainId", id);
+                        using (var reader = cmd.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                int dist = 0;
+                                try
+                                {
+                                    int distOrd = reader.GetOrdinal("Distance");
+                                    if (distOrd >= 0 && !reader.IsDBNull(distOrd))
+                                    {
+                                        dist = Convert.ToInt32(reader.GetValue(distOrd));
+                                    }
+                                }
+                                catch { }
+
+                                int stopNum = 0;
+                                try
+                                {
+                                    int stopOrd = reader.GetOrdinal("StopNumber");
+                                    if (stopOrd >= 0 && !reader.IsDBNull(stopOrd))
+                                    {
+                                        stopNum = Convert.ToInt32(reader.GetValue(stopOrd));
+                                    }
+                                }
+                                catch { }
+
+                                int afterId = 0;
+                                try
+                                {
+                                    int afterOrd = reader.GetOrdinal("AfterStationId");
+                                    if (afterOrd >= 0 && !reader.IsDBNull(afterOrd))
+                                    {
+                                        afterId = Convert.ToInt32(reader.GetValue(afterOrd));
+                                    }
+                                }
+                                catch { }
+
+                                temporaryStops.Add(new TrainTemporaryStop
+                                {
+                                    Id = Convert.ToInt32(reader["Id"]),
+                                    TrainId = Convert.ToInt32(reader["TrainId"]),
+                                    StationId = Convert.ToInt32(reader["StationId"]),
+                                    StationName = reader["StationName"].ToString(),
+                                    StationCode = reader["StationCode"].ToString(),
+                                    ArrivalTime = reader["ArrivalTime"] == DBNull.Value ? null : (TimeSpan?)reader["ArrivalTime"],
+                                    DepartureTime = reader["DepartureTime"] == DBNull.Value ? null : (TimeSpan?)reader["DepartureTime"],
+                                    RouteDay = Convert.ToInt32(reader["RouteDay"]),
+                                    Distance = dist,
+                                    StopNumber = stopNum,
+                                    AfterStationId = afterId,
+                                    FromDate = Convert.ToDateTime(reader["FromDate"]),
+                                    ToDate = Convert.ToDateTime(reader["ToDate"]),
+                                    Reason = reader["Reason"]?.ToString() ?? "Festival Season"
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception) { }
+
+            var allTempDates = new List<string>();
+            var tempStationIds = new HashSet<int>();
+            foreach (var ts in temporaryStops)
+            {
+                tempStationIds.Add(ts.StationId);
+                for (var d = ts.FromDate.Date; d <= ts.ToDate.Date; d = d.AddDays(1))
+                {
+                    allTempDates.Add(d.ToString("yyyy-MM-dd"));
+                }
+            }
+
+            ViewBag.TempDates = string.Join(", ", allTempDates.Where(d => !string.IsNullOrWhiteSpace(d)).Distinct());
+            ViewBag.TemporaryStops = temporaryStops;
+
+            foreach (var route in routes)
+            {
+                if (tempStationIds.Contains(route.StationId))
+                {
+                    route.IsTemporary = true;
+                    var matchingTs = temporaryStops.FirstOrDefault(t => t.StationId == route.StationId);
+                    if (matchingTs != null)
+                    {
+                        if (matchingTs.Distance > 0 && route.Distance == 0)
+                            route.Distance = matchingTs.Distance;
+                        if (matchingTs.StopNumber > 0)
+                            route.StopNumber = matchingTs.StopNumber;
+                    }
+                }
+            }
+
+            // Insert temporary stoppage station immediately after its preceding station (AfterStationId)
+            foreach (var ts in temporaryStops)
+            {
+                if (!routes.Any(r => r.StationId == ts.StationId))
+                {
+                    var tempRoute = new TrainRoute
+                    {
+                        TrainId = id,
+                        StationId = ts.StationId,
+                        ArrivalTime = ts.ArrivalTime,
+                        DepartureTime = ts.DepartureTime,
+                        Distance = ts.Distance,
+                        Day = ts.RouteDay,
+                        StopNumber = ts.StopNumber > 0 ? ts.StopNumber : 0,
+                        IsTemporary = true,
+                        Station = new Station { Id = ts.StationId, Name = ts.StationName, Code = ts.StationCode }
+                    };
+
+                    int insertIndex = -1;
+                    if (ts.AfterStationId > 0)
+                    {
+                        insertIndex = routes.FindIndex(r => r.StationId == ts.AfterStationId);
+                    }
+
+                    if (insertIndex >= 0)
+                    {
+                        routes.Insert(insertIndex + 1, tempRoute);
+                    }
+                    else if (ts.StopNumber > 0 && ts.StopNumber <= routes.Count)
+                    {
+                        routes.Insert(ts.StopNumber - 1, tempRoute);
+                    }
+                    else
+                    {
+                        routes.Add(tempRoute);
+                    }
+                }
+            }
+
+            // 🔥 RENUMBER STRICTLY SEQUENTIALLY: 1, 2, 3...
+            for (int i = 0; i < routes.Count; i++)
+            {
+                routes[i].StopNumber = i + 1;
+            }
+
             // ✅ 4. Return view with routes list
             return View("AddRoute", routes);
+        }
+
+        private void EnsureTemporaryStopsSchema(SqlConnection conn)
+        {
+            try
+            {
+                string schemaSql = @"
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TrainTemporaryStops')
+                BEGIN
+                    CREATE TABLE TrainTemporaryStops (
+                        Id INT IDENTITY(1,1) PRIMARY KEY,
+                        TrainId INT NOT NULL,
+                        StationId INT NOT NULL,
+                        ArrivalTime TIME NULL,
+                        DepartureTime TIME NULL,
+                        RouteDay INT NOT NULL DEFAULT 1,
+                        Distance INT NOT NULL DEFAULT 0,
+                        StopNumber INT NOT NULL DEFAULT 0,
+                        AfterStationId INT NOT NULL DEFAULT 0,
+                        FromDate DATE NOT NULL,
+                        ToDate DATE NOT NULL,
+                        Reason NVARCHAR(250) NULL DEFAULT 'Festival Season',
+                        CreatedAt DATETIME NOT NULL DEFAULT GETDATE()
+                    );
+                    CREATE INDEX IX_TTS_TrainId_Dates ON TrainTemporaryStops(TrainId, FromDate, ToDate);
+                END
+                ELSE
+                BEGIN
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('TrainTemporaryStops') AND name = 'Distance')
+                    BEGIN
+                        ALTER TABLE TrainTemporaryStops ADD Distance INT NOT NULL DEFAULT 0;
+                    END
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('TrainTemporaryStops') AND name = 'StopNumber')
+                    BEGIN
+                        ALTER TABLE TrainTemporaryStops ADD StopNumber INT NOT NULL DEFAULT 0;
+                    END
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('TrainTemporaryStops') AND name = 'AfterStationId')
+                    BEGIN
+                        ALTER TABLE TrainTemporaryStops ADD AfterStationId INT NOT NULL DEFAULT 0;
+                    END
+                END";
+
+                using (var cmd = new SqlCommand(schemaSql, conn))
+                {
+                    cmd.ExecuteNonQuery();
+                }
+
+                // One-time update for existing Hitech City stops inserted after Lingampalli (StationId 2)
+                try
+                {
+                    using (var migCmd = new SqlCommand("UPDATE TrainTemporaryStops SET AfterStationId = 2 WHERE StationId = 4 AND (AfterStationId IS NULL OR AfterStationId = 0)", conn))
+                    {
+                        migCmd.ExecuteNonQuery();
+                    }
+                }
+                catch { }
+
+                string procsSql = @"
+                CREATE OR ALTER PROCEDURE spGetTemporaryStopsByTrainId
+                    @TrainId INT
+                AS
+                BEGIN
+                    SET NOCOUNT ON;
+                    SELECT 
+                        ts.Id,
+                        ts.TrainId,
+                        ts.StationId,
+                        s.Name AS StationName,
+                        s.Code AS StationCode,
+                        ts.ArrivalTime,
+                        ts.DepartureTime,
+                        ts.RouteDay,
+                        ts.Distance,
+                        ts.StopNumber,
+                        ts.AfterStationId,
+                        ts.FromDate,
+                        ts.ToDate,
+                        ts.Reason
+                    FROM TrainTemporaryStops ts
+                    INNER JOIN Stations s ON ts.StationId = s.Id
+                    WHERE ts.TrainId = @TrainId
+                    ORDER BY ts.StopNumber, ts.RouteDay, ts.ArrivalTime;
+                END";
+
+                using (var cmd = new SqlCommand(procsSql, conn))
+                {
+                    cmd.ExecuteNonQuery();
+                }
+
+                string insProcSql = @"
+                CREATE OR ALTER PROCEDURE spInsertTemporaryStop
+                    @TrainId INT,
+                    @StationId INT,
+                    @ArrivalTime TIME = NULL,
+                    @DepartureTime TIME = NULL,
+                    @RouteDay INT = 1,
+                    @Distance INT = 0,
+                    @StopNumber INT = 0,
+                    @AfterStationId INT = 0,
+                    @FromDate DATE,
+                    @ToDate DATE,
+                    @Reason NVARCHAR(250) = 'Festival Season'
+                AS
+                BEGIN
+                    SET NOCOUNT ON;
+                    INSERT INTO TrainTemporaryStops (TrainId, StationId, ArrivalTime, DepartureTime, RouteDay, Distance, StopNumber, AfterStationId, FromDate, ToDate, Reason)
+                    VALUES (@TrainId, @StationId, @ArrivalTime, @DepartureTime, @RouteDay, @Distance, @StopNumber, @AfterStationId, @FromDate, @ToDate, @Reason);
+                END";
+
+                using (var cmd = new SqlCommand(insProcSql, conn))
+                {
+                    cmd.ExecuteNonQuery();
+                }
+
+                string delProcSql = @"
+                CREATE OR ALTER PROCEDURE spDeleteTemporaryStopsByTrainId
+                    @TrainId INT
+                AS
+                BEGIN
+                    SET NOCOUNT ON;
+                    DELETE FROM TrainTemporaryStops WHERE TrainId = @TrainId;
+                END";
+
+                using (var cmd = new SqlCommand(delProcSql, conn))
+                {
+                    cmd.ExecuteNonQuery();
+                }
+            }
+            catch { }
         }
 
         private Train GetTrainById(int trainId, string trainType)
@@ -534,7 +840,7 @@ namespace IrctcClone.Controllers
 
         // ✅ POST: Add Route
         [HttpPost]
-        public IActionResult AddRoute(int trainId, List<TrainRoute> routes, string deletedIds)
+        public IActionResult AddRoute(int trainId, List<TrainRoute> routes, string deletedIds, List<TrainTemporaryStop>? tempStops = null)
         {
             bool cancelTrain = Request.Form["cancelTrain"] == "on";
             string skipDates = Request.Form["skipDates"];
@@ -555,18 +861,18 @@ namespace IrctcClone.Controllers
             if (!string.IsNullOrEmpty(skipDates))
             {
                 skipDateList = skipDates
-                    .Split(',')
-                    .Where(d => !string.IsNullOrWhiteSpace(d))
+                    .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
                     .Select(d => DateTime.Parse(d.Trim()))
+                    .Distinct()
                     .ToList();
             }
 
             if (!string.IsNullOrEmpty(cancelDates))
             {
                 cancelDateList = cancelDates
-                    .Split(',')
-                    .Where(d => !string.IsNullOrWhiteSpace(d))
+                    .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
                     .Select(d => DateTime.Parse(d.Trim()))
+                    .Distinct()
                     .ToList();
             }
 
@@ -574,24 +880,11 @@ namespace IrctcClone.Controllers
             {
                 conn.Open();
 
-                // 1) delete base-routes rows if needed (exsiting)
-                if (!string.IsNullOrEmpty(deletedIds))
-                {
-                    using (var cmd = new SqlCommand("spDeleteTrainRoute", conn))
-                    {
-                        cmd.CommandType = CommandType.StoredProcedure;
-                        cmd.Parameters.AddWithValue("@Ids", deletedIds);
-                        cmd.ExecuteNonQuery();
-                    }
-                }
-
-                // 2) save base route (existing)
+                // 1) Fetch current routes from DB using stored procedure to detect any deleted or excess stops
                 using (var cmd = new SqlCommand("spGetTrainTypeById", conn))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
-
                     cmd.Parameters.AddWithValue("@Id", trainId);
-
                     var result = cmd.ExecuteScalar();
                     if (result != null)
                         trainType = result.ToString();
@@ -599,24 +892,79 @@ namespace IrctcClone.Controllers
 
                 bool isMemuDemu = trainType == "MEMU" || trainType == "DEMU" || trainType == "MMTS";
 
-                foreach (var route in routes)
+                var baseRoutes = routes.Where(r => !r.IsTemporary).ToList();
+
+                // Check existing DB routes for this train
+                var currentDbRoutes = GetTrainRoutes(trainId, trainType);
+                var submittedIds = baseRoutes.Where(r => r.Id > 0).Select(r => r.Id).ToHashSet();
+
+                var idsToDelete = new List<string>();
+
+                // Any existing DB stops that were removed by the admin
+                foreach (var dbRoute in currentDbRoutes)
+                {
+                    if (!submittedIds.Contains(dbRoute.Id) || dbRoute.StopNumber > baseRoutes.Count)
+                    {
+                        idsToDelete.Add(dbRoute.Id.ToString());
+                    }
+                }
+
+                // Explicit deletedIds from client-side
+                if (!string.IsNullOrWhiteSpace(deletedIds))
+                {
+                    var idList = deletedIds.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                                           .Select(s => s.Trim())
+                                           .Where(s => int.TryParse(s, out _));
+                    idsToDelete.AddRange(idList);
+                }
+
+                idsToDelete = idsToDelete.Distinct().ToList();
+
+                if (idsToDelete.Any())
+                {
+                    using (var delCmd = new SqlCommand("spDeleteTrainRoute", conn))
+                    {
+                        delCmd.CommandType = CommandType.StoredProcedure;
+                        delCmd.Parameters.AddWithValue("@Ids", string.Join(",", idsToDelete));
+                        delCmd.ExecuteNonQuery();
+                    }
+                }
+
+                // 2) Save / Upsert base routes using user's stored procedure
+                int baseStopNumber = 1;
+                foreach (var route in baseRoutes)
                 {
                     using (var cmd = new SqlCommand(isMemuDemu ? "spInsertMemuDemuRoute" : "spInsertTrainRoute", conn))
                     {
                         cmd.CommandType = CommandType.StoredProcedure;
                         cmd.Parameters.AddWithValue("@TrainId", trainId);
                         cmd.Parameters.AddWithValue("@StationId", route.StationId);
-                        cmd.Parameters.AddWithValue("@StopNumber", route.StopNumber);
+                        cmd.Parameters.AddWithValue("@StopNumber", baseStopNumber++);
                         cmd.Parameters.AddWithValue("@ArrivalTime", (object?)route.ArrivalTime ?? DBNull.Value);
                         cmd.Parameters.AddWithValue("@DepartureTime", (object?)route.DepartureTime ?? DBNull.Value);
                         cmd.Parameters.AddWithValue("@DistanceFromSource", (object?)route.Distance ?? DBNull.Value);
-                        cmd.Parameters.AddWithValue("@Day", route.Day);
-
+                        cmd.Parameters.AddWithValue("@Day", route.Day > 0 ? route.Day : 1);
                         cmd.ExecuteNonQuery();
                     }
                 }
 
-                // 3) clear old tempe entries for same range (clean update)
+                // If any excess stops remained in DB (e.g. if the train previously had 17 stops and now has 16),
+                // delete them cleanly using stored procedures
+                var updatedDbRoutes = GetTrainRoutes(trainId, trainType);
+                var excessIds = updatedDbRoutes.Where(r => r.StopNumber > baseRoutes.Count)
+                                               .Select(r => r.Id.ToString())
+                                               .ToList();
+                if (excessIds.Any())
+                {
+                    using (var cleanCmd = new SqlCommand("spDeleteTrainRoute", conn))
+                    {
+                        cleanCmd.CommandType = CommandType.StoredProcedure;
+                        cleanCmd.Parameters.AddWithValue("@Ids", string.Join(",", excessIds));
+                        cleanCmd.ExecuteNonQuery();
+                    }
+                }
+
+                // 3) clear old temp entries for same range (clean update)
                 using (var delTemp = new SqlCommand("spDeleteTrainRouteTemp", conn))
                 {
                     delTemp.CommandType = CommandType.StoredProcedure;
@@ -626,12 +974,35 @@ namespace IrctcClone.Controllers
                     delTemp.ExecuteNonQuery();
                 }
 
-                // 4) INSERT ONLY SKIPPED STATIONS
+                // 4) INSERT ONLY SKIPPED STATIONS (MERGING CONSECUTIVE DATES INTO RANGES)
+                var skipDateRanges = new List<(DateTime From, DateTime To)>();
+                var sortedSkipDates = skipDateList.OrderBy(d => d.Date).Distinct().ToList();
+                if (sortedSkipDates.Any())
+                {
+                    DateTime rangeStart = sortedSkipDates[0];
+                    DateTime rangeEnd = sortedSkipDates[0];
+
+                    for (int i = 1; i < sortedSkipDates.Count; i++)
+                    {
+                        if (sortedSkipDates[i].Date == rangeEnd.AddDays(1).Date)
+                        {
+                            rangeEnd = sortedSkipDates[i];
+                        }
+                        else
+                        {
+                            skipDateRanges.Add((rangeStart, rangeEnd));
+                            rangeStart = sortedSkipDates[i];
+                            rangeEnd = sortedSkipDates[i];
+                        }
+                    }
+                    skipDateRanges.Add((rangeStart, rangeEnd));
+                }
+
                 foreach (var route in routes)
                 {
-                    if (route.IsSkipped && skipDateList.Any())
+                    if (route.IsSkipped && skipDateRanges.Any())
                     {
-                        foreach (var date in skipDateList)
+                        foreach (var range in skipDateRanges)
                         {
                             using (var cmd = new SqlCommand("spInsertTrainRouteTemp", conn))
                             {
@@ -640,8 +1011,8 @@ namespace IrctcClone.Controllers
                                 cmd.Parameters.AddWithValue("@TrainId", trainId);
                                 cmd.Parameters.AddWithValue("@StationId", route.StationId);
 
-                                cmd.Parameters.AddWithValue("@FromDate", date);
-                                cmd.Parameters.AddWithValue("@ToDate", date);
+                                cmd.Parameters.AddWithValue("@FromDate", range.From);
+                                cmd.Parameters.AddWithValue("@ToDate", range.To);
 
                                 // 🔥 THIS IS THE FIX (WITHOUT THIS NOTHING WORKS)
                                 cmd.Parameters.AddWithValue("@RouteDay", route.Day);
@@ -688,6 +1059,103 @@ namespace IrctcClone.Controllers
                         }
                     }
                 }
+
+                // 6️⃣ TEMPORARY STOPPAGES (Save/Update)
+                string tempDates = Request.Form["tempDates"];
+                var tempDateList = new List<DateTime>();
+
+                if (!string.IsNullOrEmpty(tempDates))
+                {
+                    tempDateList = tempDates
+                        .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                        .Where(d => DateTime.TryParse(d.Trim(), out _))
+                        .Select(d => DateTime.Parse(d.Trim()))
+                        .Distinct()
+                        .OrderBy(d => d.Date)
+                        .ToList();
+                }
+
+                var tempDateRanges = new List<(DateTime From, DateTime To)>();
+                if (tempDateList.Any())
+                {
+                    DateTime rStart = tempDateList[0];
+                    DateTime rEnd = tempDateList[0];
+
+                    for (int i = 1; i < tempDateList.Count; i++)
+                    {
+                        if (tempDateList[i].Date == rEnd.AddDays(1).Date)
+                        {
+                            rEnd = tempDateList[i];
+                        }
+                        else
+                        {
+                            tempDateRanges.Add((rStart, rEnd));
+                            rStart = tempDateList[i];
+                            rEnd = tempDateList[i];
+                        }
+                    }
+                    tempDateRanges.Add((rStart, rEnd));
+                }
+
+                // 🔥 FALLBACK FOR TEMPORARY DATES:
+                // If the user added a temporary halt but didn't separately pick dates in tempDates:
+                // 1. Inherit from skipDateRanges (if regular station was skipped for this halt)
+                // 2. Or default to the upcoming 3-month operational window
+                if (!tempDateRanges.Any() && routes.Any(r => r.IsTemporary))
+                {
+                    if (skipDateRanges.Any())
+                    {
+                        tempDateRanges.AddRange(skipDateRanges);
+                    }
+                    else
+                    {
+                        tempDateRanges.Add((DateTime.Today, DateTime.Today.AddMonths(3)));
+                    }
+                }
+
+                try
+                {
+                    EnsureTemporaryStopsSchema(conn);
+
+                    using (var del = new SqlCommand("spDeleteTemporaryStopsByTrainId", conn))
+                    {
+                        del.CommandType = CommandType.StoredProcedure;
+                        del.Parameters.AddWithValue("@TrainId", trainId);
+                        del.ExecuteNonQuery();
+                    }
+
+                    if (tempDateRanges.Any())
+                    {
+                        for (int i = 0; i < routes.Count; i++)
+                        {
+                            var route = routes[i];
+                            if (route.IsTemporary)
+                            {
+                                int afterStationId = (i > 0) ? routes[i - 1].StationId : 0;
+                                foreach (var range in tempDateRanges)
+                                {
+                                    using (var insCmd = new SqlCommand("spInsertTemporaryStop", conn))
+                                    {
+                                        insCmd.CommandType = CommandType.StoredProcedure;
+                                        insCmd.Parameters.AddWithValue("@TrainId", trainId);
+                                        insCmd.Parameters.AddWithValue("@StationId", route.StationId);
+                                        insCmd.Parameters.AddWithValue("@ArrivalTime", (object?)route.ArrivalTime ?? DBNull.Value);
+                                        insCmd.Parameters.AddWithValue("@DepartureTime", (object?)route.DepartureTime ?? DBNull.Value);
+                                        insCmd.Parameters.AddWithValue("@RouteDay", route.Day > 0 ? route.Day : 1);
+                                        insCmd.Parameters.AddWithValue("@Distance", route.Distance);
+                                        insCmd.Parameters.AddWithValue("@StopNumber", route.StopNumber > 0 ? route.StopNumber : (i + 1));
+                                        insCmd.Parameters.AddWithValue("@AfterStationId", afterStationId);
+                                        insCmd.Parameters.AddWithValue("@FromDate", range.From);
+                                        insCmd.Parameters.AddWithValue("@ToDate", range.To);
+                                        insCmd.Parameters.AddWithValue("@Reason", !string.IsNullOrWhiteSpace(route.TemporaryReason) ? route.TemporaryReason : "Festival Season");
+                                        insCmd.ExecuteNonQuery();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception) { }
             }
 
             TempData["SuccessMessage"] = "✅ Train routes updated successfully!";
@@ -696,14 +1164,8 @@ namespace IrctcClone.Controllers
 
 
         [AllowAnonymous]    
-        public IActionResult GetTrainRoute(int trainId, string trainType, DateTime? journeyDate)
+        public IActionResult GetTrainRoute(int trainId, string? trainType = null, DateTime? journeyDate = null, int? trainNumber = null, string? trainName = null, string? fromStation = null, string? toStation = null)
         {
-            bool isTatkal = TatkalHelper.IsTatkalWindow();
-
-            if (isTatkal && !User.Identity.IsAuthenticated)
-            {
-                return Unauthorized();
-            }
 
             var routes = new List<TrainRoute>();
 
@@ -718,6 +1180,31 @@ namespace IrctcClone.Controllers
             using (var conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
+
+                try
+                {
+                    using (var cmdTrain = new SqlCommand("SELECT Number, Name, RunMon, RunTue, RunWed, RunThu, RunFri, RunSat, RunSun FROM Trains WHERE Id = @TrainId", conn))
+                    {
+                        cmdTrain.Parameters.AddWithValue("@TrainId", trainId);
+                        using (var r = cmdTrain.ExecuteReader())
+                        {
+                            if (r.Read())
+                            {
+                                if (trainNumber == null && !r.IsDBNull(0)) trainNumber = r.GetInt32(0);
+                                if (string.IsNullOrEmpty(trainName) && !r.IsDBNull(1)) trainName = r.GetString(1);
+                                char m = (!r.IsDBNull(2) && r.GetInt32(2) == 1) ? 'M' : '-';
+                                char tu = (!r.IsDBNull(3) && r.GetInt32(3) == 1) ? 'T' : '-';
+                                char w = (!r.IsDBNull(4) && r.GetInt32(4) == 1) ? 'W' : '-';
+                                char th = (!r.IsDBNull(5) && r.GetInt32(5) == 1) ? 'T' : '-';
+                                char f = (!r.IsDBNull(6) && r.GetInt32(6) == 1) ? 'F' : '-';
+                                char sa = (!r.IsDBNull(7) && r.GetInt32(7) == 1) ? 'S' : '-';
+                                char su = (!r.IsDBNull(8) && r.GetInt32(8) == 1) ? 'S' : '-';
+                                runsOn = $"{m}{tu}{w}{th}{f}{sa}{su}";
+                            }
+                        }
+                    }
+                }
+                catch { }
 
                 bool isMemuDemu = !string.IsNullOrEmpty(trainType) && (trainType.ToUpper() == "MEMU" || trainType.ToUpper() == "DEMU" || trainType.ToUpper() == "MMTS");
 
@@ -755,9 +1242,173 @@ namespace IrctcClone.Controllers
                         }
                     }
                 }
+
+                // ✅ Check temporary skipped routes & omit skipped stations until skipped dates have ended
+                var tempRoutes = new List<(int StationId, DateTime FromDate, DateTime ToDate)>();
+                try
+                {
+                    using (var cmdTemp = new SqlCommand("spGetTrainTempRoutes", conn))
+                    {
+                        cmdTemp.CommandType = CommandType.StoredProcedure;
+                        cmdTemp.Parameters.AddWithValue("@TrainId", trainId);
+
+                        using (var readerTemp = cmdTemp.ExecuteReader())
+                        {
+                            while (readerTemp.Read())
+                            {
+                                tempRoutes.Add((
+                                    Convert.ToInt32(readerTemp["StationId"]),
+                                    Convert.ToDateTime(readerTemp["FromDate"]),
+                                    Convert.ToDateTime(readerTemp["ToDate"])
+                                ));
+                            }
+                        }
+                    }
+                }
+                catch { }
+
+                DateTime targetDate = journeyDate?.Date ?? DateTime.Today;
+
+                foreach (var route in routes)
+                {
+                    var stationSkips = tempRoutes.Where(t => t.StationId == route.StationId).ToList();
+                    if (stationSkips.Any())
+                    {
+                        DateTime maxSkip = stationSkips.Max(t => t.ToDate.Date);
+                        DateTime minSkip = stationSkips.Min(t => t.FromDate.Date);
+
+                        bool isDateSkipped = stationSkips.Any(t => targetDate >= t.FromDate.Date && targetDate <= t.ToDate.Date)
+                                             || (targetDate >= minSkip && targetDate <= maxSkip)
+                                             || (DateTime.Today <= maxSkip && targetDate <= maxSkip);
+
+                        if (isDateSkipped)
+                        {
+                            route.IsSkipped = true;
+                        }
+                    }
+                }
+
+                // Omit skipped stations from the train schedule timetable until skipped dates have ended
+                var activeRoutes = routes.Where(r => !r.IsSkipped).ToList();
+                if (activeRoutes.Any())
+                {
+                    int stopIndex = 1;
+                    foreach (var r in activeRoutes)
+                    {
+                        r.StopNumber = stopIndex++;
+                    }
+                    routes = activeRoutes;
+                }
+
+                // ✅ Check active temporary stops for this train on targetDate
+                try
+                {
+                    var activeTempStops = new List<(int StationId, string Code, string Name, TimeSpan? Arr, TimeSpan? Dep, int Day, string Reason, int Distance)>();
+                    var allConfiguredTempStationIds = new HashSet<int>();
+
+                    using (var cmdTempStops = new SqlCommand("spGetTemporaryStopsByTrainId", conn))
+                    {
+                        cmdTempStops.CommandType = CommandType.StoredProcedure;
+                        cmdTempStops.Parameters.AddWithValue("@TrainId", trainId);
+                        using (var r = cmdTempStops.ExecuteReader())
+                        {
+                            while (r.Read())
+                            {
+                                int stnId = Convert.ToInt32(r["StationId"]);
+                                allConfiguredTempStationIds.Add(stnId);
+
+                                DateTime fDate = Convert.ToDateTime(r["FromDate"]).Date;
+                                DateTime tDate = Convert.ToDateTime(r["ToDate"]).Date;
+                                if (targetDate >= fDate && targetDate <= tDate)
+                                {
+                                    int dist = 0;
+                                    try
+                                    {
+                                        int distOrd = r.GetOrdinal("Distance");
+                                        if (distOrd >= 0 && !r.IsDBNull(distOrd))
+                                        {
+                                            dist = Convert.ToInt32(r.GetValue(distOrd));
+                                        }
+                                    }
+                                    catch { }
+
+                                    activeTempStops.Add((
+                                        stnId,
+                                        r["StationCode"].ToString() ?? "",
+                                        r["StationName"].ToString() ?? "",
+                                        r["ArrivalTime"] == DBNull.Value ? null : (TimeSpan?)r["ArrivalTime"],
+                                        r["DepartureTime"] == DBNull.Value ? null : (TimeSpan?)r["DepartureTime"],
+                                        Convert.ToInt32(r["RouteDay"]),
+                                        r["Reason"]?.ToString() ?? "Festival Season",
+                                        dist
+                                    ));
+                                }
+                            }
+                        }
+                    }
+
+                    var activeStationIds = new HashSet<int>();
+                    foreach (var ts in activeTempStops)
+                    {
+                        activeStationIds.Add(ts.StationId);
+                        var existingRoute = routes.FirstOrDefault(rt => rt.StationId == ts.StationId);
+                        if (existingRoute != null)
+                        {
+                            existingRoute.IsTemporary = true;
+                            existingRoute.TemporaryReason = ts.Reason;
+                            if (ts.Distance > 0 && existingRoute.Distance == 0)
+                            {
+                                existingRoute.Distance = ts.Distance;
+                            }
+                        }
+                        else
+                        {
+                            routes.Add(new TrainRoute
+                            {
+                                TrainId = trainId,
+                                StationId = ts.StationId,
+                                StationCode = ts.Code,
+                                StationName = ts.Name,
+                                ArrivalTime = ts.Arr,
+                                DepartureTime = ts.Dep,
+                                Day = ts.Day,
+                                Distance = ts.Distance,
+                                IsTemporary = true,
+                                TemporaryReason = ts.Reason,
+                                Station = new Station
+                                {
+                                    Id = ts.StationId,
+                                    Code = ts.Code,
+                                    Name = ts.Name
+                                }
+                            });
+                        }
+                    }
+
+                    // Temporary stops not active on targetDate should not appear in schedule
+                    var inactiveTempStationIds = allConfiguredTempStationIds.Except(activeStationIds).ToList();
+                    if (inactiveTempStationIds.Any())
+                    {
+                        routes = routes.Where(rt => !inactiveTempStationIds.Contains(rt.StationId)).ToList();
+                    }
+
+                    routes = routes.OrderBy(r => r.Day)
+                                   .ThenBy(r => r.ArrivalTime ?? r.DepartureTime ?? TimeSpan.Zero)
+                                   .ToList();
+
+                    for (int i = 0; i < routes.Count; i++)
+                    {
+                        routes[i].StopNumber = i + 1;
+                    }
+                }
+                catch (SqlException) { }
             }
 
             ViewBag.RunsOn = runsOn;
+            ViewBag.TrainNumber = trainNumber;
+            ViewBag.TrainName = trainName;
+            ViewBag.FromStation = fromStation;
+            ViewBag.ToStation = toStation;
 
             return PartialView("TrainRoutePartial", routes);
         }
@@ -1083,6 +1734,25 @@ namespace IrctcClone.Controllers
                 if (train == null)
                     return NotFound();
 
+                // Load service dates and coach positions
+                try
+                {
+                    using (var dateCmd = new SqlCommand("SELECT ServiceStartDate, ServiceEndDate, CoachPositions FROM Trains WHERE Id = @TrainId", conn))
+                    {
+                        dateCmd.Parameters.AddWithValue("@TrainId", id);
+                        using (var dReader = dateCmd.ExecuteReader())
+                        {
+                            if (dReader.Read())
+                            {
+                                train.ServiceStartDate = dReader.IsDBNull(0) ? null : dReader.GetDateTime(0);
+                                train.ServiceEndDate = dReader.IsDBNull(1) ? null : dReader.GetDateTime(1);
+                                train.CoachPositions = dReader.IsDBNull(2) ? null : dReader.GetString(2);
+                            }
+                        }
+                    }
+                }
+                catch { }
+
                 // --- Get stations ---
                 using (var cmd = new SqlCommand("spGetAllStations", conn))
                 {
@@ -1176,7 +1846,8 @@ namespace IrctcClone.Controllers
             List<string> routeArrivals,       // ✅ NEW
             List<string> routeDepartures,     // ✅ NEW
             List<int> routeOrder,             // ✅ NEW
-            string deletedClassIds // 👈 add this
+            string deletedClassIds,
+            string? CoachPositions
         )
         {
             try
@@ -1210,6 +1881,40 @@ namespace IrctcClone.Controllers
                         cmd.ExecuteNonQuery();
                     }
 
+                    // Save Service dates and CoachPositions
+                    try
+                    {
+                        using (var dateCmd = new SqlCommand("UPDATE Trains SET ServiceStartDate = @ServiceStartDate, ServiceEndDate = @ServiceEndDate, CoachPositions = @CoachPositions WHERE Id = @TrainId", conn))
+                        {
+                            dateCmd.Parameters.AddWithValue("@TrainId", train.Id);
+                            dateCmd.Parameters.AddWithValue("@ServiceStartDate", (object?)train.ServiceStartDate ?? DBNull.Value);
+                            dateCmd.Parameters.AddWithValue("@ServiceEndDate", (object?)train.ServiceEndDate ?? DBNull.Value);
+                            dateCmd.Parameters.AddWithValue("@CoachPositions", (object?)CoachPositions ?? DBNull.Value);
+                            dateCmd.ExecuteNonQuery();
+                        }
+
+                        // Generate/update coaches & berths if CoachPositions provided
+                        if (!string.IsNullOrWhiteSpace(CoachPositions))
+                        {
+                            using (var trans = conn.BeginTransaction())
+                            {
+                                try
+                                {
+                                    ParseCompositionAndGenerateSeats(conn, trans, train.Id, CoachPositions);
+                                    trans.Commit();
+                                }
+                                catch (Exception cEx)
+                                {
+                                    trans.Rollback();
+                                    Console.WriteLine("Error generating coaches in EditTrain: " + cEx.Message);
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("Error updating service dates/coach positions: " + ex.Message);
+                    }
 
                     // --- ✅ Delete removed classes ---
                     if (!string.IsNullOrEmpty(deletedClassIds))
@@ -1539,20 +2244,21 @@ namespace IrctcClone.Controllers
                 switch (prefix)
                 {
                     case "S":
+                    case "SE":
                         classCode = "Sleeper (SL)";
                         seatsPerCoach = 80;
                         break;
                     case "B":
                         classCode = "AC 3 Tier (3A)";
-                        seatsPerCoach = 80;
+                        seatsPerCoach = 72;
                         break;
                     case "M":
                         classCode = "AC 3 Economy (3E)";
-                        seatsPerCoach = 80;
+                        seatsPerCoach = 83;
                         break;
                     case "A":
                         classCode = "AC 2 Tier (2A)";
-                        seatsPerCoach = 48;
+                        seatsPerCoach = 54;
                         break;
                     case "H":
                         classCode = "AC First Class (1A)";
@@ -1560,17 +2266,29 @@ namespace IrctcClone.Controllers
                         break;
                     case "C":
                     case "D":
+                    case "E":
                         classCode = "AC Chair Car (CC)";
                         seatsPerCoach = 78;
                         break;
                     case "GS":
+                    case "GN":
+                    case "GEN":
+                    case "UR":
                     case "D1":
                     case "D2":
                         classCode = "Second Sitting (2S)";
                         seatsPerCoach = 108;
                         break;
+                    case "ENG":
+                    case "LOCO":
+                    case "EOG":
+                    case "HOG":
+                    case "SLR":
+                    case "PC":
+                    case "PWR":
+                        continue; // Non-passenger operational units (Locomotive, Generator Car, Guard/Brake Van, Pantry)
                     default:
-                        continue; // Skip unrecognized codes like "ENG"
+                        continue;
                 }
 
                 // 2. Fetch the corresponding Class ID for this train in the database (with loose matching for descriptive names)

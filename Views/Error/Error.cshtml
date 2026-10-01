@@ -1,39 +1,676 @@
-﻿@{
-    Layout = "~/Views/Shared/_Layout.cshtml";
-    ViewData["Title"] = "Critical Alert - NexusRail Portal";
+@{
+    Layout = null;
+    ViewData["Title"] = "Session Expired - IRCTC";
 }
 
-<div class="error-wrapper">
-    <div class="error-box-glass">
-        <div class="error-icon-glow">
-            <i class="fa-solid fa-triangle-exclamation"></i>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IRCTC Next Generation eTicketing System</title>
+    <link rel="icon" type="image/png" href="~/images/irctc_Logo.png" />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Plus Jakarta Sans', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #091325 0%, #0d1e3d 50%, #0a162c 100%);
+            color: #f1f5f9;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Top Brand Header */
+        .error-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 35px;
+            background: rgba(10, 22, 44, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            z-index: 10;
+        }
+
+        .header-logo-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-logo-left svg {
+            height: 44px;
+            width: auto;
+            filter: drop-shadow(0 2px 8px rgba(37, 99, 235, 0.3));
+        }
+
+        .header-brand-text {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header-brand-name {
+            font-size: 17px;
+            font-weight: 800;
+            color: #ffffff;
+            letter-spacing: 0.5px;
+        }
+
+        .header-brand-sub {
+            font-size: 11px;
+            color: #94a3b8;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        .header-logo-right img {
+            height: 42px;
+            width: auto;
+            filter: brightness(1.05);
+        }
+
+        /* Main Container */
+        .error-main-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 30px 20px 40px;
+            position: relative;
+            z-index: 2;
+        }
+
+        /* Creative Train & Red Signal Stage */
+        .railway-scene-wrapper {
+            width: 100%;
+            max-width: 620px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 24px;
+            position: relative;
+        }
+
+        .train-signal-illustration {
+            width: 100%;
+            height: 140px;
+            position: relative;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+        }
+
+        /* The Signal Post */
+        .signal-post {
+            position: absolute;
+            right: 45px;
+            bottom: 22px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 5;
+        }
+
+        .signal-head {
+            width: 26px;
+            height: 52px;
+            background: #1e293b;
+            border-radius: 14px;
+            border: 2px solid #334155;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-around;
+            padding: 4px 0;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+        }
+
+        .signal-lamp {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #334155;
+        }
+
+        .signal-lamp.red {
+            background: #ef4444;
+            box-shadow: 0 0 16px 6px rgba(239, 68, 68, 0.8), 0 0 30px 10px rgba(239, 68, 68, 0.4);
+            animation: redSignalPulse 2s infinite ease-in-out;
+        }
+
+        @@keyframes redSignalPulse {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+                box-shadow: 0 0 16px 6px rgba(239, 68, 68, 0.8), 0 0 30px 10px rgba(239, 68, 68, 0.4);
+            }
+            50% {
+                opacity: 0.75;
+                transform: scale(0.96);
+                box-shadow: 0 0 10px 4px rgba(239, 68, 68, 0.6), 0 0 20px 6px rgba(239, 68, 68, 0.25);
+            }
+        }
+
+        .signal-pole {
+            width: 6px;
+            height: 50px;
+            background: linear-gradient(to right, #475569, #334155);
+            border-radius: 2px;
+        }
+
+        .signal-base {
+            width: 24px;
+            height: 8px;
+            background: #1e293b;
+            border-radius: 2px;
+        }
+
+        /* Halted Locomotive */
+        .train-locomotive {
+            position: relative;
+            width: 240px;
+            height: 90px;
+            margin-right: 70px;
+            z-index: 4;
+        }
+
+        .loco-body {
+            position: absolute;
+            top: 10px;
+            left: 0;
+            width: 220px;
+            height: 60px;
+            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 60%, #1d4ed8 100%);
+            border-radius: 16px 28px 6px 6px;
+            border-top: 2px solid rgba(255, 255, 255, 0.35);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+        }
+
+        .loco-stripe {
+            position: absolute;
+            top: 32px;
+            left: 0;
+            width: 100%;
+            height: 8px;
+            background: linear-gradient(to right, #ff9933 0%, #ffffff 50%, #138808 100%);
+        }
+
+        .loco-window-front {
+            position: absolute;
+            top: 8px;
+            right: 12px;
+            width: 32px;
+            height: 20px;
+            background: #e0f2fe;
+            border-radius: 4px 10px 2px 2px;
+            border: 2px solid #0f172a;
+            box-shadow: inset 0 0 6px rgba(14, 165, 233, 0.5);
+        }
+
+        .loco-window-side {
+            position: absolute;
+            top: 10px;
+            left: 45px;
+            width: 24px;
+            height: 16px;
+            background: #bae6fd;
+            border-radius: 3px;
+            border: 1px solid #0f172a;
+        }
+
+        .loco-window-side2 {
+            position: absolute;
+            top: 10px;
+            left: 80px;
+            width: 24px;
+            height: 16px;
+            background: #bae6fd;
+            border-radius: 3px;
+            border: 1px solid #0f172a;
+        }
+
+        .loco-headlight {
+            position: absolute;
+            bottom: 12px;
+            right: 4px;
+            width: 10px;
+            height: 10px;
+            background: #fef08a;
+            border-radius: 50%;
+            box-shadow: 0 0 14px 5px rgba(254, 240, 138, 0.7);
+        }
+
+        .loco-light-beam {
+            position: absolute;
+            bottom: 4px;
+            right: -85px;
+            width: 90px;
+            height: 24px;
+            background: linear-gradient(to right, rgba(254, 240, 138, 0.4), transparent);
+            clip-path: polygon(0 35%, 100% 0, 100% 100%, 0 65%);
+            pointer-events: none;
+        }
+
+        .loco-wheels {
+            position: absolute;
+            bottom: 2px;
+            left: 10px;
+            display: flex;
+            gap: 14px;
+            z-index: 6;
+        }
+
+        .wheel {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #334155;
+            border: 3px solid #64748b;
+            position: relative;
+        }
+
+        .wheel::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 6px;
+            height: 6px;
+            background: #cbd5e1;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        /* Pantograph */
+        .pantograph {
+            position: absolute;
+            top: -12px;
+            left: 60px;
+            width: 40px;
+            height: 22px;
+            border-top: 2px solid #94a3b8;
+            border-left: 2px solid #94a3b8;
+            transform: skewX(-25deg);
+        }
+
+        /* Railway Track */
+        .railway-track {
+            width: 100%;
+            height: 16px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .track-rail {
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(to right, #64748b, #cbd5e1, #64748b);
+            border-radius: 1px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+        }
+
+        .track-sleepers {
+            position: absolute;
+            width: 100%;
+            height: 12px;
+            top: 2px;
+            display: flex;
+            justify-content: space-around;
+            pointer-events: none;
+        }
+
+        .sleeper {
+            width: 7px;
+            height: 10px;
+            background: #475569;
+            border-radius: 1px;
+        }
+
+        /* Creative Glassmorphic Card */
+        .error-card {
+            width: 100%;
+            max-width: 580px;
+            background: rgba(15, 28, 54, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 16px;
+            padding: 30px 28px;
+            box-shadow: 0 20px 45px rgba(0, 0, 0, 0.45);
+            text-align: center;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.35);
+            color: #fca5a5;
+            padding: 6px 16px;
+            border-radius: 30px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            margin-bottom: 16px;
+        }
+
+        .status-pill-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ef4444;
+            box-shadow: 0 0 8px #ef4444;
+        }
+
+        .error-title {
+            font-size: 24px;
+            font-weight: 800;
+            color: #ffffff;
+            margin-bottom: 8px;
+            letter-spacing: -0.3px;
+        }
+
+        .error-subtitle {
+            font-size: 14px;
+            color: #94a3b8;
+            margin-bottom: 22px;
+            line-height: 1.5;
+        }
+
+        /* Reasons Grid */
+        .reasons-container {
+            text-align: left;
+            margin-bottom: 26px;
+            background: rgba(10, 20, 40, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .reasons-header {
+            padding: 10px 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            font-size: 12px;
+            font-weight: 700;
+            color: #cbd5e1;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .reasons-list {
+            list-style: none;
+        }
+
+        .reason-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 11px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            font-size: 13px;
+            color: #e2e8f0;
+            transition: background 0.15s ease;
+        }
+
+        .reason-item:last-child {
+            border-bottom: none;
+        }
+
+        .reason-item:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .reason-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            background: rgba(251, 121, 43, 0.15);
+            color: #fb792b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            flex-shrink: 0;
+        }
+
+        /* Action Buttons */
+        .action-group {
+            display: flex;
+            gap: 14px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-primary-login {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: linear-gradient(135deg, #fb792b 0%, #ea580c 100%);
+            color: #ffffff;
+            font-size: 14px;
+            font-weight: 700;
+            padding: 12px 28px;
+            border-radius: 8px;
+            text-decoration: none;
+            box-shadow: 0 4px 15px rgba(251, 121, 43, 0.35);
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary-login:hover {
+            background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(251, 121, 43, 0.45);
+            color: #ffffff;
+        }
+
+        .btn-secondary-home {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            color: #cbd5e1;
+            font-size: 14px;
+            font-weight: 600;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+
+        .btn-secondary-home:hover {
+            background: rgba(255, 255, 255, 0.12);
+            color: #ffffff;
+            border-color: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        /* Footer */
+        .error-footer {
+            text-align: center;
+            padding: 18px 20px;
+            font-size: 12px;
+            color: #64748b;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            background: rgba(10, 22, 44, 0.6);
+            backdrop-filter: blur(8px);
+        }
+
+        @@media (max-width: 600px) {
+            .error-header {
+                padding: 12px 18px;
+            }
+            .error-card {
+                padding: 24px 18px;
+            }
+            .error-title {
+                font-size: 20px;
+            }
+            .train-locomotive {
+                width: 180px;
+                margin-right: 50px;
+            }
+            .loco-body {
+                width: 165px;
+            }
+            .signal-post {
+                right: 20px;
+            }
+            .btn-primary-login, .btn-secondary-home {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="error-header">
+        <div class="header-logo-left">
+            <!-- Indian Railways Seal -->
+            <svg width="44" height="44" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="50" cy="50" r="46" stroke="#3b82f6" stroke-width="4" fill="#1e3a8a"/>
+                <circle cx="50" cy="50" r="40" stroke="#60a5fa" stroke-width="2" stroke-dasharray="3 3"/>
+                <path d="M30 65H70L65 42H35L30 65Z" fill="#93c5fd"/>
+                <circle cx="40" cy="56" r="4" fill="#1e3a8a"/>
+                <circle cx="60" cy="56" r="4" fill="#1e3a8a"/>
+                <rect x="42" y="32" width="16" height="10" rx="2" fill="#93c5fd"/>
+                <rect x="47" y="24" width="6" height="8" fill="#60a5fa"/>
+                <circle cx="50" cy="50" r="47" stroke="#3b82f6" stroke-width="1.5"/>
+            </svg>
+            <div class="header-brand-text">
+                <span class="header-brand-name">IRCTC Clone</span>
+                <span class="header-brand-sub">Next-Gen Rail Portal</span>
+            </div>
+        </div>
+        <div class="header-logo-right">
+            <img src="~/images/irctc_Logo.png" alt="IRCTC Logo" />
+        </div>
+    </header>
+
+    <main class="error-main-container">
+        <!-- Railway Scenery: Train Halted at Red Signal -->
+        <div class="railway-scene-wrapper">
+            <div class="train-signal-illustration">
+                <!-- Halted Locomotive -->
+                <div class="train-locomotive">
+                    <div class="pantograph"></div>
+                    <div class="loco-body">
+                        <div class="loco-stripe"></div>
+                        <div class="loco-window-side"></div>
+                        <div class="loco-window-side2"></div>
+                        <div class="loco-window-front"></div>
+                        <div class="loco-headlight"></div>
+                    </div>
+                    <div class="loco-light-beam"></div>
+                    <div class="loco-wheels">
+                        <div class="wheel"></div>
+                        <div class="wheel"></div>
+                        <div class="wheel"></div>
+                        <div class="wheel"></div>
+                        <div class="wheel"></div>
+                        <div class="wheel"></div>
+                    </div>
+                </div>
+
+                <!-- Red Track Signal Post -->
+                <div class="signal-post">
+                    <div class="signal-head">
+                        <div class="signal-lamp red" title="Signal at Danger (Track Halted)"></div>
+                        <div class="signal-lamp"></div>
+                    </div>
+                    <div class="signal-pole"></div>
+                    <div class="signal-base"></div>
+                </div>
+            </div>
+
+            <!-- Railway Track -->
+            <div class="railway-track">
+                <div class="track-sleepers">
+                    <div class="sleeper"></div>
+                    <div class="sleeper"></div>
+                    <div class="sleeper"></div>
+                    <div class="sleeper"></div>
+                    <div class="sleeper"></div>
+                    <div class="sleeper"></div>
+                    <div class="sleeper"></div>
+                    <div class="sleeper"></div>
+                    <div class="sleeper"></div>
+                    <div class="sleeper"></div>
+                    <div class="sleeper"></div>
+                    <div class="sleeper"></div>
+                </div>
+                <div class="track-rail"></div>
+            </div>
         </div>
 
-        <h2>DIAGNOSTICS: TERMINAL ALERT</h2>
+        <!-- Glassmorphic Error Content Card -->
+        <div class="error-card">
+            <div class="status-pill">
+                <span class="status-pill-dot"></span>
+                <span>Signal At Danger • Track Idle</span>
+            </div>
 
-        <p class="error-message">
-            @ViewBag.ErrorMessage
-        </p>
+            <h1 class="error-title">Sorry!!! Please Try Again!!</h1>
+            <p class="error-subtitle">
+                Your reservation session has been securely paused. To protect your transaction integrity and booking slot, inactive sessions are automatically halted.
+            </p>
 
-        <div class="error-divider"></div>
+            <div class="reasons-container">
+                <div class="reasons-header">
+                    <i class="fa-solid fa-circle-info me-1 text-warning"></i> Possible Causes For This Pause
+                </div>
+                <ul class="reasons-list">
+                    <li class="reason-item">
+                        <div class="reason-icon"><i class="fa-solid fa-hourglass-end"></i></div>
+                        <span>You kept the browser window idle for more than 5 minutes.</span>
+                    </li>
+                    <li class="reason-item">
+                        <div class="reason-icon"><i class="fa-solid fa-arrow-rotate-left"></i></div>
+                        <span>You used the Back, Forward, or Refresh button of your browser.</span>
+                    </li>
+                    <li class="reason-item">
+                        <div class="reason-icon"><i class="fa-solid fa-computer-mouse"></i></div>
+                        <span>A double-click was detected on the search or booking action.</span>
+                    </li>
+                    <li class="reason-item">
+                        <div class="reason-icon"><i class="fa-solid fa-shield-halved"></i></div>
+                        <span>You attempted to open the booking step in a new tab or window.</span>
+                    </li>
+                </ul>
+            </div>
 
-        <div class="error-info-section">
-            <h4>POSSIBLE PROTOCOL BREACHES:</h4>
-            <ul class="error-reasons">
-                <li><i class="fa-solid fa-circle-chevron-right text-orange"></i> Session Timeout / Inactivity beyond limit.</li>
-                <li><i class="fa-solid fa-circle-chevron-right text-orange"></i> Navigation breach (Back / Forward / Page Refresh).</li>
-                <li><i class="fa-solid fa-circle-chevron-right text-orange"></i> Multiple rapid booking attempts (Double Submission).</li>
-                <li><i class="fa-solid fa-circle-chevron-right text-orange"></i> Direct page URL access without active search query.</li>
-            </ul>
+            <div class="action-group">
+                <a href="/Account/Login" class="btn-primary-login">
+                    <i class="fa-solid fa-right-to-bracket"></i> Click Here To Login
+                </a>
+                <a href="/" class="btn-secondary-home">
+                    <i class="fa-solid fa-train"></i> Return To Train Search
+                </a>
+            </div>
         </div>
+    </main>
 
-        <div class="error-actions">
-            <a href="/" class="mainpageloginbtn error-btn-reset">
-                <i class="fa-solid fa-house"></i> Return to Main Terminal
-            </a>
-            <a href="/Account/Login" class="hud-link-btn error-btn-login">
-                <i class="fa-solid fa-lock"></i> Re-authenticate Access
-            </a>
-        </div>
-    </div>
-</div>
+    <footer class="error-footer">
+        <i class="fa-solid fa-lock text-success me-1"></i> Secured with 256-bit Indian Railways Security System &bull; &copy; @DateTime.Now.Year IRCTC Clone. All Rights Reserved.
+    </footer>
+</body>
+</html>

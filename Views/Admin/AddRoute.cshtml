@@ -1,10 +1,11 @@
-﻿@using IRCTCClone.Models
+@using IRCTCClone.Models
 @model List<TrainRoute>
 
 @{
     ViewBag.Title = "Add Train Route";
     var stations = ViewBag.Stations as List<Station> ?? new List<Station>();
     var routes = ViewBag.Routes as List<TrainRoute> ?? new List<TrainRoute>();
+    var temporaryStops = ViewBag.TemporaryStops as List<TrainTemporaryStop> ?? new List<TrainTemporaryStop>();
     int trainId = ViewBag.TrainId;
 }
 
@@ -12,75 +13,202 @@
     var train = ViewBag.Train as Train;
 }
 
-<!-- Bootstrap Icons -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
-<!-- ✅ TIMELINE CARD -->
-<div class="timeline-card mb-4 sticky-timeline">
-    <div class="timeline-body">
+@{
+    // Extract coach positions list
+    var coachList = new List<string>();
+    if (!string.IsNullOrWhiteSpace(train?.CoachPositions))
+    {
+        coachList = train.CoachPositions.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                                        .Select(c => c.Trim().ToUpper())
+                                        .ToList();
+    }
+    else
+    {
+        coachList = new List<string> { "ENG", "GN", "GN", "H1", "A1", "A2", "B1", "B2", "B3", "M1", "SE1", "S1", "S2", "S3", "GN", "GN", "EOG" };
+    }
+    int totalDistance = routes.LastOrDefault()?.Distance ?? 799;
+}
 
-        <div class="timeline-flex">
+<!-- ✅ FLOATING SINGLE-LINE MINIMALIST STICKY STRIP (Revealed on Scroll Down) -->
+<div id="stickyTrainStrip" class="sticky-train-strip">
+    <div class="strip-container">
+        <!-- Train Badge -->
+        <div class="strip-train-info">
+            <span class="strip-train-num"><i class="bi bi-train-front-fill me-1"></i> @train.Number</span>
+            <span class="strip-train-name">@train.Name</span>
+        </div>
 
-            <!-- LEFT: TIMELINE -->
-            <div class="timeline-left">
+        <div class="strip-separator"></div>
 
-                <div class="timeline-line"></div>
+        <!-- From ➜ To -->
+        <div class="strip-route-info">
+            <span class="strip-station-name"><i class="bi bi-geo-alt-fill text-danger me-1"></i>@train.FromStation?.Name</span>
+            <span class="strip-time-badge">@train.Departure.ToString(@"hh\:mm")</span>
+            <i class="bi bi-arrow-right strip-route-arrow"></i>
+            <span class="strip-station-name"><i class="bi bi-geo-alt text-success me-1"></i>@train.ToStation?.Name</span>
+            <span class="strip-time-badge">@train.Arrival.ToString(@"hh\:mm")</span>
+        </div>
 
-                <div class="timeline-item">
-                    <div class="timeline-icon bg-danger">
-                        <i class="bi bi-geo-alt-fill"></i>
-                    </div>
-                    <div class="timeline-sub">Source</div>
-                    <div class="timeline-title station-badge">
-                        @train.FromStation?.Name
-                    </div>
-                    <div class="mt-2">
-                        <span class="timeline-badge">
-                            <i class="bi bi-clock-history me-1"></i>
-                            Departure: @train.Departure.ToString(@"hh\:mm")
-                        </span>
-                    </div>
-                </div>
+        <div class="strip-separator"></div>
 
-                <div class="timeline-item">
-                    <div class="timeline-icon bg-success">
-                        <i class="bi bi-geo-alt"></i>
-                    </div>
-                    <div class="timeline-sub">Destination</div>
-                    <div class="timeline-title station-badge">
-                        @train.ToStation?.Name
-                    </div>
-                    <div class="mt-2">
-                        <span class="timeline-badge">
-                            <i class="bi bi-clock me-1"></i>
-                            Arrival: @train.Arrival.ToString(@"hh\:mm")
-                        </span>
-                    </div>
-                </div>
+        <!-- Meta Details (Distance & Journey Time) in a Single Line -->
+        <div class="strip-meta-info">
+            <span class="strip-meta-pill"><i class="bi bi-speedometer2 text-primary me-1"></i> @totalDistance km</span>
+            <span class="strip-meta-pill"><i class="bi bi-clock-history text-info me-1"></i> @train.Duration</span>
+            <span class="strip-meta-pill strip-coach-pill"><i class="bi bi-grid-3x2-gap-fill text-warning me-1"></i> @coachList.Count Coaches</span>
+        </div>
+    </div>
+</div>
 
-                <div class="timeline-item">
-                    <div class="timeline-icon bg-info">
-                        <i class="bi bi-hourglass-split"></i>
-                    </div>
-                    <div class="timeline-sub">Total Journey Time</div>
-                    <div class="timeline-title">
-                        <span class="timeline-badge">@train.Duration</span>
-                    </div>
-                </div>
-
+<!-- ✅ EXPANDED TOP TIMELINE & ANIMATED COACH TRACK (Normal Scroll State) -->
+<div class="train-hero-card mb-4" id="trainHeroCard">
+    <div class="train-hero-header">
+        <div class="hero-left">
+            <div class="hero-badge-pill">
+                <i class="bi bi-train-front"></i> Indian Railways Official Schedule
             </div>
-
-            <!-- RIGHT: TRAIN INFO -->
-            <div class="timeline-train-summary">
-                <div class="timeline-train-number">@train.Number</div>
-                <div class="timeline-train-name">@train.Name</div>
-                <div class="timeline-train-sub">
-                    IRCTC Train Timeline View
+            <h2 class="hero-train-title">
+                <span class="hero-train-num">@train.Number</span>
+                <span class="hero-train-name">@train.Name</span>
+            </h2>
+            <div class="hero-journey-points">
+                <div class="journey-point">
+                    <span class="point-label"><i class="bi bi-geo-alt-fill text-danger"></i> Source</span>
+                    <span class="point-station">@train.FromStation?.Name</span>
+                    <span class="point-time">Dep: @train.Departure.ToString(@"hh\:mm")</span>
+                </div>
+                <div class="journey-arrow-box">
+                    <span class="journey-dist-badge">@totalDistance km</span>
+                    <div class="journey-arrow-line">
+                        <i class="bi bi-chevron-right arrow-anim"></i>
+                    </div>
+                    <span class="journey-time-badge"><i class="bi bi-clock"></i> @train.Duration</span>
+                </div>
+                <div class="journey-point">
+                    <span class="point-label"><i class="bi bi-geo-alt-fill text-success"></i> Destination</span>
+                    <span class="point-station">@train.ToStation?.Name</span>
+                    <span class="point-time">Arr: @train.Arrival.ToString(@"hh\:mm")</span>
                 </div>
             </div>
+        </div>
 
+        <div class="hero-right">
+            <div class="hero-stats-card">
+                <div class="stat-row">
+                    <span class="stat-label">Total Halts:</span>
+                    <span class="stat-val">@routes.Count</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Train Type:</span>
+                    <span class="stat-val text-primary font-weight-bold">@(string.IsNullOrEmpty(train.TrainType) ? "SUPERFAST" : train.TrainType)</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Total Coaches:</span>
+                    <span class="stat-val">@coachList.Count</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 🚆 LIVE ANIMATED COACH COMPOSITION TRACK -->
+    <div class="rake-track-section">
+        <div class="rake-track-header">
+            <div class="rake-title">
+                <i class="bi bi-train-front-fill text-primary"></i>
+                <span>Live Coach Positions & Rake Composition</span>
+                <span class="badge-coach-count">@coachList.Count Units</span>
+            </div>
+            <div class="rake-track-legend">
+                <span class="legend-dot loco-dot"></span> ENG/LOCO
+                <span class="legend-dot gen-dot"></span> GN (General)
+                <span class="legend-dot sl-dot"></span> Sleeper (SL/SE)
+                <span class="legend-dot ac3-dot"></span> 3AC / 3E
+                <span class="legend-dot ac2-dot"></span> 2AC
+                <span class="legend-dot ac1-dot"></span> 1AC
+                <span class="legend-dot eog-dot"></span> EOG/HOG
+                <span class="legend-dot slr-dot"></span> SLR
+            </div>
+        </div>
+
+        <!-- The Animated Train on Tracks -->
+        <div class="rake-scroll-container">
+            <div class="rail-track"></div>
+            <div class="train-consist">
+                @for (int c = 0; c < coachList.Count; c++)
+                {
+                    var code = coachList[c];
+                    string coachClass = "coach-gen";
+                    string coachIcon = "bi-people-fill";
+
+                    if (code == "ENG" || code == "LOCO")
+                    {
+                        coachClass = "coach-loco";
+                        coachIcon = "bi-train-front-fill";
+                    }
+                    else if (code == "EOG" || code == "HOG")
+                    {
+                        coachClass = "coach-eog";
+                        coachIcon = "bi-lightning-charge-fill";
+                    }
+                    else if (code == "SLR")
+                    {
+                        coachClass = "coach-slr";
+                        coachIcon = "bi-box-seam-fill";
+                    }
+                    else if (code.StartsWith("SE") || (code.StartsWith("S") && code != "SLR"))
+                    {
+                        coachClass = "coach-sleeper";
+                        coachIcon = "bi-moon-stars-fill";
+                    }
+                    else if (code.StartsWith("B") || code.StartsWith("M"))
+                    {
+                        coachClass = "coach-ac3";
+                        coachIcon = "bi-snow";
+                    }
+                    else if (code.StartsWith("A"))
+                    {
+                        coachClass = "coach-ac2";
+                        coachIcon = "bi-snow2";
+                    }
+                    else if (code.StartsWith("H"))
+                    {
+                        coachClass = "coach-ac1";
+                        coachIcon = "bi-gem";
+                    }
+                    else if (code.StartsWith("C") || (code.StartsWith("E") && !code.StartsWith("ENG") && !code.StartsWith("EOG")))
+                    {
+                        coachClass = "coach-cc";
+                        coachIcon = "bi-person-workspace";
+                    }
+                    else
+                    {
+                        coachClass = "coach-gen";
+                        coachIcon = "bi-people-fill";
+                    }
+
+                    <div class="coach-unit @coachClass" style="animation-delay: @(c * 0.04)s;">
+                        <div class="coach-roof"></div>
+                        <div class="coach-body">
+                            <span class="coach-icon"><i class="bi @coachIcon"></i></span>
+                            <span class="coach-code">@code</span>
+                        </div>
+                        <div class="coach-undercarriage">
+                            <span class="wheel left-wheel"></span>
+                            <span class="wheel right-wheel"></span>
+                        </div>
+                        <span class="coach-pos-idx">@(c + 1)</span>
+                    </div>
+
+                    @if (c < coachList.Count - 1)
+                    {
+                        <div class="coach-coupler"></div>
+                    }
+                }
+            </div>
+            <div class="rail-ties"></div>
         </div>
     </div>
 </div>
@@ -89,17 +217,23 @@
 <!-- Bootstrap Icons  -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 
-<div class="route-card">
+<div class="route-card shadow-sm">
 
-    <!-- ✅ Section Title -->
-    <div class="route-title">
-        <i class="bi bi-signpost-split"></i>
-        Add Route Stops
+    <!-- ✅ Section Header with Train Badge -->
+    <div class="route-header-bar">
+        <div>
+            <div class="route-title">
+                <i class="bi bi-signpost-split"></i>
+                <span>Train Route & Stoppage Management</span>
+            </div>
+            <div class="route-subtitle">
+                Train: <span class="train-code-badge">@train.Number</span> @train.Name • Setup intermediate halts, temporary festival stops & schedule adjustments
+            </div>
+        </div>
+        <a asp-action="TrainList" class="btn-top-back">
+            <i class="bi bi-arrow-left"></i> Back to Train List
+        </a>
     </div>
-
-    <a asp-action="TrainList" class="btn btn-outline-secondary">
-        <i class="bi bi-arrow-left"></i> Back to Train List
-    </a>
 
     <!-- ✅ Success Message -->
     @if (TempData["SuccessMessage"] != null)
@@ -111,172 +245,300 @@
         </div>
     }
 
-    <form method="post" asp-action="AddRoute" asp-route-trainId="@trainId">
+    <form method="post" asp-action="AddRoute" asp-route-trainId="@trainId" onsubmit="var ti = document.getElementById('tempDates'); if(ti) ti.disabled = false;">
         <input type="hidden" id="deletedIds" name="deletedIds" />
 
-        <div style="background:#f5f7fa; padding:15px; border-radius:8px; margin-bottom:15px; display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
+        <!-- ✅ MODERN CONTROLS BAR -->
+        <div class="route-controls-card mb-4">
+            <div class="route-controls-header">
+                <div>
+                    <span class="controls-title"><i class="bi bi-calendar2-range me-2 text-primary"></i>Schedule & Date Exceptions</span>
+                    <span class="controls-sub">Configure Skip dates, Cancellations, and Temporary Stoppages</span>
+                </div>
+            </div>
 
-            <!-- ✅ SINGLE CALENDAR FOR BOTH -->
-            <div class="route-controls">
-
+            <div class="route-controls-grid">
                 <div class="date-box">
-                    <label>Skip Dates</label>
+                    <label>
+                        <i class="bi bi-slash-circle text-warning me-1"></i> Skip Dates 
+                        <span id="skipDatesCount" class="text-primary fw-bold ms-1" style="font-size:12px;"></span>
+                    </label>
                     <input type="text" id="skipDates" name="skipDates"
                            value="@ViewBag.SkipDates"
-                           placeholder="Select skip dates"
-                           readonly class="form-control date-input" />
+                           placeholder="Select Dates"
+                           autocomplete="off" class="date-input" />
                 </div>
 
                 <div class="date-box">
-                    <label>Cancel Dates</label>
+                    <label>
+                        <i class="bi bi-x-octagon text-danger me-1"></i> Cancel Dates 
+                        <span id="cancelDatesCount" class="text-danger fw-bold ms-1" style="font-size:12px;"></span>
+                    </label>
                     <input type="text" id="cancelDates" name="cancelDates"
                            value="@ViewBag.CancelDates"
-                           placeholder="Select cancel dates"
-                           readonly class="form-control date-input" />
+                           placeholder="Select Dates"
+                           autocomplete="off" class="date-input" />
                 </div>
 
-                <button type="button" onclick="clearSkipDates()" class="btn btn-warning" style="cursor: pointer;">
-                    Reset Skip
+                <div class="date-box">
+                    <label>
+                        <i class="bi bi-clock-history text-primary me-1"></i> Temporary Stoppage Dates 
+                        <span id="tempDatesCount" class="text-primary fw-bold ms-1" style="font-size:12px;"></span>
+                    </label>
+                    <input type="text" id="tempDates" name="tempDates"
+                           value="@ViewBag.TempDates"
+                           placeholder="@(Model.Any(r => r.IsTemporary) ? "Select Dates" : "Add a temporary stop first")"
+                           autocomplete="off" class="date-input" @(Model.Any(r => r.IsTemporary) ? "" : "disabled") />
+                </div>
+            </div>
+
+            <div class="route-controls-actions">
+                <button type="button" onclick="clearSkipDates()" class="btn-ctrl btn-ctrl-warning">
+                    <i class="bi bi-arrow-counterclockwise"></i> Reset Skip
                 </button>
 
-                <button type="button" onclick="clearCancelDates()" class="btn btn-danger" style="cursor: pointer;">
-                    Reset Cancel
+                <button type="button" onclick="clearCancelDates()" class="btn-ctrl btn-ctrl-danger">
+                    <i class="bi bi-x-circle"></i> Reset Cancel
                 </button>
 
-                <button type="submit" class="btn btn-success btn-save" style="cursor: pointer; background-color: lightgreen;">
-                    <i class="bi bi-save2 me-1"></i> Save Route
+                <button type="button" id="btnResetTemp" onclick="clearTempDates()" class="btn-ctrl btn-ctrl-primary" disabled>
+                    <i class="bi bi-clock-history"></i> Reset Temporary
                 </button>
 
+                <button type="submit" class="btn-ctrl btn-ctrl-save">
+                    <i class="bi bi-check2-circle"></i> Save Route
+                </button>
             </div>
         </div>
 
-        <!-- ✅ Table -->
-        <table class="table route-table" id="routeTable">
-            <thead>
-                <tr>
-                    <th style="width:90px;">Stop #</th>
-                    <th>Station</th>
-                    <th style="width:150px;">Arrival</th>
-                    <th style="width:150px;">Departure</th>
-                    <th style="width:150px;">Distance</th>
-                    <th style="width:150px;">Day</th>
-                    <th style="width:100px;" class="text-center">Action</th>
-                    <th style="width:100px;">Skip?</th>
-                </tr>
-            </thead>
+        <!-- ✅ Table (Minimalistic & Screen Responsive) -->
+        <div class="table-responsive route-table-wrapper mb-4">
+            <table class="route-table" id="routeTable">
+                <thead>
+                    <tr>
+                        <th style="width:65px; min-width:65px;">Stop #</th>
+                        <th style="width:260px; min-width:200px; max-width:300px; text-align:left; padding-left:14px;">Station</th>
+                        <th style="width:115px; min-width:110px;">Arrival</th>
+                        <th style="width:115px; min-width:110px;">Departure</th>
+                        <th style="width:110px; min-width:100px;">Distance (km)</th>
+                        <th style="width:75px; min-width:70px;">Day</th>
+                        <th style="width:95px; min-width:90px;" class="text-center">Action</th>
+                        <th style="width:75px; min-width:70px; text-align:center;">Skip?</th>
+                    </tr>
+                </thead>
 
-            <tbody id="routeTableBody">
+                <tbody id="routeTableBody">
 
-                @if (Model != null && Model.Any())
-                {
-                    for (int i = 0; i < Model.Count; i++)
+                    @if (Model != null && Model.Any())
+                    {
+                        for (int i = 0; i < Model.Count; i++)
+                        {
+                            <tr class="fade-row @(Model[i].IsTemporary ? "temporary-row" : "")">
+                                <td style="width:65px; text-align:center;">
+                                    <input name="routes[@i].StopNumber" type="number" min="1" class="stop-number-input" value="@Model[i].StopNumber" readonly />
+                                </td>
+
+                                <td style="width:260px; min-width:200px; max-width:300px; text-align:left; padding-left:14px;">
+                                    <div class="station-cell-flex">
+                                        <select name="routes[@i].StationId" class="modern-select">
+                                            @foreach (var s in stations)
+                                            {
+                                                <option value="@s.Id" selected="@(s.Id == Model[i].StationId)">
+                                                    @s.Name
+                                                </option>
+                                            }
+                                        </select>
+                                        @if (Model[i].IsTemporary)
+                                        {
+                                            <span class="temp-badge temp-badge-pill">
+                                                <i class="bi bi-clock-history"></i> Temp Halt
+                                            </span>
+                                        }
+                                    </div>
+                                </td>
+
+                                <td style="width:115px; text-align:center;">
+                                    <input name="routes[@i].ArrivalTime" type="time" class="modern-time"
+                                           value="@(Model[i].ArrivalTime?.ToString(@"hh\:mm"))" />
+                                </td>
+
+                                <td style="width:115px; text-align:center;">
+                                    <input name="routes[@i].DepartureTime" type="time" class="modern-time"
+                                           value="@(Model[i].DepartureTime?.ToString(@"hh\:mm"))" />
+                                </td>
+
+                                <td style="width:110px; text-align:center;">
+                                    <input name="routes[@i].Distance" type="number" class="modern-number" value="@Model[i].Distance" placeholder="0" />
+                                </td>
+
+                                <td style="width:75px; text-align:center;">
+                                    <input name="routes[@i].Day" type="number" min="1" class="modern-number" style="width:55px;" value="@Model[i].Day" />
+                                </td>
+
+                                <!-- Hidden ID & IsTemporary -->
+                                <td style="display:none;">
+                                    <input name="routes[@i].Id" type="hidden" value="@Model[i].Id" />
+                                    <input type="hidden" name="routes[@i].IsTemporary" value="@(Model[i].IsTemporary ? "true" : "false")" class="is-temp-input" />
+                                </td>
+
+                                <td style="width:95px; text-align:center;">
+                                    <div style="display:flex; justify-content:center; align-items:center; gap:8px;">
+                                        <button type="button" class="btn-action-add" onclick="openInsertModal(this)" title="Insert Stop Below">
+                                            <i class="bi bi-plus-lg"></i>
+                                        </button>
+                                        <button type="button" class="btn-action-delete" onclick="deleteRouteRow(this)" title="Delete Stop">
+                                            <i class="bi bi-trash3"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                                <td style="width:75px; text-align:center;">
+                                    <input type="checkbox"
+                                           class="skip-checkbox modern-checkbox"
+                                           name="routes[@i].IsSkipped"
+                                           value="true"
+                                           @(Model[i].IsSkipped ? "checked" : "") />
+
+                                    <input type="hidden" name="routes[@i].IsSkipped" value="false" />
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
                     {
                         <tr class="fade-row">
-                            <td>
-                                <input name="routes[@i].StopNumber" type="number" min="1" class="form-control" value="@Model[i].StopNumber" />
+                            <td style="width:65px; text-align:center;">
+                                <input name="routes[0].StopNumber" type="number" class="stop-number-input" value="1" readonly />
                             </td>
 
-                            <td>
-                                <select name="routes[@i].StationId" class="form-select">
-                                    @foreach (var s in stations)
-                                    {
-                                        <option value="@s.Id" selected="@(s.Id == Model[i].StationId)">
-                                            @s.Name
-                                        </option>
-                                    }
-                                </select>
+                            <td style="width:260px; min-width:200px; max-width:300px; text-align:left; padding-left:14px;">
+                                <div class="station-cell-flex">
+                                    <select name="routes[0].StationId" class="modern-select">
+                                        @foreach (var s in stations)
+                                        {
+                                            <option value="@s.Id">@s.Name</option>
+                                        }
+                                    </select>
+                                </div>
                             </td>
 
-                            <td>
-                                <input name="routes[@i].ArrivalTime" type="time" class="form-control"
-                                       value="@(Model[i].ArrivalTime?.ToString(@"hh\:mm"))" />
+                            <td style="width:115px; text-align:center;">
+                                <input name="routes[0].ArrivalTime" type="time" class="modern-time" />
+                            </td>
+                            <td style="width:115px; text-align:center;">
+                                <input name="routes[0].DepartureTime" type="time" class="modern-time" />
+                            </td>
+                            <td style="width:110px; text-align:center;">
+                                <input name="routes[0].Distance" type="number" class="modern-number" placeholder="0" />
+                            </td>
+                            <td style="width:75px; text-align:center;">
+                                <input name="routes[0].Day" min="1" type="number" class="modern-number" style="width:55px;" value="1" />
                             </td>
 
-                            <td>
-                                <input name="routes[@i].DepartureTime" type="time" class="form-control"
-                                       value="@(Model[i].DepartureTime?.ToString(@"hh\:mm"))" />
-                            </td>
-
-                            <td>
-                                <input name="routes[@i].Distance" type="number" class="form-control" value="@Model[i].Distance" />
-                            </td>
-
-
-                            <td>
-                                <input name="routes[@i].Day" type="number" class="form-control" value="@Model[i].Day" />
-                            </td>
-
-
-                            <!-- Hidden ID -->
+                            <!-- Hidden ID & IsTemporary -->
                             <td style="display:none;">
-                                <input name="routes[@i].Id" type="hidden" value="@Model[i].Id" />
+                                <input name="routes[0].Id" type="hidden" value="0" />
+                                <input type="hidden" name="routes[0].IsTemporary" value="false" class="is-temp-input" />
                             </td>
 
-                            <td class="text-center">
-                                <button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteRouteRow(this)">
-                                    <i class="bi bi-trash"></i>
-                                </button>
+                            <td style="width:95px; text-align:center;">
+                                <div style="display:flex; justify-content:center; align-items:center; gap:8px;">
+                                    <button type="button" class="btn-action-add" onclick="openInsertModal(this)" title="Insert Stop Below">
+                                        <i class="bi bi-plus-lg"></i>
+                                    </button>
+                                    <button type="button" class="btn-action-delete" onclick="deleteRouteRow(this)" title="Delete Stop">
+                                        <i class="bi bi-trash3"></i>
+                                    </button>
+                                </div>
                             </td>
-                            <td>
+                            <td style="width:75px; text-align:center;">
                                 <input type="checkbox"
-                                       class="skip-checkbox"
-                                       name="routes[@i].IsSkipped"
-                                       value="true"
-                                       @(Model[i].IsSkipped ? "checked" : "") />
-
-                                <input type="hidden" name="routes[@i].IsSkipped" value="false" />
+                                       class="skip-checkbox modern-checkbox"
+                                       name="routes[0].IsSkipped"
+                                       value="true" />
+                                <input type="hidden" name="routes[0].IsSkipped" value="false" />
                             </td>
                         </tr>
                     }
-                }
-                else
-                {
-                    <tr class="fade-row">
-                        <td><input name="routes[0].StopNumber" type="number" class="form-control" /></td>
+                </tbody>
+            </table>
+        </div>
 
-                        <td>
-                            <select name="routes[0].StationId" class="form-select">
-                                @foreach (var s in stations)
-                                {
-                                    <option value="@s.Id">@s.Name</option>
-                                }
-                            </select>
-                        </td>
-
-                        <td><input name="routes[0].ArrivalTime" type="time" class="form-control" /></td>
-                        <td><input name="routes[0].DepartureTime" type="time" class="form-control" /></td>
-                        <td><input name="routes[0].Distance" type="number" class="form-control" /></td>
-                        <td><input name="routes[0].Day" min="1" type="number" class="form-control" /></td>
-
-                        <td class="text-center">
-                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteRouteRow(this)">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </td>
-                        <td>
-                            <input type="checkbox" class="skip-checkbox" />
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-
-        <!-- ✅ Buttons -->
-        <div class="mt-3 d-flex gap-2">
-            <button type="button" id="addRow" class="btn btn-primary btn-add">
-                <i class="bi bi-plus-circle me-1"></i> Add Stop
-            </button>
-
-            <button type="submit" class="btn btn-success btn-save">
-                <i class="bi bi-save2 me-1"></i> Save Route
-            </button>
-
-            <a asp-action="TrainList" class="btn btn-outline-secondary">
-                <i class="bi bi-arrow-left"></i> Back
-            </a>
+        <!-- ✅ Bottom Action Buttons -->
+        <div class="route-bottom-bar">
+            <div class="bottom-bar-left">
+                <button type="button" id="addRow" class="btn-bottom-add">
+                    <i class="bi bi-plus-circle-fill"></i> Add Stop at End
+                </button>
+            </div>
+            <div class="bottom-bar-right">
+                <a asp-action="TrainList" class="btn-bottom-back">
+                    <i class="bi bi-arrow-left"></i> Back to Train List
+                </a>
+                <button type="submit" class="btn-bottom-save">
+                    <i class="bi bi-check2-circle"></i> Save Route
+                </button>
+            </div>
         </div>
 
     </form>
+</div>
+
+<!-- Modern Redesigned Modal Dialog for Choosing Stop Type (Regular vs Temp Halt) -->
+<div id="insertStopDialog" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.65); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); z-index:99999; align-items:center; justify-content:center;">
+    <div class="custom-modal-card" style="background:#ffffff; border-radius:20px; max-width:440px; width:92%; padding:28px 24px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.35); text-align:left; position:relative; border:1px solid #e2e8f0;">
+        
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <div style="width:38px; height:38px; border-radius:12px; background:#eff6ff; color:#2563eb; display:flex; align-items:center; justify-content:center; font-size:19px;">
+                    <i class="bi bi-plus-circle-fill"></i>
+                </div>
+                <div>
+                    <h5 style="margin:0; font-size:17px; font-weight:800; color:#0f172a; letter-spacing:-0.2px;">Insert Stop Below</h5>
+                    <span style="font-size:12px; color:#64748b;">Configure stoppage characteristics</span>
+                </div>
+            </div>
+            <button type="button" onclick="closeInsertDialog()" style="background:#f1f5f9; border:none; width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px; cursor:pointer; color:#64748b; transition:all 0.2s ease;">&times;</button>
+        </div>
+
+        <p style="color:#64748b; font-size:13.5px; margin-bottom:20px; line-height:1.5;">Choose whether to insert a standard regular timetable halt or a temporary/seasonal festival stoppage:</p>
+        
+        <div style="display:flex; flex-direction:column; gap:14px;">
+            <!-- Regular Stop Option -->
+            <button type="button" class="btn-option-card btn-regular-stop" onclick="confirmInsertStop(false)">
+                <div class="option-icon-box regular-icon-box">
+                    <i class="bi bi-geo-alt-fill"></i>
+                </div>
+                <div class="option-text-box">
+                    <div class="option-title">Regular Stop</div>
+                    <div class="option-desc">Permanent scheduled halt active for all regular dates</div>
+                </div>
+                <div class="option-arrow">
+                    <i class="bi bi-chevron-right"></i>
+                </div>
+            </button>
+
+            <!-- Temporary Halt Option -->
+            <button type="button" class="btn-option-card btn-temp-stop" onclick="confirmInsertStop(true)">
+                <div class="option-icon-box temp-icon-box">
+                    <i class="bi bi-clock-history"></i>
+                </div>
+                <div class="option-text-box">
+                    <div class="option-title">
+                        Temporary Halt
+                        <span class="badge-seasonal">Festival / Special</span>
+                    </div>
+                    <div class="option-desc">Special stoppage active during designated seasonal dates</div>
+                </div>
+                <div class="option-arrow">
+                    <i class="bi bi-chevron-right"></i>
+                </div>
+            </button>
+        </div>
+
+        <div style="margin-top:20px; text-align:right;">
+            <button type="button" onclick="closeInsertDialog()" style="background:transparent; border:none; color:#64748b; font-weight:600; font-size:13px; cursor:pointer; padding:6px 12px; border-radius:6px;">Cancel</button>
+        </div>
+    </div>
 </div>
 
 @section Scripts {
@@ -284,65 +546,198 @@
     <script>
         var tableBody = document.getElementById("routeTableBody");
         var deletedIdsInput = document.getElementById("deletedIds");
+        var selectedRowForInsert = null;
 
-        // ✅ Add row (MINIMAL FIX ONLY)
+        function openInsertModal(btn) {
+            selectedRowForInsert = btn.closest("tr");
+            var dialog = document.getElementById("insertStopDialog");
+            if (dialog) dialog.style.display = "flex";
+        }
+
+        function closeInsertDialog() {
+            var dialog = document.getElementById("insertStopDialog");
+            if (dialog) dialog.style.display = "none";
+            selectedRowForInsert = null;
+        }
+
+        function confirmInsertStop(isTemporary) {
+            var currentRow = selectedRowForInsert;
+            closeInsertDialog();
+            if (!currentRow) return;
+
+            var newRow = currentRow.cloneNode(true);
+            newRow.classList.add("fade-row");
+
+            var tempInput = newRow.querySelector(".is-temp-input");
+            var badge = newRow.querySelector(".temp-badge");
+            if (badge) badge.remove();
+
+            if (isTemporary) {
+                newRow.classList.add("temporary-row");
+                if (tempInput) tempInput.value = "true";
+
+                var select = newRow.querySelector("select");
+                var stationCell = select ? select.closest("td") : null;
+                if (stationCell) {
+                    var flexContainer = stationCell.querySelector(".station-cell-flex") || stationCell.querySelector(".d-flex") || stationCell;
+                    if (flexContainer && !flexContainer.querySelector(".temp-badge")) {
+                        var newBadge = document.createElement("span");
+                        newBadge.className = "temp-badge temp-badge-pill";
+                        newBadge.innerHTML = '<i class="bi bi-clock-history"></i> Temp Halt';
+                        flexContainer.appendChild(newBadge);
+                    }
+                }
+            } else {
+                newRow.classList.remove("temporary-row");
+                if (tempInput) tempInput.value = "false";
+            }
+
+            var idInput = newRow.querySelector("input[name$='.Id']");
+            if (idInput) idInput.value = "0";
+
+            var select = newRow.querySelector("select");
+            if (select) select.selectedIndex = 0;
+
+            newRow.querySelectorAll("input").forEach(function (inp) {
+                if (inp.type === "time" || inp.name.endsWith(".Distance")) {
+                    inp.value = "";
+                } else if (inp.type === "checkbox") {
+                    inp.checked = false;
+                } else if (inp.name.endsWith(".IsSkipped") && inp.type === "hidden") {
+                    inp.value = "false";
+                }
+            });
+
+            var currentDay = currentRow.querySelector("input[name$='.Day']");
+            var newDay = newRow.querySelector("input[name$='.Day']");
+            if (currentDay && newDay) {
+                newDay.value = currentDay.value || 1;
+            }
+
+            currentRow.after(newRow);
+            updateRowIndicesAndOrder();
+            updateTempControlsState();
+        }
+
+        // ✅ Add Stop at Bottom (Regular Stop)
         document.getElementById("addRow").addEventListener("click", function () {
             var rowCount = tableBody.rows.length;
             var newRow = tableBody.rows[0].cloneNode(true);
 
-            newRow.querySelectorAll("input, select").forEach(function (input) {
-                input.name = input.name.replace(/\[\d+\]/, "[" + rowCount + "]");
+            newRow.classList.remove("temporary-row");
+            newRow.classList.add("fade-row");
 
+            // Remove temp badge if cloned from a temp row
+            var badge = newRow.querySelector(".temp-badge");
+            if (badge) {
+                badge.remove();
+            }
+
+            var tempInput = newRow.querySelector(".is-temp-input");
+            if (tempInput) {
+                tempInput.value = "false";
+            }
+
+            newRow.querySelectorAll("input, select").forEach(function (input) {
                 if (input.tagName.toLowerCase() === "select") {
                     input.selectedIndex = 0;
                 }
                 else if (input.name.endsWith(".Id")) {
-                    input.value = 0;
+                    input.value = "0";
                 }
                 else if (input.name.endsWith(".Day")) {
-                    input.value = 1;   // ✅ Default Day = 1
+                    input.value = 1;
                 }
                 else if (input.type === "checkbox") {
                     input.checked = false;
+                }
+                else if (input.name.endsWith(".IsSkipped") && input.type === "hidden") {
+                    input.value = "false";
+                }
+                else if (input.name.endsWith(".IsTemporary") && input.type === "hidden") {
+                    input.value = "false";
                 }
                 else {
                     input.value = "";
                 }
             });
 
-            newRow.classList.add("fade-row");
             tableBody.appendChild(newRow);
+            updateRowIndicesAndOrder();
+            updateTempControlsState();
         });
 
-        // ✅ Delete row (UNCHANGED)
+        // ✅ Delete row
         function deleteRouteRow(btn) {
             var row = btn.closest("tr");
             var idInput = row.querySelector("input[name$='.Id']");
 
-            if (idInput && idInput.value && idInput.value != "0") {
-                var deletedIds = deletedIdsInput.value ? deletedIdsInput.value.split(",") : [];
-                deletedIds.push(idInput.value);
-                deletedIdsInput.value = deletedIds.join(",");
-            }
-
             if (tableBody.rows.length > 1) {
-                let confirmDelete = confirm("do you want delete this stop ?");
-
-                if(confirmDelete) {
+                let confirmDelete = confirm("Do you want to delete this stop?");
+                if (confirmDelete) {
+                    if (idInput && idInput.value && idInput.value != "0") {
+                        var deletedIds = deletedIdsInput.value ? deletedIdsInput.value.split(",") : [];
+                        deletedIds.push(idInput.value);
+                        deletedIdsInput.value = deletedIds.join(",");
+                    }
                     row.remove();
-                    updateRowIndices();
+                    updateRowIndicesAndOrder();
+                    updateTempControlsState();
                 }
             } else {
                 alert("At least one stop is required.");
             }
         }
 
-        // ✅ Fade-out success popup (RESTORED 100%)
+        // ✅ Fix indices and sequential Stop #
+        function updateRowIndicesAndOrder() {
+            tableBody.querySelectorAll("tr").forEach(function (row, index) {
+                row.querySelectorAll("input, select").forEach(function (input) {
+                    if (input.name) {
+                        input.name = input.name.replace(/routes\[\d+\]/, "routes[" + index + "]");
+                    }
+                });
+                var stopInput = row.querySelector(".stop-number-input");
+                if (stopInput) {
+                    stopInput.value = index + 1;
+                }
+            });
+        }
+
+        // ✅ Dynamic Temporary Controls State
+        function updateTempControlsState() {
+            var tempRows = tableBody.querySelectorAll(".is-temp-input[value='true']");
+            var hasTemp = tempRows.length > 0;
+
+            var tempInput = document.getElementById("tempDates");
+            var resetBtn = document.getElementById("btnResetTemp");
+
+            if (tempInput) {
+                tempInput.disabled = !hasTemp;
+                if (!hasTemp) {
+                    tempInput.placeholder = "Add a temporary stop first";
+                    if (tempFp) {
+                        tempFp.clear();
+                    }
+                    tempInput.value = "";
+                    tempInput.title = "";
+                    var countEl = document.getElementById("tempDatesCount");
+                    if (countEl) countEl.textContent = "";
+                } else {
+                    tempInput.placeholder = "Select Dates";
+                }
+            }
+
+            if (resetBtn) {
+                resetBtn.disabled = !hasTemp;
+            }
+        }
+
+        // ✅ Fade-out success popup
         document.addEventListener("DOMContentLoaded", () => {
             const popup = document.querySelector(".success-popup");
             if (popup) {
                 const popupContent = popup.querySelector(".popup-content");
-
                 setTimeout(() => {
                     popupContent.classList.add("fade-out");
                     setTimeout(() => {
@@ -352,85 +747,219 @@
             }
         });
 
-        // ✅ Fix indices after deletion (UNCHANGED)
-        function updateRowIndices() {
-            tableBody.querySelectorAll("tr").forEach(function (row, index) {
-                row.querySelectorAll("input, select").forEach(function (input) {
-                    input.name = input.name.replace(/\[\d+\]/, "[" + index + "]");
-                });
-            });
-        }
-
-        // GLOBAL VARIABLES
+        // GLOBAL FLATPICKR INSTANCES
         let skipFp;
         let cancelFp;
+        let tempFp;
 
-        document.addEventListener("DOMContentLoaded", function () {
+        function updateDateCounts() {
+            const sInput = document.getElementById("skipDates");
+            const cInput = document.getElementById("cancelDates");
+            const tInput = document.getElementById("tempDates");
+            const sCount = document.getElementById("skipDatesCount");
+            const cCount = document.getElementById("cancelDatesCount");
+            const tCount = document.getElementById("tempDatesCount");
 
+            if (sInput && sCount) {
+                const dates = (sInput.value || "")
+                    .split(/[,;\s]+/)
+                    .map(s => s.trim())
+                    .filter(s => /^\d{4}-\d{2}-\d{2}$/.test(s));
+                const count = (new Set(dates)).size;
+                sCount.textContent = count > 0 ? `(${count} date${count > 1 ? 's' : ''})` : "";
+                sInput.title = sInput.value;
+            }
+            if (cInput && cCount) {
+                const dates = (cInput.value || "")
+                    .split(/[,;\s]+/)
+                    .map(s => s.trim())
+                    .filter(s => /^\d{4}-\d{2}-\d{2}$/.test(s));
+                const count = (new Set(dates)).size;
+                cCount.textContent = count > 0 ? `(${count} date${count > 1 ? 's' : ''})` : "";
+                cInput.title = cInput.value;
+            }
+            if (tInput && tCount) {
+                const dates = (tInput.value || "")
+                    .split(/[,;\s]+/)
+                    .map(s => s.trim())
+                    .filter(s => /^\d{4}-\d{2}-\d{2}$/.test(s));
+                const count = (new Set(dates)).size;
+                tCount.textContent = count > 0 ? `(${count} date${count > 1 ? 's' : ''})` : "";
+                tInput.title = tInput.value;
+            }
+        }
+
+        function initDatePickers() {
             const skipInput = document.getElementById("skipDates");
             const cancelInput = document.getElementById("cancelDates");
+            const tempInput = document.getElementById("tempDates");
 
-            // ✅ INIT SKIP CALENDAR
-            if (skipInput) {
+            if (typeof flatpickr === 'undefined') {
+                setTimeout(initDatePickers, 80);
+                return;
+            }
+
+            // Up to 6 full months in advance
+            var maxLimitDate = new Date();
+            maxLimitDate.setMonth(maxLimitDate.getMonth() + 6);
+
+            function calcMinDate(dates) {
+                var min = new Date();
+                min.setHours(0, 0, 0, 0);
+                if (dates && dates.length > 0) {
+                    for (var i = 0; i < dates.length; i++) {
+                        var parsed = new Date(dates[i]);
+                        if (!isNaN(parsed) && parsed < min) {
+                            min = parsed;
+                        }
+                    }
+                }
+                return min;
+            }
+
+            // ✅ INIT SKIP CALENDAR (UP TO 6 MONTHS)
+            if (skipInput && !skipFp) {
+                const initialSkipDates = (skipInput.value || "")
+                    .split(/[,;\s]+/)
+                    .map(s => s.trim())
+                    .filter(s => /^\d{4}-\d{2}-\d{2}$/.test(s));
+
                 skipFp = flatpickr(skipInput, {
                     mode: "multiple",
                     dateFormat: "Y-m-d",
-                    minDate: "today",   // 🔥 prevents past dates
-                    maxDate: new Date().fp_incr(60), // 🔥 only next 2 months
-
-                    defaultDate: skipInput.value ? skipInput.value.split(",") : [],
-
+                    conjunction: ", ",
+                    closeOnSelect: false,
+                    allowInput: false,
+                    minDate: calcMinDate(initialSkipDates),
+                    maxDate: maxLimitDate,
+                    monthSelectorType: "dropdown",
+                    defaultDate: initialSkipDates,
                     onChange: function (selectedDates, dateStr) {
                         skipInput.value = dateStr;
+                        updateDateCounts();
                     }
                 });
             }
 
-            // ✅ INIT CANCEL CALENDAR
-            if (cancelInput) {
+            // ✅ INIT CANCEL CALENDAR (UP TO 6 MONTHS)
+            if (cancelInput && !cancelFp) {
+                const initialCancelDates = (cancelInput.value || "")
+                    .split(/[,;\s]+/)
+                    .map(s => s.trim())
+                    .filter(s => /^\d{4}-\d{2}-\d{2}$/.test(s));
+
                 cancelFp = flatpickr(cancelInput, {
                     mode: "multiple",
                     dateFormat: "Y-m-d",
-                    minDate: "today",   // 🔥 prevents past dates
-                    maxDate: new Date().fp_incr(60), // 🔥 only next 2 months
-
-                    defaultDate: cancelInput.value ? cancelInput.value.split(",") : [],
-
+                    conjunction: ", ",
+                    closeOnSelect: false,
+                    allowInput: false,
+                    minDate: calcMinDate(initialCancelDates),
+                    maxDate: maxLimitDate,
+                    monthSelectorType: "dropdown",
+                    defaultDate: initialCancelDates,
                     onChange: function (selectedDates, dateStr) {
                         cancelInput.value = dateStr;
+                        updateDateCounts();
                     }
                 });
             }
 
-            // ✅ SKIP VALIDATION
+            // ✅ INIT TEMPORARY CALENDAR (UP TO 6 MONTHS)
+            if (tempInput && !tempFp) {
+                const initialTempDates = (tempInput.value || "")
+                    .split(/[,;\s]+/)
+                    .map(s => s.trim())
+                    .filter(s => /^\d{4}-\d{2}-\d{2}$/.test(s));
+
+                tempFp = flatpickr(tempInput, {
+                    mode: "multiple",
+                    dateFormat: "Y-m-d",
+                    conjunction: ", ",
+                    closeOnSelect: false,
+                    allowInput: false,
+                    minDate: calcMinDate(initialTempDates),
+                    maxDate: maxLimitDate,
+                    monthSelectorType: "dropdown",
+                    defaultDate: initialTempDates,
+                    onChange: function (selectedDates, dateStr) {
+                        tempInput.value = dateStr;
+                        updateDateCounts();
+                    }
+                });
+            }
+
+            updateDateCounts();
+            updateTempControlsState();
+
+            // ✅ VALIDATION FOR CHECKBOXES
             document.addEventListener("change", function (e) {
-
                 if (e.target.classList.contains("skip-checkbox")) {
-
-                    let dates = skipInput.value;
-
+                    let dates = skipInput ? skipInput.value : "";
                     if (e.target.checked && (!dates || dates.trim() === "")) {
-                        alert("Select SKIP dates first");
+                        alert("Select SKIP dates first from the calendar above.");
                         e.target.checked = false;
                     }
                 }
             });
-        });
+        }
 
-        // ✅ GLOBAL RESET FUNCTIONS (IMPORTANT)
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", initDatePickers);
+        } else {
+            initDatePickers();
+        }
+
+        // ✅ GLOBAL RESET FUNCTIONS
         function clearCancelDates() {
             if (cancelFp) {
                 cancelFp.clear();
-                document.getElementById("cancelDates").value = "";
             }
+            const cInput = document.getElementById("cancelDates");
+            if (cInput) {
+                cInput.value = "";
+                cInput.title = "";
+            }
+            updateDateCounts();
         }
 
         function clearSkipDates() {
             if (skipFp) {
                 skipFp.clear();
-                document.getElementById("skipDates").value = "";
             }
+            const sInput = document.getElementById("skipDates");
+            if (sInput) {
+                sInput.value = "";
+                sInput.title = "";
+            }
+            updateDateCounts();
         }
+
+        function clearTempDates() {
+            if (tempFp) {
+                tempFp.clear();
+            }
+            const tInput = document.getElementById("tempDates");
+            if (tInput) {
+                tInput.value = "";
+                tInput.title = "";
+            }
+            updateDateCounts();
+        }
+
+        // 🚆 Sticky Single-Line Train Strip Toggle on Scroll Down
+        window.addEventListener("scroll", function () {
+            var strip = document.getElementById("stickyTrainStrip");
+            var hero = document.getElementById("trainHeroCard");
+            if (!strip) return;
+
+            var threshold = hero ? (hero.offsetTop + hero.offsetHeight - 20) : 200;
+            if (window.scrollY > threshold) {
+                strip.classList.add("visible");
+            } else {
+                strip.classList.remove("visible");
+            }
+        });
 
         // 🔥 Keep admin session alive
         setInterval(() => {
@@ -443,96 +972,1240 @@
 }
 
 <style>
-    .route-controls {
+    /* ==========================================================================
+       MINIMALIST SINGLE-LINE STICKY TRAIN STRIP (On Scroll Down)
+       ========================================================================== */
+    .sticky-train-strip {
+        position: fixed;
+        top: var(--header-total-height, 100px);
+        left: 0;
+        right: 0;
+        width: 100%;
+        background: rgba(255, 255, 255, 0.96);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-bottom: 1.5px solid #cbd5e1;
+        box-shadow: 0 4px 18px rgba(15, 23, 42, 0.08);
+        z-index: 10001;
+        padding: 8px 24px;
+        transform: translateY(-120%);
+        opacity: 0;
+        pointer-events: none;
+        transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+    }
+
+    .sticky-train-strip.visible {
+        transform: translateY(0);
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .strip-container {
+        max-width: 1380px;
+        margin: 0 auto;
         display: flex;
-        align-items: flex-end;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: nowrap;
+    }
+
+    .strip-train-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    .strip-train-num {
+        background: #1e3a8a;
+        color: #ffffff;
+        font-weight: 800;
+        font-size: 13px;
+        padding: 4px 10px;
+        border-radius: 7px;
+        letter-spacing: 0.5px;
+    }
+
+    .strip-train-name {
+        font-weight: 700;
+        font-size: 14px;
+        color: #0f172a;
+    }
+
+    .strip-separator {
+        width: 1px;
+        height: 22px;
+        background: #cbd5e1;
+        flex-shrink: 0;
+    }
+
+    .strip-route-info {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        white-space: nowrap;
+        font-size: 13px;
+        font-weight: 600;
+        color: #1e293b;
+    }
+
+    .strip-station-name {
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .strip-time-badge {
+        background: #f1f5f9;
+        color: #475569;
+        font-weight: 700;
+        font-size: 11.5px;
+        padding: 2px 7px;
+        border-radius: 6px;
+        border: 1px solid #e2e8f0;
+    }
+
+    .strip-route-arrow {
+        color: #2563eb;
+        font-size: 14px;
+        font-weight: 800;
+        margin: 0 4px;
+    }
+
+    .strip-meta-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    .strip-meta-pill {
+        display: inline-flex;
+        align-items: center;
+        font-size: 12px;
+        font-weight: 600;
+        color: #334155;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        padding: 4px 10px;
+        border-radius: 8px;
+    }
+
+    .strip-coach-pill {
+        background: #fefce8;
+        border-color: #fef08a;
+        color: #854d0e;
+        font-weight: 700;
+    }
+
+    /* ==========================================================================
+       EXPANDED TOP TRAIN HERO CARD & ANIMATED COACH TRACK
+       ========================================================================== */
+    .train-hero-card {
+        background: #ffffff;
+        border-radius: 18px;
+        padding: 22px 26px;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+        border: 1px solid #e2e8f0;
+        margin-top: 10px;
+    }
+
+    .train-hero-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
         gap: 20px;
         flex-wrap: wrap;
-        background: #f4f6fb;
-        padding: 20px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .hero-left {
+        flex: 1;
+        min-width: 320px;
+    }
+
+    .hero-badge-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #eff6ff;
+        color: #1d4ed8;
+        font-size: 11.5px;
+        font-weight: 700;
+        padding: 3px 10px;
+        border-radius: 999px;
+        border: 1px solid #bfdbfe;
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+
+    .hero-train-title {
+        font-size: 22px;
+        font-weight: 800;
+        color: #0f172a;
+        margin: 0 0 14px 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .hero-train-num {
+        background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+        color: #ffffff;
+        padding: 3px 12px;
+        border-radius: 8px;
+        font-size: 18px;
+        letter-spacing: 0.5px;
+    }
+
+    .hero-journey-points {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .journey-point {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .point-label {
+        font-size: 11px;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+    }
+
+    .point-station {
+        font-size: 15px;
+        font-weight: 800;
+        color: #0f172a;
+    }
+
+    .point-time {
+        font-size: 12px;
+        font-weight: 600;
+        color: #2563eb;
+    }
+
+    .journey-arrow-box {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 0 8px;
+    }
+
+    .journey-dist-badge {
+        font-size: 11px;
+        font-weight: 700;
+        color: #059669;
+        background: #ecfdf5;
+        border: 1px solid #a7f3d0;
+        padding: 2px 7px;
+        border-radius: 6px;
+    }
+
+    .journey-arrow-line {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 70px;
+        height: 2px;
+        background: #cbd5e1;
+        position: relative;
+    }
+
+    .arrow-anim {
+        position: absolute;
+        color: #2563eb;
+        font-size: 12px;
+        animation: arrowSlide 1.8s infinite ease-in-out;
+    }
+
+    @@keyframes arrowSlide {
+        0% { transform: translateX(-24px); opacity: 0; }
+        50% { opacity: 1; }
+        100% { transform: translateX(24px); opacity: 0; }
+    }
+
+    .journey-time-badge {
+        font-size: 11px;
+        font-weight: 700;
+        color: #475569;
+    }
+
+    .hero-right {
+        flex-shrink: 0;
+    }
+
+    .hero-stats-card {
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        border: 1px solid #e2e8f0;
         border-radius: 12px;
-        border: 1px solid #e2e6ea;
+        padding: 12px 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 190px;
+    }
+
+    .stat-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 12.5px;
+    }
+
+    .stat-label {
+        color: #64748b;
+        font-weight: 600;
+    }
+
+    .stat-val {
+        color: #0f172a;
+        font-weight: 700;
+    }
+
+    /* 🚆 RAKE TRACK & COACH COMPOSITION */
+    .rake-track-section {
+        margin-top: 18px;
+        padding-top: 16px;
+    }
+
+    .rake-track-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 14px;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .rake-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        font-weight: 800;
+        color: #0f172a;
+    }
+
+    .badge-coach-count {
+        background: #f1f5f9;
+        color: #334155;
+        border: 1px solid #cbd5e1;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 2px 7px;
+        border-radius: 6px;
+    }
+
+    .rake-track-legend {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 11.5px;
+        font-weight: 600;
+        color: #64748b;
+        flex-wrap: wrap;
+    }
+
+    .legend-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 3px;
+        display: inline-block;
+        margin-right: 3px;
+    }
+    .loco-dot { background: #ea580c; }
+    .gen-dot { background: #16a34a; }
+    .sl-dot { background: #2563eb; }
+    .ac3-dot { background: #0891b2; }
+    .ac2-dot { background: #9333ea; }
+    .ac1-dot { background: #b45309; }
+    .eog-dot { background: #eab308; }
+    .slr-dot { background: #475569; }
+
+    /* The Animated Train Consistency */
+    .rake-scroll-container {
+        position: relative;
+        padding: 16px 12px 14px 12px;
+        background: linear-gradient(180deg, #f8fafc 0%, #edf2f7 100%);
+        border-radius: 14px;
+        border: 1px solid #e2e8f0;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .train-consist {
+        display: inline-flex;
+        align-items: flex-end;
+        position: relative;
+        z-index: 2;
+        padding-bottom: 6px;
+    }
+
+    .coach-unit {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 58px;
+        position: relative;
+        animation: coachPop 0.35s ease-out backwards;
+    }
+
+    @@keyframes coachPop {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .coach-roof {
+        width: 52px;
+        height: 6px;
+        border-top-left-radius: 6px;
+        border-top-right-radius: 6px;
+        background: rgba(255, 255, 255, 0.4);
+    }
+
+    .coach-body {
+        width: 56px;
+        height: 40px;
+        border-radius: 6px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        color: #ffffff;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        cursor: default;
+    }
+
+    .coach-unit:hover .coach-body {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 14px rgba(0, 0, 0, 0.2);
+    }
+
+    .coach-icon {
+        font-size: 13px;
+        line-height: 1;
+    }
+
+    .coach-code {
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.3px;
+        line-height: 1;
+    }
+
+    .coach-undercarriage {
+        width: 44px;
+        display: flex;
+        justify-content: space-between;
+        margin-top: 2px;
+    }
+
+    .wheel {
+        width: 8px;
+        height: 8px;
+        background: #1e293b;
+        border-radius: 50%;
+        border: 1.5px solid #64748b;
+        animation: wheelSpin 1.2s linear infinite;
+    }
+
+    @@keyframes wheelSpin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+
+    .coach-pos-idx {
+        font-size: 9.5px;
+        font-weight: 700;
+        color: #94a3b8;
+        margin-top: 3px;
+    }
+
+    .coach-coupler {
+        width: 10px;
+        height: 3px;
+        background: #64748b;
+        margin-bottom: 22px;
+        border-radius: 1px;
+    }
+
+    /* Distinct Colors by Coach Type */
+    .coach-loco .coach-body {
+        background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
+        border: 1.5px solid #ffedd5;
+    }
+    .coach-gen .coach-body {
+        background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+        border: 1.5px solid #dcfce7;
+    }
+    .coach-sleeper .coach-body {
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        border: 1.5px solid #dbeafe;
+    }
+    .coach-ac3 .coach-body {
+        background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%);
+        border: 1.5px solid #cffafe;
+    }
+    .coach-ac2 .coach-body {
+        background: linear-gradient(135deg, #9333ea 0%, #7e22ce 100%);
+        border: 1.5px solid #f3e8ff;
+    }
+    .coach-ac1 .coach-body {
+        background: linear-gradient(135deg, #b45309 0%, #92400e 100%);
+        border: 1.5px solid #fef3c7;
+    }
+    .coach-eog .coach-body {
+        background: linear-gradient(135deg, #eab308 0%, #ca8a04 100%);
+        border: 1.5px solid #fef08a;
+    }
+    .coach-cc .coach-body {
+        background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+        border: 1.5px solid #bae6fd;
+    }
+    .coach-slr .coach-body {
+        background: linear-gradient(135deg, #475569 0%, #334155 100%);
+        border: 1.5px solid #e2e8f0;
+    }
+
+    /* Track Rails */
+    .rail-track {
+        position: absolute;
+        bottom: 24px;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, #94a3b8 0%, #cbd5e1 50%, #94a3b8 100%);
+        z-index: 1;
+    }
+
+    .rail-ties {
+        position: absolute;
+        bottom: 21px;
+        left: 0;
+        right: 0;
+        height: 6px;
+        background: repeating-linear-gradient(90deg, #475569 0px, #475569 4px, transparent 4px, transparent 14px);
+        opacity: 0.6;
+        z-index: 0;
+    }
+
+    /* ==========================================================================
+       PAGE CONTAINER & THEME
+       ========================================================================== */
+    .route-card {
+        background: #ffffff;
+        border-radius: 18px;
+        padding: 26px;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+        border: 1px solid #e2e8f0;
+    }
+
+    .route-header-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 24px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid #e2e8f0;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .route-title-box {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .route-title {
+        font-size: 24px;
+        font-weight: 800;
+        color: #0f172a;
+        margin: 0;
+        letter-spacing: -0.5px;
+    }
+
+    .route-subtitle {
+        font-size: 13.5px;
+        color: #64748b;
+        margin-top: 4px;
+    }
+
+    .train-code-badge {
+        display: inline-block;
+        background: #eff6ff;
+        color: #1d4ed8;
+        font-weight: 700;
+        font-size: 12px;
+        padding: 3px 8px;
+        border-radius: 6px;
+        border: 1px solid #bfdbfe;
+        margin-left: 6px;
+    }
+
+    .btn-top-back {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: #f8fafc;
+        color: #334155;
+        border: 1px solid #cbd5e1;
+        padding: 8px 16px;
+        border-radius: 9px;
+        font-size: 13px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.2s ease;
+    }
+
+    .btn-top-back:hover {
+        background: #f1f5f9;
+        color: #0f172a;
+        border-color: #94a3b8;
+        text-decoration: none;
+        transform: translateX(-2px);
+    }
+
+    /* ==========================================================================
+       SCHEDULE & DATE EXCEPTIONS BAR
+       ========================================================================== */
+    .route-controls-card {
+        background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 20px 22px;
+    }
+
+    .route-controls-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+    }
+
+    .controls-title {
+        font-size: 15px;
+        font-weight: 700;
+        color: #0f172a;
+        display: block;
+    }
+
+    .controls-sub {
+        font-size: 12.5px;
+        color: #64748b;
+        display: block;
+        margin-top: 2px;
+    }
+
+    .route-controls-grid {
+        display: flex;
+        align-items: flex-end;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
     }
 
     .date-box {
         display: flex;
         flex-direction: column;
         gap: 6px;
+        flex: 1;
+        min-width: 220px;
     }
 
-        .date-box label {
-            font-weight: 600;
-            font-size: 14px;
-            color: #333;
-        }
+    .date-box label {
+        font-weight: 600;
+        font-size: 13px;
+        color: #334155;
+        display: flex;
+        align-items: center;
+    }
 
     .date-input {
-        width: 240px;
-        padding: 10px;
-        border-radius: 8px;
-        border: 1px solid #ced4da;
+        width: 100%;
+        padding: 9px 14px;
+        border-radius: 10px;
+        border: 1px solid #cbd5e1;
+        transition: all 0.2s ease;
+        background-color: #ffffff !important;
+        font-size: 13px;
+        color: #1e293b;
+        cursor: pointer;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+
+    .date-input:focus {
+        border-color: #2563eb;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+        background-color: #ffffff !important;
+    }
+
+    .date-input:disabled {
+        background-color: #e2e8f0 !important;
+        cursor: not-allowed !important;
+        color: #94a3b8 !important;
+    }
+
+    .route-controls-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        padding-top: 12px;
+        border-top: 1px dashed #cbd5e1;
+    }
+
+    .btn-ctrl {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        padding: 8px 16px;
+        border-radius: 9px;
+        border: 1px solid transparent;
+        cursor: pointer;
         transition: all 0.2s ease;
     }
 
-        .date-input:focus {
-            border-color: #0d6efd;
-            box-shadow: 0 0 4px rgba(13,110,253,0.3);
-        }
+    .btn-ctrl-warning {
+        background: #fef3c7;
+        color: #92400e;
+        border-color: #fde68a;
+    }
+    .btn-ctrl-warning:hover {
+        background: #fde68a;
+        color: #78350f;
+        transform: translateY(-1px);
+    }
 
-    .btn-warning {
-        background: #ffc107;
+    .btn-ctrl-danger {
+        background: #fee2e2;
+        color: #991b1b;
+        border-color: #fecaca;
+    }
+    .btn-ctrl-danger:hover {
+        background: #fecaca;
+        color: #7f1d1d;
+        transform: translateY(-1px);
+    }
+
+    .btn-ctrl-primary {
+        background: #dbeafe;
+        color: #1e40af;
+        border-color: #bfdbfe;
+    }
+    .btn-ctrl-primary:hover:not(:disabled) {
+        background: #bfdbfe;
+        color: #1e3a8a;
+        transform: translateY(-1px);
+    }
+    .btn-ctrl-primary:disabled {
+        background: #f1f5f9;
+        color: #94a3b8;
+        border-color: #e2e8f0;
+        cursor: not-allowed;
+        opacity: 0.7;
+    }
+
+    .btn-ctrl-save {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: #ffffff;
         border: none;
-        color: #000;
-        font-weight: 500;
-        border-radius: 8px;
-        padding: 8px 14px;
+        padding: 8px 20px;
+        font-weight: 700;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+        margin-left: auto;
+    }
+    .btn-ctrl-save:hover {
+        background: linear-gradient(135deg, #059669 0%, #047857 100%);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);
     }
 
-    .btn-danger {
-        background: #dc3545;
-        border: none;
-        color: #fff;
-        font-weight: 500;
-        border-radius: 8px;
-        padding: 8px 14px;
+    /* ==========================================================================
+       ROUTE TABLE STYLING
+       ========================================================================== */
+    .route-table-wrapper {
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        overflow: hidden;
     }
-
-    .btn-warning:hover {
-        background: #e0a800;
-    }
-
-    .btn-danger:hover {
-        background: #bb2d3b;
-    }
-
-    /* TABLE */
 
     .route-table {
+        margin-bottom: 0;
+        width: 100%;
+    }
+
+    .route-table thead th {
+        background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+        color: #ffffff;
+        font-size: 12.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 13px 10px;
+        text-align: center;
+        border: none;
+        white-space: nowrap;
+    }
+
+    .route-table tbody td {
+        padding: 10px;
+        vertical-align: middle;
+        font-size: 13.5px;
+        border-bottom: 1px solid #f1f5f9;
+        background: #ffffff;
+    }
+
+    .route-table tbody tr:hover td {
+        background-color: #f8fafc;
+    }
+
+    .temporary-row td {
+        background-color: #eff6ff !important;
+    }
+
+    .temporary-row td:first-child {
+        border-left: 4px solid #2563eb !important;
+    }
+
+    .station-cell-flex {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        max-width: 280px;
+    }
+
+    .stop-number-input {
+        width: 46px;
+        text-align: center;
+        font-weight: 700;
+        background: #f8fafc;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        padding: 6px 4px;
+        color: #0f172a;
+        font-size: 13px;
+    }
+
+    .modern-select {
+        flex: 1;
+        min-width: 150px;
+        max-width: 250px;
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+        padding: 6px 10px;
+        font-weight: 600;
+        color: #1e293b;
+        font-size: 13px;
+        background-color: #ffffff;
+        outline: none;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .modern-select:focus {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+
+    .modern-time {
+        width: 95px;
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+        padding: 6px 8px;
+        text-align: center;
+        font-weight: 600;
+        color: #1e293b;
+        font-size: 13px;
+        outline: none;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .modern-time:focus {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+
+    .modern-number {
+        width: 75px;
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+        padding: 6px 8px;
+        text-align: center;
+        font-weight: 600;
+        color: #1e293b;
+        font-size: 13px;
+        outline: none;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .modern-number:focus {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+
+    .temp-badge-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 11px;
+        font-weight: 700;
+        color: #1d4ed8;
+        background: #dbeafe;
+        border: 1px solid #bfdbfe;
+        border-radius: 6px;
+        padding: 3px 7px;
+        white-space: nowrap;
+    }
+
+    .modern-checkbox {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+        accent-color: #2563eb;
+    }
+
+    /* Action Buttons in Rows */
+    .btn-action-add {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        font-size: 14px;
+        color: #2563eb;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        transition: all 0.2s ease;
+    }
+    .btn-action-add:hover {
+        background: #2563eb;
+        color: #ffffff;
+        border-color: #2563eb;
+        transform: scale(1.05);
+    }
+
+    .btn-action-delete {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        font-size: 14px;
+        color: #dc2626;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        transition: all 0.2s ease;
+    }
+    .btn-action-delete:hover {
+        background: #dc2626;
+        color: #ffffff;
+        border-color: #dc2626;
+        transform: scale(1.05);
+    }
+
+    /* ==========================================================================
+       MODAL OPTION CARDS (Regular vs Temp Halt)
+       ========================================================================== */
+    .btn-option-card {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        width: 100%;
+        padding: 14px 16px;
+        border-radius: 14px;
+        background: #ffffff;
+        border: 1.5px solid #e2e8f0;
+        text-align: left;
+        cursor: pointer;
+        transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+        position: relative;
+    }
+
+    .btn-regular-stop {
+        border-color: #a7f3d0;
+        background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
+    }
+    .btn-regular-stop:hover {
+        border-color: #10b981;
+        box-shadow: 0 8px 20px rgba(16, 185, 129, 0.2);
+        transform: translateY(-2px);
+    }
+
+    .btn-temp-stop {
+        border-color: #bfdbfe;
+        background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%);
+    }
+    .btn-temp-stop:hover {
+        border-color: #2563eb;
+        box-shadow: 0 8px 20px rgba(37, 99, 235, 0.2);
+        transform: translateY(-2px);
+    }
+
+    .option-icon-box {
+        width: 44px;
+        height: 44px;
         border-radius: 12px;
-        overflow: hidden;
-        border: 1px solid #dee2e6;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        flex-shrink: 0;
     }
 
-        .route-table th {
-            background: linear-gradient(90deg, #0d6efd, #0b5ed7);
-            color: white;
-            text-align: center;
-            font-weight: 600;
-        }
+    .regular-icon-box {
+        background: #dcfce7;
+        color: #15803d;
+    }
 
-        .route-table td {
-            vertical-align: middle;
-            text-align: center;
-        }
+    .temp-icon-box {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
 
-        .route-table input,
-        .route-table select {
-            border-radius: 6px;
-        }
+    .option-text-box {
+        flex: 1;
+    }
 
-    /* Smooth row animation */
+    .option-title {
+        font-size: 15px;
+        font-weight: 700;
+        color: #0f172a;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .option-desc {
+        font-size: 12px;
+        color: #64748b;
+        margin-top: 2px;
+        line-height: 1.35;
+    }
+
+    .badge-seasonal {
+        font-size: 10px;
+        font-weight: 700;
+        background: #2563eb;
+        color: #ffffff;
+        padding: 2px 7px;
+        border-radius: 999px;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+
+    .option-arrow {
+        color: #94a3b8;
+        font-size: 16px;
+        transition: transform 0.2s ease;
+    }
+
+    .btn-option-card:hover .option-arrow {
+        color: #0f172a;
+        transform: translateX(3px);
+    }
+
+    /* Animation */
     .fade-row {
-        animation: fadeIn 0.3s ease-in-out;
+        animation: fadeIn 0.25s ease-in-out;
+    }
+    @@keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-4px); }
+        to { opacity: 1; transform: translateY(0); }
     }
 
+    /* ==========================================================================
+       BOTTOM ACTION BAR
+       ========================================================================== */
+    .route-bottom-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 24px;
+        padding-top: 20px;
+        border-top: 1px solid #e2e8f0;
+        gap: 14px;
+        flex-wrap: wrap;
+    }
+
+    .bottom-bar-left, .bottom-bar-right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .btn-bottom-add {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: #eff6ff;
+        color: #1d4ed8;
+        border: 1.5px solid #bfdbfe;
+        padding: 10px 20px;
+        border-radius: 10px;
+        font-weight: 700;
+        font-size: 13.5px;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .btn-bottom-add:hover {
+        background: #2563eb;
+        color: #ffffff;
+        border-color: #2563eb;
+        box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
+        transform: translateY(-1px);
+    }
+
+    .btn-bottom-save {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: linear-gradient(135deg, #059669 0%, #047857 100%);
+        color: #ffffff;
+        border: none;
+        padding: 10px 26px;
+        border-radius: 10px;
+        font-weight: 700;
+        font-size: 14px;
+        cursor: pointer;
+        box-shadow: 0 4px 14px rgba(5, 150, 105, 0.3);
+        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .btn-bottom-save:hover {
+        background: linear-gradient(135deg, #047857 0%, #065f46 100%);
+        box-shadow: 0 6px 18px rgba(5, 150, 105, 0.4);
+        transform: translateY(-1px);
+    }
+
+    .btn-bottom-back {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: #f8fafc;
+        color: #475569;
+        border: 1.5px solid #cbd5e1;
+        padding: 10px 20px;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 13.5px;
+        text-decoration: none;
+        transition: all 0.2s ease;
+    }
+    .btn-bottom-back:hover {
+        background: #f1f5f9;
+        color: #0f172a;
+        border-color: #94a3b8;
+        text-decoration: none;
+        transform: translateX(-2px);
+    }
+
+    /* ==========================================================================
+       RESPONSIVE MEDIA QUERIES (Mobile, Tablet, Desktop)
+       ========================================================================== */
+    @@media (max-width: 992px) {
+        .sticky-train-strip {
+            padding: 6px 14px;
+        }
+        .strip-container {
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+        }
+        .strip-separator {
+            display: none;
+        }
+        .train-hero-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .hero-right {
+            width: 100%;
+        }
+        .hero-stats-card {
+            width: 100%;
+        }
+        .route-card {
+            padding: 18px 14px;
+        }
+        .route-controls-grid {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 12px;
+        }
+        .date-box {
+            width: 100%;
+            min-width: 100%;
+        }
+        .route-bottom-bar {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .bottom-bar-left, .bottom-bar-right {
+            width: 100%;
+            justify-content: stretch;
+        }
+        .btn-bottom-add, .btn-bottom-save, .btn-bottom-back {
+            flex: 1;
+            justify-content: center;
+            text-align: center;
+        }
+    }
+
+    @@media (max-width: 768px) {
+        .strip-route-info {
+            font-size: 12px;
+        }
+        .strip-meta-info {
+            display: none;
+        }
+        .hero-journey-points {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 10px;
+        }
+        .journey-arrow-box {
+            align-self: center;
+        }
+        .route-header-bar {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .route-title {
+            font-size: 20px;
+        }
+        .route-table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .route-table {
+            min-width: 680px;
+        }
+        .btn-ctrl {
+            flex: 1;
+            justify-content: center;
+        }
+    }
 </style>

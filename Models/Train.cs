@@ -35,6 +35,7 @@ namespace IRCTCClone.Models
         public int SeatsAvailable { get; set; }
         public List<TrainClass> Classes { get; set; } = new();
         public bool IsDeparted { get; set; }
+        public bool IsFirstChartPrepared { get; set; }
         public bool IsChartPrepared { get; set; }
         public int DurationMinutes { get; set; }
         public string Durations
@@ -61,6 +62,29 @@ namespace IRCTCClone.Models
         public DateTime? ServiceStartDate { get; set; }
         public DateTime? ServiceEndDate { get; set; }
         public bool IsTrainCancelled { get; set; }
+        public string? CoachPositions { get; set; }
+
+        private bool? _isBookingAllowed;
+        public bool IsBookingAllowed
+        {
+            get
+            {
+                if (_isBookingAllowed.HasValue) return _isBookingAllowed.Value;
+                if (ServiceStartDate.HasValue)
+                {
+                    var indiaTime = TimeZoneInfo.ConvertTimeBySystemTimeZoneId(DateTime.UtcNow, "India Standard Time");
+                    var bookingOpenDate = ServiceStartDate.Value.Date.AddDays(-3);
+                    if (indiaTime.Date < bookingOpenDate)
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }
+            set => _isBookingAllowed = value;
+        }
+
+        public string BookingNotAllowedReason => "BOOKINGs are NOT ALLOWED at this TIME";
         //public DateTime? BookingOpenDate { get; set; }
         //public TimeSpan? BookingWindowTime { get; set; }
         //public bool IsBookingEnabled { get; set; }
@@ -107,6 +131,29 @@ namespace IRCTCClone.Models
                                 }
                             };
                         }
+                    }
+                }
+
+                if (train != null)
+                {
+                    try
+                    {
+                        using (var dateCmd = new SqlCommand("SELECT ServiceStartDate, ServiceEndDate FROM Trains WHERE Id = @TrainId", conn))
+                        {
+                            dateCmd.Parameters.AddWithValue("@TrainId", train.Id);
+                            using (var dReader = dateCmd.ExecuteReader())
+                            {
+                                if (dReader.Read())
+                                {
+                                    train.ServiceStartDate = dReader.IsDBNull(0) ? null : dReader.GetDateTime(0);
+                                    train.ServiceEndDate = dReader.IsDBNull(1) ? null : dReader.GetDateTime(1);
+                                }
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore if column or query error
                     }
                 }
             }
@@ -252,6 +299,77 @@ namespace IRCTCClone.Models
                         }
                     }
                 }
+
+                // Batch load ServiceStartDate and ServiceEndDate from Trains table
+                if (trains.Any())
+                {
+                    try
+                    {
+                        var idList = string.Join(",", trains.Select(t => t.Id));
+                        using (var dateCmd = new SqlCommand($"SELECT Id, ServiceStartDate, ServiceEndDate FROM Trains WHERE Id IN ({idList})", conn))
+                        using (var dateReader = dateCmd.ExecuteReader())
+                        {
+                            var dateMap = new Dictionary<int, (DateTime? start, DateTime? end)>();
+                            while (dateReader.Read())
+                            {
+                                int tid = dateReader.GetInt32(0);
+                                DateTime? s = dateReader.IsDBNull(1) ? null : dateReader.GetDateTime(1);
+                                DateTime? e = dateReader.IsDBNull(2) ? null : dateReader.GetDateTime(2);
+                                dateMap[tid] = (s, e);
+                            }
+                            foreach (var t in trains)
+                            {
+                                if (dateMap.TryGetValue(t.Id, out var dates))
+                                {
+                                    t.ServiceStartDate = dates.start;
+                                    t.ServiceEndDate = dates.end;
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("Error loading train service dates: " + ex.Message);
+                    }
+                }
+
+                // Check if any train has active temporary stops on JourneyDate
+                if (trains.Any())
+                {
+                    try
+                    {
+                        using (var tempCmd = new SqlCommand(@"
+                            SELECT DISTINCT TrainId 
+                            FROM TrainTemporaryStops 
+                            WHERE @JourneyDate BETWEEN FromDate AND ToDate", conn))
+                        {
+                            tempCmd.Parameters.Add("@JourneyDate", SqlDbType.Date).Value = journeyDate.Date;
+                            using (var tempReader = tempCmd.ExecuteReader())
+                            {
+                                var tempTrainIds = new HashSet<int>();
+                                while (tempReader.Read())
+                                {
+                                    tempTrainIds.Add(tempReader.GetInt32(0));
+                                }
+                                foreach (var t in trains)
+                                {
+                                    if (tempTrainIds.Contains(t.Id))
+                                    {
+                                        t.HasAlerts = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch (SqlException) { }
+                }
+
+                // Filter out trains outside their service dates:
+                // Train is shown strictly from ServiceStartDate and continues till ServiceEndDate
+                trains = trains.Where(t =>
+                    (!t.ServiceStartDate.HasValue || journeyDate.Date >= t.ServiceStartDate.Value.Date) &&
+                    (!t.ServiceEndDate.HasValue || journeyDate.Date <= t.ServiceEndDate.Value.Date)
+                ).ToList();
 
                 // Load classes for each train
                 foreach (var train in trains)

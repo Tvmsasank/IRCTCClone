@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="icon" type="image/png" href="~/images/irctc_Logo.png" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     @if (User.Identity.IsAuthenticated)
     {
@@ -84,7 +85,7 @@
                 <img src="~/images/irctc_logo.png" alt="IRCTC Logo" class="logo" />
                 <div class="brand-text">
                     <span class="brand-name">IRCTC Clone</span>
-                    <span class="brand-subname">NexusRail Portal</span>
+                    <span class="brand-subname">@* NexusRail Portal *@</span>
                 </div>
             </div>
 
@@ -100,6 +101,25 @@
                 <!-- CENTER NAVIGATION -->
                 <nav id="navMenu" class="nav-links">
                     
+                    <!-- Mobile Drawer Header (Visible on <= 991px) -->
+                    <div class="mobile-drawer-header">
+                        <div class="mobile-drawer-brand">
+                            <img src="~/images/irctc_logo.png" alt="IRCTC" class="drawer-logo" />
+                            <div class="drawer-user-info">
+                                @if (User?.Identity?.IsAuthenticated == true)
+                                {
+                                    <span class="drawer-greet">Welcome,</span>
+                                    <strong class="drawer-username">@(User.Identity.Name?.Split('@')[0] ?? User.Identity.Name)</strong>
+                                }
+                                else
+                                {
+                                    <span class="drawer-greet">Welcome to IRCTC</span>
+                                }
+                            </div>
+                        </div>
+                        <button type="button" class="drawer-close-btn" id="drawerCloseBtn" aria-label="Close navigation">&times;</button>
+                    </div>
+
                     <!-- HOME -->
                     <a href="/" class="nav-item-link"><i class="fa-solid fa-house"></i> Home</a>
 
@@ -158,13 +178,13 @@
                             {
                                 <a asp-controller="Admin" asp-action="AdminLogin" class="admin-login-btn"><i class="fa-solid fa-user-tie"></i> Admin</a>
                             }
-                            <a asp-controller="Account" asp-action="Login" class="nav-btn-login-register"><i class="fa-solid fa-right-from-bracket"></i> LOGIN / REGISTER</a>
+                            <a asp-controller="Account" asp-action="Login" class="nav-btn-login-register"><i class="fa-solid fa-right-from-bracket"></i> LOGIN</a>
                         </div>
                     }
 
                     <!-- TRAINS DROPDOWN -->
                     <div class="nav-dropdown">
-                        <a href="#" class="nav-item-link dropdown-toggle" data-translate="trains">TRAINS <i class="fa-solid fa-chevron-down"></i></a>
+                        <a href="#" class="nav-item-link dropdown-toggle" data-translate="trains">TRAINS @* <i class="fa-solid fa-chevron-down"></i> *@</a>
                         <div class="nav-dropdown-menu">
                             <a href="/"><i class="fa-solid fa-ticket-simple"></i> Book Ticket</a>
                             <a href="/?quota=FOREIGN_TOURIST"><i class="fa-solid fa-passport"></i> Foreign Tourist Booking</a>
@@ -183,7 +203,7 @@
 
                     <!-- MEALS DROPDOWN -->
                     <div class="nav-dropdown">
-                        <a href="#" class="nav-item-link dropdown-toggle" data-translate="meals">MEALS <i class="fa-solid fa-chevron-down"></i></a>
+                        <a href="#" class="nav-item-link dropdown-toggle" data-translate="meals">MEALS @* <i class="fa-solid fa-chevron-down"></i> *@</a>
                         <div class="nav-dropdown-menu">
                             <a href="javascript:void(0)" onclick="openNavModal('ePantry')"><i class="fa-solid fa-utensils"></i> Book Food - E-Pantry</a>
                             <a href="javascript:void(0)" onclick="openNavModal('eCatering')"><i class="fa-solid fa-bowl-food"></i> Order Food - E-Catering</a>
@@ -193,7 +213,7 @@
 
                     <!-- LOYALTY DROPDOWN -->
                     <div class="nav-dropdown">
-                        <a href="#" class="nav-item-link dropdown-toggle" data-translate="loyalty">LOYALTY <i class="fa-solid fa-chevron-down"></i></a>
+                        <a href="#" class="nav-item-link dropdown-toggle" data-translate="loyalty">LOYALTY @* <i class="fa-solid fa-chevron-down"></i> *@</a>
                         <div class="nav-dropdown-menu">
                             <a href="javascript:void(0)" onclick="openNavModal('cashbackInfo')"><i class="fa-solid fa-percent"></i> Upto 10% Cashback</a>
                             <a href="javascript:void(0)" onclick="openNavModal('loyaltyInfo')"><i class="fa-solid fa-award"></i> Loyalty Program Info</a>
@@ -203,7 +223,7 @@
 
                     <!-- E-WALLET DROPDOWN -->
                     <div class="nav-dropdown">
-                        <a href="#" class="nav-item-link dropdown-toggle" data-translate="ewallet">E-WALLET <i class="fa-solid fa-chevron-down"></i></a>
+                        <a href="#" class="nav-item-link dropdown-toggle" data-translate="ewallet">E-WALLET @* <i class="fa-solid fa-chevron-down"></i> *@</a>
                         <div class="nav-dropdown-menu">
                             <a href="javascript:void(0)" onclick="openNavModal('ewalletAbout')"><i class="fa-solid fa-wallet"></i> About IRCTC eWallet</a>
                             <a href="javascript:void(0)" onclick="openNavModal('ewalletGuide')"><i class="fa-solid fa-circle-info"></i> IRCTC eWallet User Guide</a>
@@ -215,7 +235,7 @@
 
                     <!-- OTHER SERVICES DROPDOWN -->
                     <div class="nav-dropdown">
-                        <a href="#" class="nav-item-link dropdown-toggle" data-translate="otherservices">OTHER SERVICES <i class="fa-solid fa-chevron-down"></i></a>
+                        <a href="#" class="nav-item-link dropdown-toggle" data-translate="otherservices">OTHER SERVICES @* <i class="fa-solid fa-chevron-down"></i> *@</a>
                         <div class="nav-dropdown-menu">
                             <a href="javascript:void(0)" onclick="openNavModal('ipay')"><i class="fa-solid fa-money-bill-transfer"></i> IRCTC-IPAY</a>
                             <a href="javascript:void(0)" onclick="openNavModal('buses')"><i class="fa-solid fa-bus"></i> Buses</a>
@@ -231,6 +251,8 @@
                     <a href="javascript:void(0)" onclick="openNavModal('contactUs')" class="nav-item-link" data-translate="contactus">CONTACT US</a>
 
                 </nav>
+                <!-- Mobile Drawer Backdrop Overlay -->
+                <div id="navDrawerBackdrop" class="nav-drawer-backdrop"></div>
             }
 
             <!-- RIGHT LOGO -->
@@ -348,8 +370,8 @@
                 "classes": "Classes",
                 "quota": "Quota",
                 "searchtrains": "Search Trains",
-                "searchmemu": "🔍 Search MEMU/DEMU/MMTS Trains",
-                "checkpnr": "🔍 Check PNR Status",
+                "searchmemu": "Search MEMU/DEMU/MMTS Trains",
+                "checkpnr": "PNR Status",
                 "chartvacancy": "Chart Vacancy"
             },
             "hi": {
@@ -371,8 +393,8 @@
                 "classes": "श्रेणी",
                 "quota": "कोटा",
                 "searchtrains": "ट्रेनें खोजें",
-                "searchmemu": "🔍 मेमू/डेमू/एमएमटीएस ट्रेनें खोजें",
-                "checkpnr": "🔍 पीएनआर स्थिति जांचें",
+                "searchmemu": "मेमू/डेमू/एमएमटीएस ट्रेनें खोजें",
+                "checkpnr": "पीएनआर स्थिति जांचें",
                 "chartvacancy": "चार्ट रिक्ति"
             }
         };
@@ -450,13 +472,42 @@
 
             const btn = document.getElementById("hamburgerBtn");
             const menu = document.getElementById("navMenu");
+            const backdrop = document.getElementById("navDrawerBackdrop");
+            const closeBtn = document.getElementById("drawerCloseBtn");
+
+            function openDrawer() {
+                menu?.classList.add("show");
+                btn?.classList.add("active");
+                backdrop?.classList.add("show");
+                document.body.classList.add("drawer-open");
+            }
+
+            function closeDrawer() {
+                menu?.classList.remove("show");
+                btn?.classList.remove("active");
+                backdrop?.classList.remove("show");
+                document.body.classList.remove("drawer-open");
+            }
 
             if (btn && menu) {
-                btn.addEventListener("click", function () {
-                    menu.classList.toggle("show");
-                    btn.classList.toggle("active");
+                btn.addEventListener("click", function (e) {
+                    e.stopPropagation();
+                    if (menu.classList.contains("show")) {
+                        closeDrawer();
+                    } else {
+                        openDrawer();
+                    }
                 });
             }
+
+            backdrop?.addEventListener("click", closeDrawer);
+            closeBtn?.addEventListener("click", closeDrawer);
+
+            document.addEventListener("keydown", function(e) {
+                if (e.key === "Escape" && menu?.classList.contains("show")) {
+                    closeDrawer();
+                }
+            });
 
             // Accordion toggle for dropdown menus on mobile viewports
             document.querySelectorAll('.dropdown-toggle').forEach(toggle => {
@@ -475,10 +526,11 @@
     <script>
         const themeToggle = document.getElementById("themeToggle");
 
-        // LOAD SAVED THEME
+        // Default to white/light theme; clear any forced dark mode from localStorage
         if (localStorage.getItem("theme") === "dark") {
-            document.body.classList.add("dark-mode");
+            localStorage.removeItem("theme");
         }
+        document.body.classList.remove("dark-mode");
 
         // TOGGLE THEME
         themeToggle?.addEventListener("click", () => {

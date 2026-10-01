@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="igStone" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+  </defs>
+  <!-- Circular Badge Background -->
+  <circle cx="32" cy="32" r="30" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+  
+  <!-- Base Stairs -->
+  <rect x="12" y="52" width="40" height="3" fill="#78350f"/>
+  <rect x="15" y="49" width="34" height="3" fill="#9a3412"/>
+  
+  <!-- Main Arch Structure -->
+  <rect x="18" y="24" width="28" height="25" fill="url(#igStone)"/>
+  
+  <!-- Central Grand Arch Opening -->
+  <path d="M 26 49 L 26 36 Q 32 29 38 36 L 38 49 Z" fill="#431407"/>
+  
+  <!-- Top Attic / Cornice -->
+  <rect x="16" y="21" width="32" height="4" rx="0.5" fill="#ea580c"/>
+  <rect x="19" y="16" width="26" height="5" fill="#f97316"/>
+  <rect x="22" y="12" width="20" height="4" fill="#fb923c"/>
+  
+  <!-- Amar Jawan Jyoti (Eternal Flame) in Center -->
+  <polygon points="32,41 33.5,45 30.5,45" fill="#facc15"/>
+  <circle cx="32" cy="42" r="1.2" fill="#ef4444"/>
+</svg>

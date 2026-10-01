@@ -14,7 +14,7 @@ namespace IRCTCClone.Models
         public string FullName { get; set; } = string.Empty;
         public bool AadhaarVerified { get; set; }   // ✅ NEW
         public string? AadhaarNumber { get; set; }   // ✅ OPTIONAL     
-        public string CaptchaInput { get; set; }    // 🔐 CAPTCHA
+        //public string CaptchaInput { get; set; }    // 🔐 CAPTCHA
 
     }
 }

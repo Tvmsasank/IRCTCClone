@@ -301,7 +301,8 @@ namespace IRCTCClone.Controllers
                     qCmd.Parameters.AddWithValue("@ClassId", classId);
                     qCmd.Parameters.AddWithValue("@Quota", targetQuota);
 
-                    totalQuotaSeats = Convert.ToInt32(qCmd.ExecuteScalar());
+                    var qRes = qCmd.ExecuteScalar();
+                    totalQuotaSeats = (qRes != null && qRes != DBNull.Value) ? Convert.ToInt32(qRes) : 0;
                 }
 
                 // B. Get confirmed passengers for this class, date, and quota
@@ -316,7 +317,8 @@ namespace IRCTCClone.Controllers
                     cCmd.Parameters.AddWithValue("@JourneyDate", journeyDate.Date);
                     cCmd.Parameters.AddWithValue("@Quota", targetQuota);
 
-                    cnfQuotaCount = Convert.ToInt32(cCmd.ExecuteScalar());
+                    var cRes = cCmd.ExecuteScalar();
+                    cnfQuotaCount = (cRes != null && cRes != DBNull.Value) ? Convert.ToInt32(cRes) : 0;
                 }
 
                 // If coaches are seeded, calculate strictly based on Quota range!
@@ -341,12 +343,12 @@ namespace IRCTCClone.Controllers
                             {
                                 return new SeatStatus
                                 {
-                                    SeatsAvailable = Convert.ToInt32(rdr["SeatsAvailable"]),
-                                    RACSeats = Convert.ToInt32(rdr["RACSeats"]),
-                                    ConfirmedCount = Convert.ToInt32(rdr["ConfirmedCount"]),
-                                    RACCount = Convert.ToInt32(rdr["RACCount"]),
-                                    WLCount = Convert.ToInt32(rdr["WLCount"]),
-                                    TatkalSeats = Convert.ToInt32(rdr["TatkalSeats"])
+                                    SeatsAvailable = (rdr["SeatsAvailable"] != null && rdr["SeatsAvailable"] != DBNull.Value) ? Convert.ToInt32(rdr["SeatsAvailable"]) : 0,
+                                    RACSeats = (rdr["RACSeats"] != null && rdr["RACSeats"] != DBNull.Value) ? Convert.ToInt32(rdr["RACSeats"]) : 0,
+                                    ConfirmedCount = (rdr["ConfirmedCount"] != null && rdr["ConfirmedCount"] != DBNull.Value) ? Convert.ToInt32(rdr["ConfirmedCount"]) : 0,
+                                    RACCount = (rdr["RACCount"] != null && rdr["RACCount"] != DBNull.Value) ? Convert.ToInt32(rdr["RACCount"]) : 0,
+                                    WLCount = (rdr["WLCount"] != null && rdr["WLCount"] != DBNull.Value) ? Convert.ToInt32(rdr["WLCount"]) : 0,
+                                    TatkalSeats = (rdr["TatkalSeats"] != null && rdr["TatkalSeats"] != DBNull.Value) ? Convert.ToInt32(rdr["TatkalSeats"]) : 0
                                 };
                             }
                         }
@@ -367,7 +369,8 @@ namespace IRCTCClone.Controllers
                     wlCmd.Parameters.AddWithValue("@JourneyDate", journeyDate.Date);
                     wlCmd.Parameters.AddWithValue("@Quota", targetQuota);
 
-                    seatStatus.WLCount = Convert.ToInt32(wlCmd.ExecuteScalar());
+                    var wlRes = wlCmd.ExecuteScalar();
+                    seatStatus.WLCount = (wlRes != null && wlRes != DBNull.Value) ? Convert.ToInt32(wlRes) : 0;
                 }
 
                 return seatStatus;
@@ -528,36 +531,55 @@ namespace IRCTCClone.Controllers
 
                 HttpContext.Session.SetString("CheckoutPayload", JsonConvert.SerializeObject(payload));
 
-                /*            Train train = Train.GetTrainById(connStr, trainId, classId, journeyDate);*/
+                // ⚡ Tatkal single ticket per session restriction
+                bool isTatkalWindowOrQuota = (quota?.ToUpper() == "TATKAL" || TatkalHelper.IsTatkalWindow() || TatkalHelper.IsTatkalExclusiveWindow());
+                if (isTatkalWindowOrQuota && HttpContext.Session.GetString("HasBookedTatkalInSession") == "true")
+                {
+                    TempData["Error"] = "As per IRCTC guidelines, only 1 ticket can be booked per user login during Tatkal hours. Please logout and login again to book another ticket.";
+                    return RedirectToAction("TrainResults", "Train");
+                }
+
                 var trains = Train.GetTrains(connStr, FromStationId, ToStationId, journeyDate, quota);
                 Train train = trains.FirstOrDefault(t => t.Id == trainId);
-
-
-                var validation = TrainRouteValidator.Validate(userfromid, usertoid, train, FSM, TSM, FromStation, ToStation);
-
-                if (!validation.IsValid)
+                if (train == null)
                 {
-                    TempData["RouteMismatch"] = true;
-                    TempData["ActualFrom"] = validation.ActualFrom;
-                    TempData["ActualTo"] = validation.ActualTo;
-                    TempData["SearchedFrom"] = validation.SearchedFrom;
-                    TempData["SearchedTo"] = validation.SearchedTo;
-                    TempData["ActualFromId"] = validation.ActualFromId;
-                    TempData["ActualToId"] = validation.ActualToId;
+                    train = Train.GetTrainById(connStr, trainId, classId, journeyDate);
+                }
 
-                    TempData["fromStationId"] = validation.ActualFromId;
-                    TempData["toStationId"] = validation.ActualToId;
-
-                    //   return RedirectToAction("TrainResults", "Train");
-
-                    return RedirectToAction("TrainResults", "Train", new
+                if (train != null)
+                {
+                    if (!train.IsBookingAllowed)
                     {
-                        fromStationId = validation.ActualFromId,
-                        toStationId = validation.ActualToId,
-                        FromStation = validation.ActualFrom,
-                        ToStation = validation.ActualTo,
-                        journeyDateStr = journeyDate
-                    });
+                        TempData["Error"] = "BOOKINGs are NOT ALLOWED at this TIME";
+                        return RedirectToAction("TrainResults", "Train");
+                    }
+
+                    var validation = TrainRouteValidator.Validate(userfromid, usertoid, train, FSM, TSM, FromStation, ToStation);
+
+                    if (!validation.IsValid)
+                    {
+                        TempData["RouteMismatch"] = true;
+                        TempData["ActualFrom"] = validation.ActualFrom;
+                        TempData["ActualTo"] = validation.ActualTo;
+                        TempData["SearchedFrom"] = validation.SearchedFrom;
+                        TempData["SearchedTo"] = validation.SearchedTo;
+                        TempData["ActualFromId"] = validation.ActualFromId;
+                        TempData["ActualToId"] = validation.ActualToId;
+
+                        // Keep original searched station IDs so search state is not corrupted
+                        TempData["fromStationId"] = userfromid;
+                        TempData["toStationId"] = usertoid;
+                        TempData["FromStation"] = FromStation;
+                        TempData["ToStation"] = ToStation;
+                        TempData["JourneyDate"] = journeyDate;
+
+                        TempData["trainId"] = trainId;
+                        TempData["classId"] = classId;
+                        TempData["classCode"] = classCode;
+                        TempData["journeyDate"] = journeyDate;
+
+                        return RedirectToAction("TrainResults", "Train");
+                    }
                 }
 
                 // Auth check
@@ -606,6 +628,15 @@ namespace IRCTCClone.Controllers
                 }
 
                 var payload = JsonConvert.DeserializeObject<CheckoutPayload>(payloadJson);
+
+                // ⚡ Tatkal single ticket check
+                string q = payload?.Quota ?? "";
+                bool isTatkalWindowOrQuota = (q.ToUpper() == "TATKAL" || TatkalHelper.IsTatkalWindow() || TatkalHelper.IsTatkalExclusiveWindow());
+                if (isTatkalWindowOrQuota && HttpContext.Session.GetString("HasBookedTatkalInSession") == "true")
+                {
+                    TempData["Error"] = "As per IRCTC guidelines, only 1 ticket can be booked per user login during Tatkal hours. Please logout and login again to book another ticket.";
+                    return RedirectToAction("TrainResults", "Train");
+                }
 
                 // override station ids if modal sent new ones
                 if (FromStationId.HasValue)
@@ -687,6 +718,7 @@ namespace IRCTCClone.Controllers
 
 
                 ViewBag.SeatStatusCount = SeatStatuscount;
+                ViewBag.SeatStatus = SeatStatus;
 
                 // 1️⃣ Create a booking object with empty passengers
                 Booking booking = new Booking();
@@ -823,9 +855,9 @@ namespace IRCTCClone.Controllers
                     return RedirectToAction("TrainResults", "Train");
                 }
 
-                if (timeToDeparture.TotalHours <= 8)
+                if (timeToDeparture.TotalMinutes <= 30)
                 {
-                    TempData["Error"] = "Booking closed. Charting has already been prepared for this train.";
+                    TempData["Error"] = "Booking closed. Final charting has already been prepared for this train.";
                     return RedirectToAction("TrainResults", "Train");
                 }
 
@@ -944,6 +976,17 @@ namespace IRCTCClone.Controllers
                     ViewBag.BookingStatus = status;
                 }
 
+                bool isFirstAc = (cls?.Code ?? "").Contains("1A") || (cls?.Code ?? "").Contains("EA");
+                if (Quota == "TATKAL" && isFirstAc)
+                {
+                    bool isTatkalOpen = TatkalHelper.IsTatkalOpen("1A");
+                    ViewBag.SeatStatus = isTatkalOpen ? "NOT AVAILABLE" : "NOT AVAILABLE#";
+                }
+                else if (string.IsNullOrWhiteSpace(ViewBag.SeatStatus as string))
+                {
+                    ViewBag.SeatStatus = remainingSeats > 0 ? $"AVAILABLE - {remainingSeats}" : (racCount > 0 ? $"RAC - {racCount}" : (wlCount > 0 ? $"WL - {wlCount}" : "AVAILABLE"));
+                }
+
                 // Pass to ViewBag for display
                 ViewBag.Train = train;
                 ViewBag.Class = cls;
@@ -1045,6 +1088,87 @@ namespace IRCTCClone.Controllers
 
                 ViewBag.CurrentStep = 1;
 
+                // Load authentic user profile mobile and username from database
+                string loggedInUserEmail = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue(ClaimTypes.Email) ?? "";
+                string dynamicMobile = "";
+                string dynamicUsername = "";
+
+                string sessionIrctcUser = User.FindFirstValue("IRCTCUsername") ?? HttpContext.Session.GetString("irctc_username") ?? "";
+                try
+                {
+                    using (var conn = new SqlConnection(_connectionString))
+                    {
+                        conn.Open();
+
+                        // 1. Fetch authentic username from Usrs table FIRST (master authentication source)
+                        try
+                        {
+                            using (var uCmd = new SqlCommand(@"
+                                SELECT TOP 1 Username FROM Usrs 
+                                WHERE LOWER(LTRIM(RTRIM(Email))) = LOWER(LTRIM(RTRIM(@E))) 
+                                   OR LOWER(LTRIM(RTRIM(Username))) = LOWER(LTRIM(RTRIM(@E)))
+                                   OR (@S <> '' AND (LOWER(LTRIM(RTRIM(Username))) = LOWER(LTRIM(RTRIM(@S))) OR LOWER(LTRIM(RTRIM(Email))) = LOWER(LTRIM(RTRIM(@S)))))", conn))
+                            {
+                                uCmd.Parameters.AddWithValue("@E", loggedInUserEmail ?? "");
+                                uCmd.Parameters.AddWithValue("@S", sessionIrctcUser ?? "");
+                                var uVal = uCmd.ExecuteScalar();
+                                if (uVal != null && uVal != DBNull.Value && !string.IsNullOrWhiteSpace(uVal.ToString()))
+                                {
+                                    dynamicUsername = uVal.ToString().Trim();
+                                }
+                            }
+                        }
+                        catch { }
+
+                        // 2. Fetch mobile and profile data from UserProfiles table
+                        using (var pCmd = new SqlCommand(@"
+                            SELECT TOP 1 MobileNumber, Username FROM UserProfiles 
+                            WHERE LOWER(LTRIM(RTRIM(UserId))) = LOWER(LTRIM(RTRIM(@U))) 
+                               OR LOWER(LTRIM(RTRIM(Email))) = LOWER(LTRIM(RTRIM(@U)))
+                               OR (@S <> '' AND (LOWER(LTRIM(RTRIM(UserId))) = LOWER(LTRIM(RTRIM(@S))) OR LOWER(LTRIM(RTRIM(Username))) = LOWER(LTRIM(RTRIM(@S)))))", conn))
+                        {
+                            pCmd.Parameters.AddWithValue("@U", loggedInUserEmail ?? "");
+                            pCmd.Parameters.AddWithValue("@S", sessionIrctcUser ?? "");
+                            using (var pReader = pCmd.ExecuteReader())
+                            {
+                                if (pReader.Read())
+                                {
+                                    if (pReader["MobileNumber"] != DBNull.Value && !string.IsNullOrWhiteSpace(pReader["MobileNumber"].ToString()))
+                                    {
+                                        dynamicMobile = pReader["MobileNumber"].ToString().Trim();
+                                    }
+                                    if (string.IsNullOrWhiteSpace(dynamicUsername) && pReader["Username"] != DBNull.Value && !string.IsNullOrWhiteSpace(pReader["Username"].ToString()))
+                                    {
+                                        dynamicUsername = pReader["Username"].ToString().Trim();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Notice loading checkout user profile: " + ex.Message);
+                }
+
+                // Clean mobile to pure 10 digits
+                if (!string.IsNullOrWhiteSpace(dynamicMobile))
+                {
+                    string digitsOnly = System.Text.RegularExpressions.Regex.Replace(dynamicMobile, @"[^\d]", "");
+                    if (digitsOnly.Length > 10 && digitsOnly.StartsWith("91"))
+                    {
+                        digitsOnly = digitsOnly.Substring(digitsOnly.Length - 10);
+                    }
+                    if (digitsOnly.Length == 10)
+                    {
+                        dynamicMobile = digitsOnly;
+                    }
+                }
+
+                ViewBag.UserMobile = dynamicMobile;
+                ViewBag.UserEmail = loggedInUserEmail;
+                ViewBag.UserDbUsername = !string.IsNullOrWhiteSpace(dynamicUsername) ? dynamicUsername : (!string.IsNullOrWhiteSpace(sessionIrctcUser) ? sessionIrctcUser : (loggedInUserEmail.Contains("@") ? loggedInUserEmail.Split('@')[0] : loggedInUserEmail));
+
                 return View("Checkout", booking);
             }
 
@@ -1075,11 +1199,19 @@ namespace IRCTCClone.Controllers
             string BookingStatus,
             string CaptchaInput,
             string paymentCode,
-            string otp = null
+            string otp = null,
+            string boardingStation = null,
+            string boardingDeparture = null,
+            string boardingDay = null,
+            string preferredCoach = null
             )
         {
             try
             {
+                if (string.IsNullOrWhiteSpace(preferredCoach))
+                {
+                    preferredCoach = Request.Form["preferredCoach"].FirstOrDefault();
+                }
                 // ================= AUTH =================
                 string userid = User.FindFirstValue(ClaimTypes.NameIdentifier); // email
                 string username = User.Identity.Name ?? "Passenger";
@@ -1114,6 +1246,17 @@ namespace IRCTCClone.Controllers
                 {
                     TempData["Error"] = "Please log in to continue.";
                     return RedirectToAction("Login", "Account");
+                }
+
+                // ⚡ Tatkal single ticket check
+                var tatkalPayloadJson = HttpContext.Session.GetString("CheckoutPayload");
+                var tatkalPayloadTemp = !string.IsNullOrEmpty(tatkalPayloadJson) ? JsonConvert.DeserializeObject<CheckoutPayload>(tatkalPayloadJson) : null;
+                string currentQuota = tatkalPayloadTemp?.Quota ?? "";
+                bool isTatkalWindowOrQuota = (currentQuota.ToUpper() == "TATKAL" || TatkalHelper.IsTatkalWindow() || TatkalHelper.IsTatkalExclusiveWindow());
+                if (isTatkalWindowOrQuota && HttpContext.Session.GetString("HasBookedTatkalInSession") == "true")
+                {
+                    TempData["Error"] = "As per IRCTC guidelines, only 1 ticket can be booked per user login during Tatkal hours. Please logout and login again to book another ticket.";
+                    return RedirectToAction("Checkout");
                 }
 
                 // ================= BASIC VALIDATION =================
@@ -1244,9 +1387,14 @@ namespace IRCTCClone.Controllers
                         }
                         DateTime departureDateTimeInit = DateTime.Parse(journeyDate).Date + departureTimeInit;
                         TimeSpan timeToDepartureInit = departureDateTimeInit - indiaTimeInit;
-                        if (timeToDepartureInit.TotalHours <= 8)
+                        if (timeToDepartureInit.TotalSeconds <= 0)
                         {
-                            TempData["Error"] = "Booking closed. Charting has already been prepared for this train.";
+                            TempData["Error"] = "Booking closed. This train has already departed.";
+                            return RedirectToAction("TrainResults", "Train");
+                        }
+                        if (timeToDepartureInit.TotalMinutes <= 30)
+                        {
+                            TempData["Error"] = "Booking closed. Final charting has already been prepared for this train.";
                             return RedirectToAction("TrainResults", "Train");
                         }
 
@@ -1349,6 +1497,12 @@ namespace IRCTCClone.Controllers
                         int bookingId;
                         string pnr = GeneratePnr();
 
+                        string effectiveBoardingStation = !string.IsNullOrWhiteSpace(boardingStation) ? boardingStation : Request.Form["boardingStation"].FirstOrDefault();
+                        if (string.IsNullOrWhiteSpace(effectiveBoardingStation)) effectiveBoardingStation = fromStation.Name;
+
+                        string effectiveBoardingDeparture = !string.IsNullOrWhiteSpace(boardingDeparture) ? boardingDeparture : Request.Form["boardingDeparture"].FirstOrDefault();
+                        if (string.IsNullOrWhiteSpace(effectiveBoardingDeparture)) effectiveBoardingDeparture = payload.Departure;
+
                         // Insert Booking
                         using (var cmd = new SqlCommand("InsertBooking", conn, transaction))
                         {
@@ -1366,8 +1520,8 @@ namespace IRCTCClone.Controllers
                             cmd.Parameters.AddWithValue("@TrainNumber", trainNumber);
                             cmd.Parameters.AddWithValue("@TrainName", trainName);
                             cmd.Parameters.AddWithValue("@Class", Class);
-                            cmd.Parameters.AddWithValue("@Frmst", fromStation.Name);
-                            cmd.Parameters.AddWithValue("@Departure", payload.Departure);
+                            cmd.Parameters.AddWithValue("@Frmst", effectiveBoardingStation);
+                            cmd.Parameters.AddWithValue("@Departure", effectiveBoardingDeparture);
                             cmd.Parameters.AddWithValue("@Arrival", payload.Arrival);
                             cmd.Parameters.AddWithValue("@Duration", payload.Duration);
                             cmd.Parameters.AddWithValue("@Tost", toStation.Name);
@@ -1378,6 +1532,22 @@ namespace IRCTCClone.Controllers
                             cmd.Parameters.AddWithValue("@TotalFare", totalFare);
 
                             bookingId = Convert.ToInt32(cmd.ExecuteScalar());
+                        }
+
+                        EnsureBoardingColumnsExist(conn);
+                        if (!string.IsNullOrWhiteSpace(effectiveBoardingStation) && !effectiveBoardingStation.Equals(fromStation.Name, StringComparison.OrdinalIgnoreCase))
+                        {
+                            using (var bChangeCmd = new SqlCommand(@"
+                                UPDATE Bookings 
+                                SET OriginalBoardingStation = @Orig,
+                                    IsBoardingChanged = 1,
+                                    BoardingChangedAt = GETUTCDATE()
+                                WHERE Id = @BId", conn, transaction))
+                            {
+                                bChangeCmd.Parameters.AddWithValue("@Orig", fromStation.Name);
+                                bChangeCmd.Parameters.AddWithValue("@BId", bookingId);
+                                bChangeCmd.ExecuteNonQuery();
+                            }
                         }
 
                         // ---------------------------- ALLOCATE SEATS RANDOMLY ----------------------------
@@ -1401,8 +1571,43 @@ namespace IRCTCClone.Controllers
                             seatsCapacity: cls.TotalSeats,
                             raccount: seatStatus.RACCount,
                             racSeats: seatStatus.RACSeats,
-                            quota// this will now be updated inside method,
+                            quota: quota,
+                            preferredCoach: preferredCoach
                         );
+
+                        // Persist catering / meal options for passengers (e.g. Vande Bharat)
+                        try
+                        {
+                            var cateringList = Request.Form["passengerCatering"].ToList();
+                            bool optOutFood = Request.Form["optOutMeals"] == "true";
+
+                            using (var mealCheckCmd = new SqlCommand("IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('Passengers') AND name = 'Meal') ALTER TABLE Passengers ADD Meal NVARCHAR(50) NULL", conn, transaction))
+                            {
+                                mealCheckCmd.ExecuteNonQuery();
+                            }
+
+                            using (var getPassCmd = new SqlCommand("SELECT Id FROM Passengers WHERE BookingId = @BId ORDER BY Id", conn, transaction))
+                            {
+                                getPassCmd.Parameters.AddWithValue("@BId", bookingId);
+                                var passIds = new List<int>();
+                                using (var pRdr = getPassCmd.ExecuteReader())
+                                {
+                                    while (pRdr.Read()) passIds.Add(pRdr.GetInt32(0));
+                                }
+
+                                for (int i = 0; i < passIds.Count; i++)
+                                {
+                                    string mealVal = optOutFood ? "No Food" : ((cateringList != null && i < cateringList.Count && !string.IsNullOrWhiteSpace(cateringList[i])) ? cateringList[i] : "Veg");
+                                    using (var upCmd = new SqlCommand("UPDATE Passengers SET Meal = @Meal WHERE Id = @PId", conn, transaction))
+                                    {
+                                        upCmd.Parameters.AddWithValue("@Meal", mealVal);
+                                        upCmd.Parameters.AddWithValue("@PId", passIds[i]);
+                                        upCmd.ExecuteNonQuery();
+                                    }
+                                }
+                            }
+                        }
+                        catch { }
 
                         // ✅ ONLY ONE COMMIT
                         transaction.Commit();
@@ -1846,6 +2051,11 @@ namespace IRCTCClone.Controllers
                             $"Ticket_{pnrLocal}.pdf"
                         );
 
+                        if (isTatkalWindowOrQuota)
+                        {
+                            HttpContext.Session.SetString("HasBookedTatkalInSession", "true");
+                        }
+
                         TempData["BookingSuccess"] = "Ticket booked successfully and sent to your email!";
                         TempData["BookingId"] = bookingId;
                         return RedirectToAction("Confirmation", new { id = bookingId, userId = userId });
@@ -2251,10 +2461,55 @@ namespace IRCTCClone.Controllers
             {
                 using (var conn = new SqlConnection(_connectionString))
                 {
-                    conn.Open();
+                    await conn.OpenAsync();
 
                     // ✅ GET BOOKING BEFORE CANCELLATION
                     var booking = GetBookingById(id);
+                    if (booking == null)
+                    {
+                        return Json(new { success = false, message = "Booking not found" });
+                    }
+
+                    DateTime departureDateTime = booking.JourneyDate.Date + booking.Departure;
+                    var indiaTime = TimeZoneInfo.ConvertTimeBySystemTimeZoneId(DateTime.UtcNow, "India Standard Time");
+                    TimeSpan timeToDeparture = departureDateTime - indiaTime;
+
+                    if (timeToDeparture.TotalSeconds <= 0)
+                    {
+                        return Json(new
+                        {
+                            success = false,
+                            message = $"FLUSHED PNR / PNR NOT YET GENERATED- ({booking.PNR})"
+                        });
+                    }
+
+                    if (timeToDeparture.TotalMinutes <= 30)
+                    {
+                        return Json(new
+                        {
+                            success = false,
+                            message = "Cancellation is Not Allowed as ticket is beyond permissible limit of cancellation"
+                        });
+                    }
+
+                    // Collect active passengers before cancelling for dynamic promotion
+                    var cancelledPax = new List<(string status, string seat, string berth, int? pos)>();
+                    string getPaxSql = "SELECT CurrentStatus, SeatNumber, Berth, Position FROM Passengers WHERE BookingId = @BookingId AND CurrentStatus != 'CAN'";
+                    using (var paxCmd = new SqlCommand(getPaxSql, conn))
+                    {
+                        paxCmd.Parameters.AddWithValue("@BookingId", id);
+                        using (var r = await paxCmd.ExecuteReaderAsync())
+                        {
+                            while (await r.ReadAsync())
+                            {
+                                string cStatus = r["CurrentStatus"]?.ToString() ?? "";
+                                string seat = r["SeatNumber"]?.ToString() ?? "";
+                                string berth = r["Berth"]?.ToString() ?? "";
+                                int? pos = r.IsDBNull(r.GetOrdinal("Position")) ? (int?)null : r.GetInt32(r.GetOrdinal("Position"));
+                                cancelledPax.Add((cStatus, seat, berth, pos));
+                            }
+                        }
+                    }
 
                     string pnr = "";
 
@@ -2272,34 +2527,49 @@ namespace IRCTCClone.Controllers
 
                         cmd.Parameters.Add(pnrParam);
 
-                        cmd.ExecuteNonQuery();
+                        await cmd.ExecuteNonQueryAsync();
 
                         pnr = pnrParam.Value?.ToString();
                     }
 
+                    // ✅ DYNAMIC QUEUE PROMOTIONS (RAC -> CNF, WL -> RAC)
+                    await ProcessDynamicQueuePromotions(conn, booking.TrainId, booking.TrainClassId, booking.JourneyDate, cancelledPax);
+
                     // ✅ SEND EMAIL
-                    if (booking != null)
+                    var refundResult = CalculateRefund(booking);
+                    decimal refundAmount = refundResult.refund;
+
+                    try
                     {
-                        var refundResult = CalculateRefund(booking);
-
-                        decimal refundAmount = refundResult.refund;
-
-                        try
-                        {
-                            await SendCancellationEmail(email, pnr, refundAmount);
-                        }
-                        catch (Exception emailEx)
-                        {
-                            Console.WriteLine("Email failed: " + emailEx.Message);
-                        }
+                        await SendCancellationEmail(email, pnr, refundAmount);
                     }
-                }
+                    catch (Exception emailEx)
+                    {
+                        Console.WriteLine("Email failed: " + emailEx.Message);
+                    }
 
-                return Json(new
-                {
-                    success = true,
-                    message = "Ticket cancelled successfully"
-                });
+                    // Real-time broadcast
+                    try
+                    {
+                        var updatedStatus = _bookingService.GetSeatStatus(booking.TrainId, booking.TrainClassId, booking.JourneyDate, booking.Quota);
+                        await _hub.Clients.All.SendAsync("AvailabilityUpdated", new
+                        {
+                            trainId = booking.TrainId,
+                            classId = booking.TrainClassId,
+                            availableSeats = updatedStatus.SeatsAvailable,
+                            racCount = updatedStatus.RACCount,
+                            wlCount = updatedStatus.WLCount,
+                            status = updatedStatus.SeatsAvailable > 0 ? "AVAILABLE" : (updatedStatus.RACCount < updatedStatus.RACSeats ? "RAC" : "WL")
+                        });
+                    }
+                    catch { }
+
+                    return Json(new
+                    {
+                        success = true,
+                        message = "Ticket cancelled successfully"
+                    });
+                }
             }
             catch (Exception ex)
             {
@@ -2311,50 +2581,100 @@ namespace IRCTCClone.Controllers
             }
         }
 
-        /*        [HttpPost]
-                public IActionResult CancelPassengers([FromBody] List<int> passengerIds)
-                {
-                    using (var conn = new SqlConnection(_connectionString))
-                    {
-                        conn.Open();
-
-                        foreach (var id in passengerIds)
-                        {
-                            using (var cmd = new SqlCommand("spCancelPassenger", conn))
-                            {
-                                cmd.CommandType = CommandType.StoredProcedure;
-                                cmd.Parameters.AddWithValue("@PassengerId", id);
-                                cmd.ExecuteNonQuery();
-                            }
-                        }
-
-                        // 🔥 IMPORTANT: Update booking status
-                        using (var cmd = new SqlCommand("spUpdateBookingStatusAfterPartialCancel", conn))
-                        {
-                            cmd.CommandType = CommandType.StoredProcedure;
-                            cmd.Parameters.AddWithValue("@PassengerIds", string.Join(",", passengerIds));
-                            cmd.ExecuteNonQuery();
-                        }
-                    }
-
-                    return Json(new { success = true });
-                }
-        */
-
         [HttpPost]
         public async Task<IActionResult> CancelPassengers([FromBody] List<int> passengerIds)
         {
             string userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             string email = User.FindFirstValue(ClaimTypes.Email);
 
-            if (string.IsNullOrEmpty(userId))
-                return Json(new { success = false });
+            if (string.IsNullOrEmpty(userId) || passengerIds == null || !passengerIds.Any())
+                return Json(new { success = false, message = "Invalid passenger selection" });
 
             try
             {
                 using (var conn = new SqlConnection(_connectionString))
                 {
-                    conn.Open();
+                    await conn.OpenAsync();
+
+                    int firstPaxId = passengerIds.First();
+                    int bkgId = 0;
+                    string bkgPnr = "";
+                    DateTime journeyDate = DateTime.MinValue;
+                    TimeSpan departure = TimeSpan.Zero;
+                    int trainId = 0;
+                    int trainClassId = 0;
+                    string quota = "General";
+
+                    string getBkgSql = @"
+                        SELECT b.Id, b.PNR, b.JourneyDate, b.Departure, b.TrainId, b.TrainClassId, b.Quota
+                        FROM Passengers p
+                        JOIN Bookings b ON p.BookingId = b.Id
+                        WHERE p.Id = @PaxId";
+
+                    using (var bkgCmd = new SqlCommand(getBkgSql, conn))
+                    {
+                        bkgCmd.Parameters.AddWithValue("@PaxId", firstPaxId);
+                        using (var r = await bkgCmd.ExecuteReaderAsync())
+                        {
+                            if (await r.ReadAsync())
+                            {
+                                bkgId = Convert.ToInt32(r["Id"]);
+                                bkgPnr = r["PNR"].ToString();
+                                journeyDate = Convert.ToDateTime(r["JourneyDate"]);
+                                if (r["Departure"] != DBNull.Value && TimeSpan.TryParse(r["Departure"].ToString(), out var depTime))
+                                    departure = depTime;
+                                trainId = Convert.ToInt32(r["TrainId"]);
+                                trainClassId = Convert.ToInt32(r["TrainClassId"]);
+                                quota = r["Quota"]?.ToString() ?? "General";
+                            }
+                        }
+                    }
+
+                    if (bkgId == 0)
+                    {
+                        return Json(new { success = false, message = "Booking details not found." });
+                    }
+
+                    DateTime departureDateTime = journeyDate.Date + departure;
+                    var indiaTime = TimeZoneInfo.ConvertTimeBySystemTimeZoneId(DateTime.UtcNow, "India Standard Time");
+                    TimeSpan timeToDeparture = departureDateTime - indiaTime;
+
+                    if (timeToDeparture.TotalSeconds <= 0)
+                    {
+                        return Json(new
+                        {
+                            success = false,
+                            message = $"FLUSHED PNR / PNR NOT YET GENERATED- ({bkgPnr})"
+                        });
+                    }
+
+                    if (timeToDeparture.TotalMinutes <= 30)
+                    {
+                        return Json(new
+                        {
+                            success = false,
+                            message = "Cancellation is Not Allowed as ticket is beyond permissible limit of cancellation"
+                        });
+                    }
+
+                    // Collect details of passengers being cancelled
+                    var cancelledPax = new List<(string status, string seat, string berth, int? pos)>();
+                    string inClause = string.Join(",", passengerIds);
+                    string getPaxDetailsSql = $"SELECT CurrentStatus, SeatNumber, Berth, Position FROM Passengers WHERE Id IN ({inClause}) AND CurrentStatus != 'CAN'";
+                    using (var pDetailsCmd = new SqlCommand(getPaxDetailsSql, conn))
+                    {
+                        using (var r = await pDetailsCmd.ExecuteReaderAsync())
+                        {
+                            while (await r.ReadAsync())
+                            {
+                                string cStatus = r["CurrentStatus"]?.ToString() ?? "";
+                                string seat = r["SeatNumber"]?.ToString() ?? "";
+                                string berth = r["Berth"]?.ToString() ?? "";
+                                int? pos = r.IsDBNull(r.GetOrdinal("Position")) ? (int?)null : r.GetInt32(r.GetOrdinal("Position"));
+                                cancelledPax.Add((cStatus, seat, berth, pos));
+                            }
+                        }
+                    }
 
                     string pnr = "";
 
@@ -2364,7 +2684,7 @@ namespace IRCTCClone.Controllers
                         {
                             cmd.CommandType = CommandType.StoredProcedure;
                             cmd.Parameters.AddWithValue("@PassengerId", id);
-                            cmd.ExecuteNonQuery();
+                            await cmd.ExecuteNonQueryAsync();
                         }
                     }
 
@@ -2380,14 +2700,15 @@ namespace IRCTCClone.Controllers
                         };
 
                         cmd.Parameters.Add(pnrParam);
-                        cmd.ExecuteNonQuery();
+                        await cmd.ExecuteNonQueryAsync();
 
                         pnr = pnrParam.Value?.ToString();
                     }
 
-                    // 🔥 SAME LOGIC AS OLD METHOD
-                    var booking = GetBookingByPNR(pnr);
+                    // ✅ DYNAMIC QUEUE PROMOTIONS (RAC -> CNF, WL -> RAC)
+                    await ProcessDynamicQueuePromotions(conn, trainId, trainClassId, journeyDate, cancelledPax);
 
+                    var booking = GetBookingByPNR(pnr);
                     if (booking != null)
                     {
                         var refundResult = CalculateRefund(booking);
@@ -2402,14 +2723,575 @@ namespace IRCTCClone.Controllers
                             Console.WriteLine("Email failed: " + emailEx.Message);
                         }
                     }
-                }
 
-                return Json(new { success = true });
+                    // Real-time broadcast
+                    try
+                    {
+                        var updatedStatus = _bookingService.GetSeatStatus(trainId, trainClassId, journeyDate, quota);
+                        await _hub.Clients.All.SendAsync("AvailabilityUpdated", new
+                        {
+                            trainId = trainId,
+                            classId = trainClassId,
+                            availableSeats = updatedStatus.SeatsAvailable,
+                            racCount = updatedStatus.RACCount,
+                            wlCount = updatedStatus.WLCount,
+                            status = updatedStatus.SeatsAvailable > 0 ? "AVAILABLE" : (updatedStatus.RACCount < updatedStatus.RACSeats ? "RAC" : "WL")
+                        });
+                    }
+                    catch { }
+
+                    return Json(new { success = true, message = "Passenger cancelled successfully" });
+                }
             }
             catch (Exception ex)
             {
-                return Json(new { success = false, error = ex.Message });
+                return Json(new { success = false, message = ex.Message });
             }
+        }
+
+        private async Task ProcessDynamicQueuePromotions(
+            SqlConnection conn, 
+            int trainId, 
+            int classId, 
+            DateTime journeyDate, 
+            List<(string status, string seat, string berth, int? position)> cancelledPaxList)
+        {
+            foreach (var pax in cancelledPaxList)
+            {
+                try
+                {
+                    if (pax.status == "CNF" && !string.IsNullOrWhiteSpace(pax.seat))
+                    {
+                        // 1. Find next RAC passenger
+                        int racPaxId = 0;
+                        string racUserEmail = "";
+                        string racPaxName = "";
+                        string racPnr = "";
+                        string trainName = "";
+                        string trainNo = "";
+
+                        string findRacSql = @"
+                            SELECT TOP 1 p.Id, p.Name, b.PNR, b.UserId, b.TrainName, b.TrainNumber
+                            FROM Passengers p
+                            JOIN Bookings b ON p.BookingId = b.Id
+                            WHERE b.TrainId = @TrainId 
+                              AND b.TrainClassId = @ClassId 
+                              AND CAST(b.JourneyDate AS DATE) = @JourneyDate
+                              AND p.CurrentStatus = 'RAC'
+                              AND b.Status != 'CANCELLED'
+                            ORDER BY p.Id ASC";
+
+                        using (var cmd = new SqlCommand(findRacSql, conn))
+                        {
+                            cmd.Parameters.AddWithValue("@TrainId", trainId);
+                            cmd.Parameters.AddWithValue("@ClassId", classId);
+                            cmd.Parameters.AddWithValue("@JourneyDate", journeyDate.Date);
+
+                            using (var r = await cmd.ExecuteReaderAsync())
+                            {
+                                if (await r.ReadAsync())
+                                {
+                                    racPaxId = Convert.ToInt32(r["Id"]);
+                                    racPaxName = r["Name"]?.ToString() ?? "Passenger";
+                                    racPnr = r["PNR"]?.ToString() ?? "";
+                                    racUserEmail = r["UserId"]?.ToString() ?? "";
+                                    trainName = r["TrainName"]?.ToString() ?? "";
+                                    trainNo = r["TrainNumber"]?.ToString() ?? "";
+                                }
+                            }
+                        }
+
+                        if (racPaxId > 0)
+                        {
+                            // Promote RAC -> CNF with this freed seat & berth
+                            string updateRacSql = @"
+                                UPDATE Passengers 
+                                SET CurrentStatus = 'CNF', 
+                                    SeatNumber = @SeatNumber, 
+                                    Berth = @Berth 
+                                WHERE Id = @PassengerId";
+
+                            using (var upCmd = new SqlCommand(updateRacSql, conn))
+                            {
+                                upCmd.Parameters.AddWithValue("@SeatNumber", pax.seat);
+                                upCmd.Parameters.AddWithValue("@Berth", string.IsNullOrWhiteSpace(pax.berth) ? "LB" : pax.berth);
+                                upCmd.Parameters.AddWithValue("@PassengerId", racPaxId);
+                                await upCmd.ExecuteNonQueryAsync();
+                            }
+
+                            // Send Email to promoted RAC -> CNF passenger
+                            string targetEmail = racUserEmail;
+                            _ = Task.Run(async () =>
+                            {
+                                try
+                                {
+                                    await _emailService.SendStatusUpgradeEmailAsync(
+                                        targetEmail, racPnr, trainNo, trainName, racPaxName,
+                                        "RAC", "CNF", $"{pax.seat} ({pax.berth})", journeyDate);
+                                }
+                                catch { }
+                            });
+
+                            // 2. Now promote next WL -> RAC
+                            await PromoteNextWlToRac(conn, trainId, classId, journeyDate);
+                        }
+                    }
+                    else if (pax.status == "RAC")
+                    {
+                        // RAC cancelled -> Promote next WL to RAC
+                        await PromoteNextWlToRac(conn, trainId, classId, journeyDate);
+                    }
+                    else if (pax.status == "WL" && pax.position.HasValue)
+                    {
+                        // Decrement positions of subsequent WL passengers
+                        string decWlSql = @"
+                            UPDATE p
+                            SET p.Position = p.Position - 1
+                            FROM Passengers p
+                            JOIN Bookings b ON p.BookingId = b.Id
+                            WHERE b.TrainId = @TrainId 
+                              AND b.TrainClassId = @ClassId 
+                              AND CAST(b.JourneyDate AS DATE) = @JourneyDate
+                              AND p.CurrentStatus = 'WL'
+                              AND p.Position > @CancelledPos
+                              AND b.Status != 'CANCELLED'";
+
+                        using (var cmd = new SqlCommand(decWlSql, conn))
+                        {
+                            cmd.Parameters.AddWithValue("@TrainId", trainId);
+                            cmd.Parameters.AddWithValue("@ClassId", classId);
+                            cmd.Parameters.AddWithValue("@JourneyDate", journeyDate.Date);
+                            cmd.Parameters.AddWithValue("@CancelledPos", pax.position.Value);
+                            await cmd.ExecuteNonQueryAsync();
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Error in ProcessDynamicQueuePromotions: " + ex.Message);
+                }
+            }
+        }
+
+        private async Task PromoteNextWlToRac(SqlConnection conn, int trainId, int classId, DateTime journeyDate)
+        {
+            try
+            {
+                int wlPaxId = 0;
+                string wlUserEmail = "";
+                string wlPaxName = "";
+                string wlPnr = "";
+                string trainName = "";
+                string trainNo = "";
+                int? oldWlPos = null;
+
+                string findWlSql = @"
+                    SELECT TOP 1 p.Id, p.Name, p.Position, b.PNR, b.UserId, b.TrainName, b.TrainNumber
+                    FROM Passengers p
+                    JOIN Bookings b ON p.BookingId = b.Id
+                    WHERE b.TrainId = @TrainId 
+                      AND b.TrainClassId = @ClassId 
+                      AND CAST(b.JourneyDate AS DATE) = @JourneyDate
+                      AND p.CurrentStatus = 'WL'
+                      AND b.Status != 'CANCELLED'
+                    ORDER BY p.Position ASC, p.Id ASC";
+
+                using (var cmd = new SqlCommand(findWlSql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@TrainId", trainId);
+                    cmd.Parameters.AddWithValue("@ClassId", classId);
+                    cmd.Parameters.AddWithValue("@JourneyDate", journeyDate.Date);
+
+                    using (var r = await cmd.ExecuteReaderAsync())
+                    {
+                        if (await r.ReadAsync())
+                        {
+                            wlPaxId = Convert.ToInt32(r["Id"]);
+                            wlPaxName = r["Name"]?.ToString() ?? "Passenger";
+                            wlPnr = r["PNR"]?.ToString() ?? "";
+                            wlUserEmail = r["UserId"]?.ToString() ?? "";
+                            trainName = r["TrainName"]?.ToString() ?? "";
+                            trainNo = r["TrainNumber"]?.ToString() ?? "";
+                            if (r["Position"] != DBNull.Value) oldWlPos = Convert.ToInt32(r["Position"]);
+                        }
+                    }
+                }
+
+                if (wlPaxId > 0)
+                {
+                    // Promote WL -> RAC
+                    string updateWlSql = @"
+                        UPDATE Passengers 
+                        SET CurrentStatus = 'RAC'
+                        WHERE Id = @PassengerId";
+
+                    using (var upCmd = new SqlCommand(updateWlSql, conn))
+                    {
+                        upCmd.Parameters.AddWithValue("@PassengerId", wlPaxId);
+                        await upCmd.ExecuteNonQueryAsync();
+                    }
+
+                    // Decrement subsequent WL positions
+                    if (oldWlPos.HasValue)
+                    {
+                        string decSubsequentWl = @"
+                            UPDATE p
+                            SET p.Position = p.Position - 1
+                            FROM Passengers p
+                            JOIN Bookings b ON p.BookingId = b.Id
+                            WHERE b.TrainId = @TrainId 
+                              AND b.TrainClassId = @ClassId 
+                              AND CAST(b.JourneyDate AS DATE) = @JourneyDate
+                              AND p.CurrentStatus = 'WL'
+                              AND p.Position > @OldPos
+                              AND b.Status != 'CANCELLED'";
+
+                        using (var decCmd = new SqlCommand(decSubsequentWl, conn))
+                        {
+                            decCmd.Parameters.AddWithValue("@TrainId", trainId);
+                            decCmd.Parameters.AddWithValue("@ClassId", classId);
+                            decCmd.Parameters.AddWithValue("@JourneyDate", journeyDate.Date);
+                            decCmd.Parameters.AddWithValue("@OldPos", oldWlPos.Value);
+                            await decCmd.ExecuteNonQueryAsync();
+                        }
+                    }
+
+                    // Send Email to promoted WL -> RAC passenger
+                    string targetEmail = wlUserEmail;
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await _emailService.SendStatusUpgradeEmailAsync(
+                                targetEmail, wlPnr, trainNo, trainName, wlPaxName,
+                                "WL", "RAC", "RAC Status Confirmed", journeyDate);
+                        }
+                        catch { }
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error in PromoteNextWlToRac: " + ex.Message);
+            }
+        }
+
+        public class ChangeBoardingRequest
+        {
+            public int BookingId { get; set; }
+            public string NewStation { get; set; }
+            public string DepartureTime { get; set; }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetBoardingStations(int bookingId)
+        {
+            string userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Json(new { success = false, message = "Please login to change boarding point." });
+            }
+
+            try
+            {
+                using (var conn = new SqlConnection(_connectionString))
+                {
+                    await conn.OpenAsync();
+
+                    EnsureBoardingColumnsExist(conn);
+
+                    string sql = @"
+                        SELECT b.Id, b.PNR, b.TrainId, b.TrainNumber, b.TrainName, b.Frmst, b.Tost, b.JourneyDate, b.Departure,
+                               b.Status, ISNULL(b.IsBoardingChanged, 0) AS IsBoardingChanged
+                        FROM Bookings b
+                        WHERE b.Id = @BookingId AND b.UserId = @UserId";
+
+                    int trainId = 0;
+                    string pnr = "";
+                    string trainName = "";
+                    string trainNumber = "";
+                    string currentBoarding = "";
+                    string destination = "";
+                    DateTime journeyDate = DateTime.MinValue;
+                    TimeSpan currentDeparture = TimeSpan.Zero;
+                    string status = "";
+                    bool isBoardingChanged = false;
+
+                    using (var cmd = new SqlCommand(sql, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@BookingId", bookingId);
+                        cmd.Parameters.AddWithValue("@UserId", userId);
+
+                        using (var r = await cmd.ExecuteReaderAsync())
+                        {
+                            if (!await r.ReadAsync())
+                            {
+                                return Json(new { success = false, message = "Booking not found." });
+                            }
+
+                            trainId = Convert.ToInt32(r["TrainId"]);
+                            pnr = r["PNR"].ToString();
+                            trainName = r["TrainName"]?.ToString() ?? "";
+                            trainNumber = r["TrainNumber"]?.ToString() ?? "";
+                            currentBoarding = r["Frmst"]?.ToString() ?? "";
+                            destination = r["Tost"]?.ToString() ?? "";
+                            journeyDate = Convert.ToDateTime(r["JourneyDate"]);
+                            if (r["Departure"] != DBNull.Value && TimeSpan.TryParse(r["Departure"].ToString(), out var depTime))
+                                currentDeparture = depTime;
+                            status = r["Status"]?.ToString() ?? "";
+                            isBoardingChanged = Convert.ToBoolean(r["IsBoardingChanged"]);
+                        }
+                    }
+
+                    if (status == "CANCELLED")
+                    {
+                        return Json(new { success = false, message = "Ticket is cancelled. Boarding station cannot be changed." });
+                    }
+
+                    if (isBoardingChanged)
+                    {
+                        return Json(new
+                        {
+                            success = false,
+                            message = "Boarding station can be changed only once. Second chance is not permitted as per IRCTC rules.",
+                            code = "ALREADY_CHANGED"
+                        });
+                    }
+
+                    var indiaTime = TimeZoneInfo.ConvertTimeBySystemTimeZoneId(DateTime.UtcNow, "India Standard Time");
+                    DateTime departureDateTime = journeyDate.Date + currentDeparture;
+                    TimeSpan timeToDeparture = departureDateTime - indiaTime;
+
+                    if (timeToDeparture.TotalSeconds <= 0)
+                    {
+                        return Json(new
+                        {
+                            success = false,
+                            message = $"FLUSHED PNR / PNR NOT YET GENERATED- ({pnr})",
+                            code = "DEPARTED"
+                        });
+                    }
+
+                    if (timeToDeparture.TotalMinutes <= 30)
+                    {
+                        return Json(new
+                        {
+                            success = false,
+                            message = "Boarding station change is not allowed within 30 minutes of departure.",
+                            code = "BEYOND_LIMIT"
+                        });
+                    }
+
+                    var routeStops = new List<object>();
+                    using (var cmd = new SqlCommand("spGetFullTrainRouteForBooking", conn))
+                    {
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.AddWithValue("@TrainId", trainId);
+
+                        using (var reader = await cmd.ExecuteReaderAsync())
+                        {
+                            while (await reader.ReadAsync())
+                            {
+                                string stName = reader["StationName"]?.ToString() ?? "";
+                                string depTime = reader["DepartureTime"]?.ToString() ?? reader["ArrivalTime"]?.ToString() ?? "";
+
+                                routeStops.Add(new
+                                {
+                                    StopNumber = reader["StopNumber"],
+                                    StationName = stName,
+                                    DepartureTime = depTime,
+                                    DayNumber = reader["Day"],
+                                    Distance = reader["DistanceFromSource"]
+                                });
+                            }
+                        }
+                    }
+
+                    return Json(new
+                    {
+                        success = true,
+                        pnr = pnr,
+                        bookingId = bookingId,
+                        trainNo = trainNumber,
+                        trainName = trainName,
+                        currentBoarding = currentBoarding,
+                        destination = destination,
+                        currentDeparture = currentDeparture.ToString(@"hh\:mm"),
+                        journeyDate = journeyDate.ToString("dd MMM yyyy"),
+                        stations = routeStops
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = "Error loading boarding stations: " + ex.Message });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ChangeBoardingPoint([FromBody] ChangeBoardingRequest req)
+        {
+            string userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            string userEmail = User.FindFirstValue(ClaimTypes.Email);
+
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Json(new { success = false, message = "Please login again." });
+            }
+
+            if (req == null || req.BookingId <= 0 || string.IsNullOrWhiteSpace(req.NewStation))
+            {
+                return Json(new { success = false, message = "Invalid request details." });
+            }
+
+            try
+            {
+                using (var conn = new SqlConnection(_connectionString))
+                {
+                    await conn.OpenAsync();
+
+                    EnsureBoardingColumnsExist(conn);
+
+                    string checkSql = @"
+                        SELECT b.Id, b.PNR, b.TrainId, b.TrainNumber, b.TrainName, b.Frmst, b.Tost, b.JourneyDate, b.Departure,
+                               b.Status, ISNULL(b.IsBoardingChanged, 0) AS IsBoardingChanged, b.UserId
+                        FROM Bookings b
+                        WHERE b.Id = @BookingId AND b.UserId = @UserId";
+
+                    string pnr = "";
+                    string trainName = "";
+                    string trainNumber = "";
+                    string oldBoarding = "";
+                    DateTime journeyDate = DateTime.MinValue;
+                    TimeSpan currentDeparture = TimeSpan.Zero;
+                    bool isBoardingChanged = false;
+
+                    using (var cmd = new SqlCommand(checkSql, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@BookingId", req.BookingId);
+                        cmd.Parameters.AddWithValue("@UserId", userId);
+
+                        using (var r = await cmd.ExecuteReaderAsync())
+                        {
+                            if (!await r.ReadAsync())
+                            {
+                                return Json(new { success = false, message = "Booking not found." });
+                            }
+
+                            pnr = r["PNR"].ToString();
+                            trainName = r["TrainName"]?.ToString() ?? "";
+                            trainNumber = r["TrainNumber"]?.ToString() ?? "";
+                            oldBoarding = r["Frmst"]?.ToString() ?? "";
+                            journeyDate = Convert.ToDateTime(r["JourneyDate"]);
+                            if (r["Departure"] != DBNull.Value && TimeSpan.TryParse(r["Departure"].ToString(), out var depTime))
+                                currentDeparture = depTime;
+                            isBoardingChanged = Convert.ToBoolean(r["IsBoardingChanged"]);
+                        }
+                    }
+
+                    if (isBoardingChanged)
+                    {
+                        return Json(new
+                        {
+                            success = false,
+                            message = "Boarding station can be changed only once. Second chance is not permitted as per IRCTC rules."
+                        });
+                    }
+
+                    var indiaTime = TimeZoneInfo.ConvertTimeBySystemTimeZoneId(DateTime.UtcNow, "India Standard Time");
+                    DateTime departureDateTime = journeyDate.Date + currentDeparture;
+                    TimeSpan timeToDeparture = departureDateTime - indiaTime;
+
+                    if (timeToDeparture.TotalSeconds <= 0)
+                    {
+                        return Json(new { success = false, message = $"FLUSHED PNR / PNR NOT YET GENERATED- ({pnr})" });
+                    }
+
+                    if (timeToDeparture.TotalMinutes <= 30)
+                    {
+                        return Json(new { success = false, message = "Boarding station change is not allowed within 30 minutes of departure." });
+                    }
+
+                    TimeSpan newDepTime = currentDeparture;
+                    if (!string.IsNullOrWhiteSpace(req.DepartureTime) && TimeSpan.TryParse(req.DepartureTime, out var parsedDep))
+                    {
+                        newDepTime = parsedDep;
+                    }
+
+                    string updateSql = @"
+                        UPDATE Bookings
+                        SET Frmst = @NewStation,
+                            Departure = @NewDeparture,
+                            IsBoardingChanged = 1,
+                            BoardingChangedAt = GETUTCDATE(),
+                            OriginalBoardingStation = CASE WHEN OriginalBoardingStation IS NULL THEN @OldStation ELSE OriginalBoardingStation END
+                        WHERE Id = @BookingId AND UserId = @UserId";
+
+                    using (var updateCmd = new SqlCommand(updateSql, conn))
+                    {
+                        updateCmd.Parameters.AddWithValue("@NewStation", req.NewStation);
+                        updateCmd.Parameters.AddWithValue("@NewDeparture", newDepTime);
+                        updateCmd.Parameters.AddWithValue("@OldStation", oldBoarding);
+                        updateCmd.Parameters.AddWithValue("@BookingId", req.BookingId);
+                        updateCmd.Parameters.AddWithValue("@UserId", userId);
+
+                        await updateCmd.ExecuteNonQueryAsync();
+                    }
+
+                    // Send email confirmation
+                    string recipientEmail = !string.IsNullOrWhiteSpace(userEmail) ? userEmail : userId;
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await _emailService.SendBoardingPointChangedEmailAsync(
+                                recipientEmail, pnr, trainNumber, trainName, oldBoarding, req.NewStation,
+                                journeyDate, newDepTime);
+                        }
+                        catch (Exception emailEx)
+                        {
+                            Console.WriteLine("Boarding change email error: " + emailEx.Message);
+                        }
+                    });
+
+                    return Json(new
+                    {
+                        success = true,
+                        message = $"Boarding station changed successfully to {req.NewStation}.",
+                        newStation = req.NewStation,
+                        newDeparture = newDepTime.ToString(@"hh\:mm")
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = "Failed to update boarding station: " + ex.Message });
+            }
+        }
+
+        private void EnsureBoardingColumnsExist(SqlConnection conn)
+        {
+            try
+            {
+                string sql = @"
+                    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Bookings' AND COLUMN_NAME = 'IsBoardingChanged')
+                    BEGIN
+                        ALTER TABLE Bookings ADD IsBoardingChanged BIT NOT NULL DEFAULT 0;
+                    END
+                    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Bookings' AND COLUMN_NAME = 'BoardingChangedAt')
+                    BEGIN
+                        ALTER TABLE Bookings ADD BoardingChangedAt DATETIME NULL;
+                    END
+                    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Bookings' AND COLUMN_NAME = 'OriginalBoardingStation')
+                    BEGIN
+                        ALTER TABLE Bookings ADD OriginalBoardingStation NVARCHAR(100) NULL;
+                    END";
+                using (var cmd = new SqlCommand(sql, conn))
+                {
+                    cmd.ExecuteNonQuery();
+                }
+            }
+            catch { }
         }
 
         [HttpGet]
@@ -2439,10 +3321,30 @@ namespace IRCTCClone.Controllers
                             var indiaTimeNow = TimeZoneInfo.ConvertTimeBySystemTimeZoneId(DateTime.UtcNow, "India Standard Time");
                             DateTime depDateTime = jDate.Date + depTime;
                             TimeSpan diff = depDateTime - indiaTimeNow;
-                            bool isChartPrepared = diff.TotalHours <= 8;
-                            string chartingStatus = isChartPrepared ? "Chart Prepared" : "Chart Not Prepared";
+
                             string pnrStr = reader["PNR"].ToString();
                             string userEmailStr = reader["UserId"]?.ToString() ?? userId;
+
+                            if (diff.TotalSeconds <= 0)
+                            {
+                                return Json(new
+                                {
+                                    success = false,
+                                    message = $"FLUSHED PNR / PNR NOT YET GENERATED- ({pnrStr})"
+                                });
+                            }
+
+                            if (diff.TotalMinutes <= 30)
+                            {
+                                return Json(new
+                                {
+                                    success = false,
+                                    message = "Cancellation is Not Allowed as ticket is beyond permissible limit of cancellation"
+                                });
+                            }
+
+                            bool isChartPrepared = diff.TotalHours <= 8;
+                            string chartingStatus = isChartPrepared ? "Chart Prepared" : "Chart Not Prepared";
 
                             // Immediate trigger if chart prepared
                             if (isChartPrepared && diff.TotalHours >= -4)
@@ -2538,6 +3440,254 @@ namespace IRCTCClone.Controllers
                         return Json(new { booking, passengers });
                     }
                 }
+            }
+        }
+
+        [HttpGet]
+        [ActionName("GetBookingDetails")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetBookingDetailsAsync(int id)
+        {
+            string userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            try
+            {
+                using (var conn = new SqlConnection(_connectionString))
+                {
+                    await conn.OpenAsync();
+
+                    using (var cmd = new SqlCommand("spGetBookingDtls", conn))
+                    {
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.AddWithValue("@BookingId", id);
+                        cmd.Parameters.AddWithValue("@UserId", userId ?? "");
+
+                        using (var reader = await cmd.ExecuteReaderAsync())
+                        {
+                            object booking = null;
+                            var passengers = new List<object>();
+
+                            if (await reader.ReadAsync())
+                            {
+                                DateTime jDate = Convert.ToDateTime(reader["JourneyDate"]);
+                                TimeSpan depTime = reader["Departure"] != DBNull.Value ? (TimeSpan)reader["Departure"] : TimeSpan.Zero;
+                                var indiaTimeNow = TimeZoneInfo.ConvertTimeBySystemTimeZoneId(DateTime.UtcNow, "India Standard Time");
+                                DateTime depDateTime = jDate.Date + depTime;
+                                TimeSpan diff = depDateTime - indiaTimeNow;
+
+                                string pnrStr = reader["PNR"].ToString();
+                                bool isChartPrepared = diff.TotalHours <= 8 && diff.TotalHours >= -24;
+                                string chartingStatus = isChartPrepared ? "Chart Prepared" : "Chart Not Prepared";
+
+                                bool canCancel = diff.TotalMinutes > 30 && diff.TotalSeconds > 0 && reader["Status"].ToString() != "CANCELLED";
+
+                                booking = new
+                                {
+                                    bookingId = id,
+                                    pnr = pnrStr,
+                                    trainName = reader["TrainName"].ToString(),
+                                    trainNo = reader["TrainNumber"].ToString(),
+                                    from = reader["Frmst"].ToString(),
+                                    to = reader["Tost"].ToString(),
+
+                                    journeyDate = jDate.ToString("dd MMM yyyy"),
+                                    rawJourneyDate = jDate.ToString("yyyy-MM-dd"),
+                                    journeyFull = reader["JourneyFull"] != DBNull.Value ? reader["JourneyFull"].ToString() : "",
+                                    bookingDate = reader["BookingDate"] != DBNull.Value ? Convert.ToDateTime(reader["BookingDate"]).ToString("dd MMM yyyy | hh:mm tt") : "",
+
+                                    quota = reader["Quota"] != DBNull.Value ? reader["Quota"].ToString() : "General",
+                                    convenienceFees = reader["ConvenienceFee"] != DBNull.Value ? Convert.ToDecimal(reader["ConvenienceFee"]) : 0.00m,
+                                    insurance = reader["Insurance"] != DBNull.Value ? Convert.ToDecimal(reader["Insurance"]) : 0.00m,
+                                    className = reader["ClassCode"].ToString(),
+
+                                    baseFare = reader["BaseFare"] != DBNull.Value ? Convert.ToDecimal(reader["BaseFare"]) : 0.00m,
+                                    gst = reader["GST"] != DBNull.Value ? Convert.ToDecimal(reader["GST"]) : 0.00m,
+                                    quotaCharge = reader["QuotaCharge"] != DBNull.Value ? Convert.ToDecimal(reader["QuotaCharge"]) : 0.00m,
+                                    surge = reader["SurgeAmount"] != DBNull.Value ? Convert.ToDecimal(reader["SurgeAmount"]) : 0.00m,
+                                    fare = reader["TotalFare"] != DBNull.Value ? Convert.ToDecimal(reader["TotalFare"]) : 0.00m,
+                                    departure = reader["Departure"] != DBNull.Value ? reader["Departure"].ToString() : "",
+                                    arrival = reader["Arrival"] != DBNull.Value ? reader["Arrival"].ToString() : "",
+                                    duration = reader["Duration"] != DBNull.Value ? reader["Duration"].ToString() : "",
+                                    status = reader["Status"] != DBNull.Value ? reader["Status"].ToString() : "CONFIRMED",
+                                    isChartPrepared = isChartPrepared,
+                                    chartingStatus = chartingStatus,
+                                    canCancel = canCancel
+                                };
+                            }
+
+                            if (await reader.NextResultAsync())
+                            {
+                                while (await reader.ReadAsync())
+                                {
+                                    string bookingStatus = reader["BookingStatus"] != DBNull.Value ? reader["BookingStatus"].ToString() : "";
+                                    string currentStatus = reader["CurrentStatus"] != DBNull.Value ? reader["CurrentStatus"].ToString() : bookingStatus;
+                                    string seatNum = reader["SeatNumber"] != DBNull.Value ? reader["SeatNumber"].ToString() : "";
+                                    string berth = reader["Berth"] != DBNull.Value ? reader["Berth"].ToString() : "";
+
+                                    string meal = "";
+                                    try
+                                    {
+                                        int mealOrd = reader.GetOrdinal("Meal");
+                                        if (mealOrd >= 0 && reader["Meal"] != DBNull.Value)
+                                        {
+                                            meal = reader["Meal"].ToString();
+                                        }
+                                    }
+                                    catch { }
+
+                                    passengers.Add(new
+                                    {
+                                        id = reader["Id"],
+                                        name = reader["Name"].ToString(),
+                                        age = reader["Age"],
+                                        gender = reader["Gender"].ToString(),
+                                        bookingStatus = bookingStatus,
+                                        currentStatus = currentStatus,
+                                        berth = berth,
+                                        seat = seatNum,
+                                        meal = meal,
+                                        Position = reader.IsDBNull(reader.GetOrdinal("Position"))
+                                            ? (int?)null
+                                            : reader.GetInt32(reader.GetOrdinal("Position"))
+                                    });
+                                }
+                            }
+
+                            if (booking != null)
+                            {
+                                return Json(new { success = true, booking, passengers });
+                            }
+                        }
+                    }
+
+                    // Fallback to direct query if spGetBookingDtls returned nothing (e.g. UserId mismatch or past trip)
+                    using (var fallbackCmd = new SqlCommand(@"
+                        SELECT TOP 1 b.Id, b.PNR, b.TrainId, b.TrainNumber, b.TrainName, b.Frmst, b.Tost, 
+                                     b.JourneyDate, b.Departure, b.Arrival, b.Duration, b.Quota, b.Class, 
+                                     b.Status, b.TicketStatus, b.BaseFare, b.TotalFare, b.CreatedDate AS BookingDate
+                        FROM Bookings b WHERE b.Id = @BId", conn))
+                    {
+                        fallbackCmd.Parameters.AddWithValue("@BId", id);
+                        using (var fbReader = await fallbackCmd.ExecuteReaderAsync())
+                        {
+                            if (await fbReader.ReadAsync())
+                            {
+                                DateTime jDate = Convert.ToDateTime(fbReader["JourneyDate"]);
+                                TimeSpan depTime = fbReader["Departure"] != DBNull.Value ? (TimeSpan)fbReader["Departure"] : TimeSpan.Zero;
+                                var indiaTimeNow = TimeZoneInfo.ConvertTimeBySystemTimeZoneId(DateTime.UtcNow, "India Standard Time");
+                                DateTime depDateTime = jDate.Date + depTime;
+                                TimeSpan diff = depDateTime - indiaTimeNow;
+
+                                string pnrStr = fbReader["PNR"].ToString();
+                                bool isChartPrepared = diff.TotalHours <= 8 && diff.TotalHours >= -24;
+                                string chartingStatus = isChartPrepared ? "Chart Prepared" : "Chart Not Prepared";
+                                bool canCancel = diff.TotalMinutes > 30 && diff.TotalSeconds > 0 && fbReader["Status"].ToString() != "CANCELLED";
+
+                                var fallbackBooking = new
+                                {
+                                    bookingId = id,
+                                    pnr = pnrStr,
+                                    trainName = fbReader["TrainName"].ToString(),
+                                    trainNo = fbReader["TrainNumber"].ToString(),
+                                    from = fbReader["Frmst"].ToString(),
+                                    to = fbReader["Tost"].ToString(),
+                                    journeyDate = jDate.ToString("dd MMM yyyy"),
+                                    rawJourneyDate = jDate.ToString("yyyy-MM-dd"),
+                                    journeyFull = "",
+                                    bookingDate = fbReader["BookingDate"] != DBNull.Value ? Convert.ToDateTime(fbReader["BookingDate"]).ToString("dd MMM yyyy | hh:mm tt") : "",
+                                    quota = fbReader["Quota"] != DBNull.Value ? fbReader["Quota"].ToString() : "General",
+                                    convenienceFees = 17.70m,
+                                    insurance = 0.45m,
+                                    className = fbReader["Class"].ToString(),
+                                    baseFare = fbReader["BaseFare"] != DBNull.Value ? Convert.ToDecimal(fbReader["BaseFare"]) : 0.00m,
+                                    gst = 0.00m,
+                                    quotaCharge = 0.00m,
+                                    surge = 0.00m,
+                                    fare = fbReader["TotalFare"] != DBNull.Value ? Convert.ToDecimal(fbReader["TotalFare"]) : 0.00m,
+                                    departure = fbReader["Departure"] != DBNull.Value ? fbReader["Departure"].ToString() : "",
+                                    arrival = fbReader["Arrival"] != DBNull.Value ? fbReader["Arrival"].ToString() : "",
+                                    duration = fbReader["Duration"] != DBNull.Value ? fbReader["Duration"].ToString() : "",
+                                    status = fbReader["Status"] != DBNull.Value ? fbReader["Status"].ToString() : "CONFIRMED",
+                                    isChartPrepared = isChartPrepared,
+                                    chartingStatus = chartingStatus,
+                                    canCancel = canCancel
+                                };
+
+                                fbReader.Close();
+
+                                var fallbackPassengers = new List<object>();
+                                using (var pCmd = new SqlCommand("SELECT * FROM Passengers WHERE BookingId = @BId ORDER BY Id", conn))
+                                {
+                                    pCmd.Parameters.AddWithValue("@BId", id);
+                                    using (var pRdr = await pCmd.ExecuteReaderAsync())
+                                    {
+                                        while (await pRdr.ReadAsync())
+                                        {
+                                            string meal = "";
+                                            try { if (pRdr["Meal"] != DBNull.Value) meal = pRdr["Meal"].ToString(); } catch { }
+
+                                            fallbackPassengers.Add(new
+                                            {
+                                                id = pRdr["Id"],
+                                                name = pRdr["Name"].ToString(),
+                                                age = pRdr["Age"],
+                                                gender = pRdr["Gender"].ToString(),
+                                                bookingStatus = pRdr["BookingStatus"] != DBNull.Value ? pRdr["BookingStatus"].ToString() : "CNF",
+                                                currentStatus = pRdr["CurrentStatus"] != DBNull.Value ? pRdr["CurrentStatus"].ToString() : "CNF",
+                                                berth = pRdr["Berth"] != DBNull.Value ? pRdr["Berth"].ToString() : "",
+                                                seat = pRdr["SeatNumber"] != DBNull.Value ? pRdr["SeatNumber"].ToString() : "",
+                                                meal = meal,
+                                                Position = pRdr.IsDBNull(pRdr.GetOrdinal("Position")) ? (int?)null : pRdr.GetInt32(pRdr.GetOrdinal("Position"))
+                                            });
+                                        }
+                                    }
+                                }
+
+                                return Json(new { success = true, booking = fallbackBooking, passengers = fallbackPassengers });
+                            }
+                        }
+                    }
+
+                    return Json(new { success = false, message = "Booking details not found." });
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        [HttpPost]
+        [AllowAnonymous]
+        public async Task<IActionResult> UpdateMealPreference(int bookingId, string meal)
+        {
+            if (string.IsNullOrWhiteSpace(meal))
+            {
+                return Json(new { success = false, message = "Please select a valid meal preference." });
+            }
+
+            try
+            {
+                using (var conn = new SqlConnection(_connectionString))
+                {
+                    await conn.OpenAsync();
+                    using (var chkCmd = new SqlCommand("IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('Passengers') AND name = 'Meal') ALTER TABLE Passengers ADD Meal NVARCHAR(50) NULL", conn))
+                    {
+                        await chkCmd.ExecuteNonQueryAsync();
+                    }
+
+                    using (var upCmd = new SqlCommand("UPDATE Passengers SET Meal = @Meal WHERE BookingId = @BId", conn))
+                    {
+                        upCmd.Parameters.AddWithValue("@Meal", meal);
+                        upCmd.Parameters.AddWithValue("@BId", bookingId);
+                        int rows = await upCmd.ExecuteNonQueryAsync();
+                        return Json(new { success = true, message = $"Meal preference successfully updated to {meal} for {rows} passenger(s)." });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = "Failed to update meal: " + ex.Message });
             }
         }
 
@@ -3265,6 +4415,51 @@ namespace IRCTCClone.Controllers
             {
                 conn.Open();
 
+                // 🔥 CHECK SERVICE VALIDITY AND 3-DAY ADVANCE BOOKING RULE
+                try
+                {
+                    using (SqlCommand serviceCmd = new SqlCommand("SELECT ServiceStartDate, ServiceEndDate FROM Trains WHERE Id = @TrainId", conn))
+                    {
+                        serviceCmd.Parameters.AddWithValue("@TrainId", trainId);
+                        using (SqlDataReader sReader = serviceCmd.ExecuteReader())
+                        {
+                            if (sReader.Read())
+                            {
+                                DateTime? serviceStart = sReader.IsDBNull(0) ? null : sReader.GetDateTime(0);
+                                DateTime? serviceEnd = sReader.IsDBNull(1) ? null : sReader.GetDateTime(1);
+
+                                var istNow = TimeZoneInfo.ConvertTimeBySystemTimeZoneId(DateTime.UtcNow, "India Standard Time");
+
+                                if (serviceEnd.HasValue && journeyDate.Date > serviceEnd.Value.Date)
+                                {
+                                    return Json(new
+                                    {
+                                        status = "BOOKING_NOT_ALLOWED",
+                                        message = "BOOKINGs are NOT ALLOWED at this TIME"
+                                    });
+                                }
+
+                                if (serviceStart.HasValue)
+                                {
+                                    DateTime bookingOpenDate = serviceStart.Value.Date.AddDays(-3);
+                                    if (istNow.Date < bookingOpenDate)
+                                    {
+                                        return Json(new
+                                        {
+                                            status = "BOOKING_NOT_ALLOWED",
+                                            message = "BOOKINGs are NOT ALLOWED at this TIME"
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Error checking service dates: " + ex.Message);
+                }
+
                 // 🔥 CHECK TRAIN CANCELLED
                 using (SqlCommand cancelCmd = new SqlCommand("spCheckTrainCancelled", conn))
                 {
@@ -3326,8 +4521,8 @@ namespace IRCTCClone.Controllers
                     });
                 }
 
-                // 🚫 8-Hour Rule: Chart Prepared (Booking Closed)
-                if (timeToDeparture.TotalHours <= 8)
+                // 🚫 Final Charting Rule: Within 30 minutes of departure (Booking Closed)
+                if (timeToDeparture.TotalMinutes <= 30)
                 {
                     return Json(new
                     {
@@ -3381,6 +4576,10 @@ namespace IRCTCClone.Controllers
 
                 bool isTatkalOpen = TatkalHelper.IsTatkalOpen(extractedCode);
 
+                int available = 0;
+                int rac = 0;
+                int wl = 0;
+
                 using (SqlCommand cmd = new SqlCommand("spGetSeatStatusCounts", conn))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
@@ -3394,154 +4593,148 @@ namespace IRCTCClone.Controllers
                     {
                         if (reader.Read())
                         {
-                            int available = 0;
-                            int rac = 0;
-                            int wl = 0;
-
                             if (quota == "TATKAL")
                             {
-                                int tatkalSeats = Convert.ToInt32(reader["TatkalSeats"]);
-
+                                int tatkalSeats = (reader["TatkalSeats"] != null && reader["TatkalSeats"] != DBNull.Value) ? Convert.ToInt32(reader["TatkalSeats"]) : 0;
                                 available = tatkalSeats;
-
-                                wl = Convert.ToInt32(reader["WLCount"]);
-
-                                if (tatkalSeats > 0)
-                                {
-                                    status = "AVAILABLE";
-                                    count = tatkalSeats;
-                                }
-                                else if (wl > 0)
-                                {
-                                    status = "WL";
-                                    count = wl;
-                                }
-                                else
-                                {
-                                    status = "NOT AVAILABLE";
-                                    count = 0;
-                                }
-                                return Json(new
-                                {
-                                    status = status,
-                                    count = count,
-                                    isTatkalOpen = isTatkalOpen
-                                });
+                                wl = (reader["WLCount"] != null && reader["WLCount"] != DBNull.Value) ? Convert.ToInt32(reader["WLCount"]) : 0;
                             }
                             else
                             {
-                                available = Convert.ToInt32(reader["SeatsAvailable"]);
-                                rac = Convert.ToInt32(reader["RACCount"]);
-                                wl = Convert.ToInt32(reader["WLCount"]);
+                                available = (reader["SeatsAvailable"] != null && reader["SeatsAvailable"] != DBNull.Value) ? Convert.ToInt32(reader["SeatsAvailable"]) : 0;
+                                rac = (reader["RACCount"] != null && reader["RACCount"] != DBNull.Value) ? Convert.ToInt32(reader["RACCount"]) : 0;
+                                wl = (reader["WLCount"] != null && reader["WLCount"] != DBNull.Value) ? Convert.ToInt32(reader["WLCount"]) : 0;
                             }
-
-                            if (available > 0)
-                            {
-                                status = "AVAILABLE";
-                                count = available;
-                            }
-                            else if (rac > 0)
-                            {
-                                status = "RAC";
-                                count = rac;
-                            }
-                            else if (wl > 0)
-                            {
-                                status = "WL";
-                                count = wl;
-                            }
-                            else
-                            {
-                                status = "NOT AVAILABLE";
-                                count = 0;
-                            }
-
-                            // 🟢 NORMAL BOOKING
-
-                            // 🔥 CHECK BOOKING OPEN CONTROL
-
-                            using (SqlCommand bookingCmd = new SqlCommand("spFetchBookingSettings", conn))
-                            {
-                                bookingCmd.CommandType = CommandType.StoredProcedure;
-
-                                bookingCmd.Parameters.AddWithValue("@TrainId", trainId);
-
-                                    if (reader.Read())
-                                    {
-                                        // ONLY APPLY IF DATE EXISTS + ENABLED
-                                        if (
-                                            reader["BookingOpenDate"] != DBNull.Value
-                                            &&
-                                            reader["IsBookingEnabled"] != DBNull.Value
-                                            &&
-                                            Convert.ToBoolean(reader["IsBookingEnabled"])
-                                        )
-                                        {
-                                            DateTime bookingOpenDate =
-                                                Convert.ToDateTime(reader["BookingOpenDate"]);
-
-                                            TimeSpan bookingTime =
-                                                reader["BookingWindowTime"] == DBNull.Value
-                                                ? new TimeSpan(8, 0, 0)
-                                                : (TimeSpan)reader["BookingWindowTime"];
-
-                                            DateTime openDateTime =
-                                                bookingOpenDate.Date + bookingTime;
-
-                                            var currentIndiaTime =
-                                                TimeZoneInfo.ConvertTimeBySystemTimeZoneId(
-                                                    DateTime.UtcNow,
-                                                    "India Standard Time"
-                                                );
-
-                                            // 🚫 BOOKING NOT OPEN
-                                            if (indiaTime < openDateTime)
-                                            {
-                                                return Json(new
-                                                {
-                                                    status = "BOOKING_NOT_ALLOWED"
-                                                });
-                                            }
-                                        }
-                                    }
-                                
-                            }
-
-                            var seatStatus = GetSeatStatus(trainId, classId, journeyDate, quota);
-
-                            int remainingSeats = seatStatus.SeatsAvailable;
-                            int racRemaining = seatStatus.RACSeats;
-
-                            if (remainingSeats > 0)
-                            {
-                                status = "AVAILABLE";
-                                count = remainingSeats;
-                            }
-                            else if (quota != "TATKAL" && racRemaining > 0)
-                            {
-                                status = "RAC";
-                                count = racRemaining;
-                            }
-                            else if (seatStatus.WLCount >= 0)
-                            {
-                                status = "WL";
-                                count = seatStatus.WLCount;
-                            }
-                            else
-                            {
-                                status = "NOT AVAILABLE";
-                                count = 0;
-                            }
-
-                            return Json(new
-                            {
-                                status = status,
-                                count = count,
-                                isTatkalOpen = isTatkalOpen
-                            });
                         }
                     }
                 }
+
+                if (quota == "TATKAL")
+                {
+                    bool isFirstAc = extractedCode == "1A" || classCode.Contains("1A") || extractedCode == "EA" || classCode.Contains("FIRST AC");
+                    if (isFirstAc)
+                    {
+                        string tatkalStatus = isTatkalOpen ? "NOT AVAILABLE" : "NOT AVAILABLE#";
+                        return Json(new
+                        {
+                            status = tatkalStatus,
+                            count = 0,
+                            isTatkalOpen = isTatkalOpen
+                        });
+                    }
+
+                    if (available > 0)
+                    {
+                        status = "AVAILABLE";
+                        count = available;
+                    }
+                    else if (wl > 0)
+                    {
+                        status = "WL";
+                        count = wl;
+                    }
+                    else
+                    {
+                        status = "NOT AVAILABLE";
+                        count = 0;
+                    }
+                    return Json(new
+                    {
+                        status = status,
+                        count = count,
+                        isTatkalOpen = isTatkalOpen
+                    });
+                }
+
+                // 🟢 NORMAL BOOKING - CHECK BOOKING OPEN CONTROL
+                try
+                {
+                    using (SqlCommand bookingCmd = new SqlCommand("spFetchBookingSettings", conn))
+                    {
+                        bookingCmd.CommandType = CommandType.StoredProcedure;
+                        bookingCmd.Parameters.AddWithValue("@TrainId", trainId);
+
+                        using (SqlDataReader bReader = bookingCmd.ExecuteReader())
+                        {
+                            if (bReader.Read())
+                            {
+                                if (bReader["BookingOpenDate"] != DBNull.Value
+                                    && bReader["IsBookingEnabled"] != DBNull.Value
+                                    && Convert.ToBoolean(bReader["IsBookingEnabled"]))
+                                {
+                                    DateTime bookingOpenDate = Convert.ToDateTime(bReader["BookingOpenDate"]);
+                                    TimeSpan bookingTime = bReader["BookingWindowTime"] == DBNull.Value
+                                        ? new TimeSpan(8, 0, 0)
+                                        : (TimeSpan)bReader["BookingWindowTime"];
+
+                                    DateTime openDateTime = bookingOpenDate.Date + bookingTime;
+
+                                    if (indiaTime < openDateTime)
+                                    {
+                                        return Json(new
+                                        {
+                                            status = "BOOKING_NOT_ALLOWED"
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                catch
+                {
+                    // Ignore if settings stored procedure is not configured
+                }
+
+                var seatStatus = GetSeatStatus(trainId, classId, journeyDate, quota);
+
+                int remainingSeats = seatStatus?.SeatsAvailable ?? available;
+                int racRemaining = seatStatus?.RACSeats ?? rac;
+                int finalWl = seatStatus?.WLCount ?? wl;
+
+                bool isFirstChart = timeToDeparture.TotalHours <= 8 && timeToDeparture.TotalMinutes > 30;
+
+                if (isFirstChart)
+                {
+                    // Current booking opens for vacant seats until final charting window
+                    if (remainingSeats > 0 && quota != "TATKAL")
+                    {
+                        status = "CURR_AVBL";
+                        count = remainingSeats;
+                    }
+                    else
+                    {
+                        status = "CHART_PREPARED";
+                        count = 0;
+                    }
+                }
+                else if (remainingSeats > 0)
+                {
+                    status = "AVAILABLE";
+                    count = remainingSeats;
+                }
+                else if (quota != "TATKAL" && racRemaining > 0)
+                {
+                    status = "RAC";
+                    count = racRemaining;
+                }
+                else if (finalWl > 0)
+                {
+                    status = "WL";
+                    count = finalWl;
+                }
+                else
+                {
+                    status = "NOT AVAILABLE";
+                    count = 0;
+                }
+
+                return Json(new
+                {
+                    status = status,
+                    count = count,
+                    isTatkalOpen = isTatkalOpen
+                });
             }
 
             return Json(new { seatsAvailable = 0 });
@@ -3722,6 +4915,123 @@ namespace IRCTCClone.Controllers
             string[] berthCycle = { "LB", "MB", "UB", "SL", "SU" };
 
             return berthCycle[(seatNumber - 1) % berthCycle.Length];
+        }
+
+        [HttpGet]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetPnrStatusDetails(string pnr, int bookingId)
+        {
+            try
+            {
+                string userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                using (var conn = new SqlConnection(_connectionString))
+                {
+                    await conn.OpenAsync();
+                    using (var cmd = new SqlCommand(@"
+                        SELECT TOP 1 b.Id, b.PNR, b.TrainId, b.TrainNumber, b.TrainName, b.Frmst, b.Tost, 
+                                     b.JourneyDate, b.Departure, b.Arrival, b.Duration, b.Quota, b.Class, 
+                                     b.Status, b.TicketStatus, b.BaseFare, b.TotalFare
+                        FROM Bookings b
+                        WHERE (b.PNR = @PNR OR b.Id = @BookingId)
+                          AND (@UserId IS NULL OR @UserId = '' OR b.UserId = @UserId)", conn))
+                    {
+                        cmd.Parameters.AddWithValue("@PNR", pnr ?? "");
+                        cmd.Parameters.AddWithValue("@BookingId", bookingId);
+                        cmd.Parameters.AddWithValue("@UserId", userId ?? "");
+
+                        using (var reader = await cmd.ExecuteReaderAsync())
+                        {
+                            if (!await reader.ReadAsync())
+                            {
+                                return Json(new { success = false, message = "PNR record not found or access denied." });
+                            }
+
+                            int foundId = Convert.ToInt32(reader["Id"]);
+                            string foundPnr = reader["PNR"].ToString();
+                            string trainName = reader["TrainName"].ToString();
+                            string trainNo = reader["TrainNumber"].ToString();
+                            string fromStn = reader["Frmst"].ToString();
+                            string toStn = reader["Tost"].ToString();
+                            DateTime jDate = Convert.ToDateTime(reader["JourneyDate"]);
+                            TimeSpan depTime = reader["Departure"] != DBNull.Value ? (TimeSpan)reader["Departure"] : TimeSpan.Zero;
+                            TimeSpan arrTime = reader["Arrival"] != DBNull.Value ? (TimeSpan)reader["Arrival"] : TimeSpan.Zero;
+                            string classCode = reader["Class"].ToString();
+                            string quota = reader["Quota"] != DBNull.Value ? reader["Quota"].ToString() : "GENERAL";
+                            string status = reader["Status"] != DBNull.Value ? reader["Status"].ToString() : "CONFIRMED";
+                            string ticketStatus = reader["TicketStatus"] != DBNull.Value ? reader["TicketStatus"].ToString() : status;
+
+                            var indiaTimeNow = TimeZoneInfo.ConvertTimeBySystemTimeZoneId(DateTime.UtcNow, "India Standard Time");
+                            DateTime depDateTime = jDate.Date + depTime;
+                            TimeSpan diff = depDateTime - indiaTimeNow;
+
+                            bool isChartPrepared = diff.TotalHours <= 8 && diff.TotalHours >= -4;
+                            string chartingStatus = isChartPrepared ? "Chart Prepared" : "Chart Not Prepared";
+
+                            reader.Close();
+
+                            // Load passengers
+                            var passengers = new List<object>();
+                            using (var pCmd = new SqlCommand(@"
+                                SELECT Id, Name, Age, Gender, BookingStatus, CurrentStatus, SeatNumber, Berth, Position
+                                FROM Passengers
+                                WHERE BookingId = @BId
+                                ORDER BY Id", conn))
+                            {
+                                pCmd.Parameters.AddWithValue("@BId", foundId);
+                                using (var pReader = await pCmd.ExecuteReaderAsync())
+                                {
+                                    while (await pReader.ReadAsync())
+                                    {
+                                        string bStatus = pReader["BookingStatus"] != DBNull.Value ? pReader["BookingStatus"].ToString() : "CNF";
+                                        string cStatus = pReader["CurrentStatus"] != DBNull.Value ? pReader["CurrentStatus"].ToString() : bStatus;
+                                        string seat = pReader["SeatNumber"] != DBNull.Value ? pReader["SeatNumber"].ToString() : "";
+                                        string berth = pReader["Berth"] != DBNull.Value ? pReader["Berth"].ToString() : "";
+                                        object pos = pReader["Position"] != DBNull.Value ? pReader["Position"] : null;
+
+                                        passengers.Add(new
+                                        {
+                                            id = pReader["Id"],
+                                            name = pReader["Name"].ToString(),
+                                            age = pReader["Age"],
+                                            gender = pReader["Gender"].ToString(),
+                                            bookingStatus = bStatus,
+                                            currentStatus = cStatus,
+                                            seat = seat,
+                                            berth = berth,
+                                            position = pos
+                                        });
+                                    }
+                                }
+                            }
+
+                            return Json(new
+                            {
+                                success = true,
+                                pnr = foundPnr,
+                                bookingId = foundId,
+                                trainName = trainName,
+                                trainNumber = trainNo,
+                                journeyDate = jDate.ToString("dd MMM yyyy"),
+                                rawJourneyDate = jDate.ToString("yyyy-MM-dd"),
+                                departure = depTime.ToString(@"hh\:mm"),
+                                arrival = arrTime.ToString(@"hh\:mm"),
+                                from = fromStn,
+                                to = toStn,
+                                classCode = classCode,
+                                quota = quota,
+                                ticketStatus = ticketStatus,
+                                isChartPrepared = isChartPrepared,
+                                chartingStatus = chartingStatus,
+                                passengers = passengers
+                            });
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = "Failed to fetch PNR status: " + ex.Message });
+            }
         }
 
         /*        private string GenerateRandomText(int length)

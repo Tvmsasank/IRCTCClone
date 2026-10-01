@@ -278,10 +278,37 @@ namespace IRCTCClone.Controllers
         }
 */
         [HttpGet]
-        public IActionResult TrainResults(string t)
+        public IActionResult TrainResults(string t, bool? flexibleWithDate = null, bool? pwdConcession = null, bool? railwayPassConcession = null)
         {
             try
             {
+                if (flexibleWithDate.HasValue)
+                {
+                    HttpContext.Session.SetString("FlexibleWithDate", flexibleWithDate.Value ? "1" : "0");
+                    TempData["FlexibleWithDate"] = flexibleWithDate.Value;
+                }
+                if (pwdConcession.HasValue)
+                {
+                    HttpContext.Session.SetString("PwdConcession", pwdConcession.Value ? "1" : "0");
+                    TempData["PwdConcession"] = pwdConcession.Value;
+                }
+                if (railwayPassConcession.HasValue)
+                {
+                    HttpContext.Session.SetString("RailwayPassConcession", railwayPassConcession.Value ? "1" : "0");
+                    TempData["RailwayPassConcession"] = railwayPassConcession.Value;
+                }
+
+                bool isFlexible = (HttpContext.Session.GetString("FlexibleWithDate") == "1") ||
+                                  (TempData.Peek("FlexibleWithDate") as bool? ?? false);
+                bool isPwd = (HttpContext.Session.GetString("PwdConcession") == "1") ||
+                             (TempData.Peek("PwdConcession") as bool? ?? false);
+                bool isRailwayPass = (HttpContext.Session.GetString("RailwayPassConcession") == "1") ||
+                                     (TempData.Peek("RailwayPassConcession") as bool? ?? false);
+
+                ViewBag.FlexibleWithDate = isFlexible;
+                ViewBag.PwdConcession = isPwd;
+                ViewBag.RailwayPassConcession = isRailwayPass;
+
                 DateTime GetStationRunDate(Train train, DateTime searchDate)
                 {
                     for (int i = 0; i < 14; i++)
@@ -391,7 +418,8 @@ namespace IRCTCClone.Controllers
                     train.IsDeparted = departureDateTime <= indiaTime;
 
                     TimeSpan timeToDeparture = departureDateTime - indiaTime;
-                    train.IsChartPrepared = timeToDeparture.TotalHours <= 8;
+                    train.IsFirstChartPrepared = timeToDeparture.TotalHours <= 8 && timeToDeparture.TotalMinutes > 30;
+                    train.IsChartPrepared = timeToDeparture.TotalMinutes <= 30;
 
                     // 🔥 ADD THIS BLOCK
                     bool isCancelled = false;
@@ -417,6 +445,60 @@ namespace IRCTCClone.Controllers
 
                     train.MapUrl = BuildGoogleMapsUrl(train.Id);
                 }
+
+                // 🌟 FETCH ALTERNATE TRAINS FOR NEXT 6 DAYS WHEN FLEXIBLE WITH DATE IS SELECTED
+                var alternateTrains = new List<Train>();
+                if (isFlexible)
+                {
+                    for (int dayOffset = 1; dayOffset <= 6; dayOffset++)
+                    {
+                        DateTime altDate = journeyDate.AddDays(dayOffset);
+                        string altDateStr = altDate.ToString("yyyy-MM-dd");
+
+                        try
+                        {
+                            var dayTrains = Train.GetTrains(
+                                _connectionString,
+                                searchFromId,
+                                searchToId,
+                                altDateStr,
+                                quota
+                            );
+
+                            if (dayTrains != null && dayTrains.Any())
+                            {
+                                dayTrains = TrainRankingHelper.RankTrains(dayTrains);
+
+                                if (!string.IsNullOrEmpty(classCode) && classCode != "ALL")
+                                {
+                                    dayTrains = dayTrains
+                                        .Where(t => t.Classes.Any(c =>
+                                            c.Code.Contains("(" + classCode + ")")
+                                        ))
+                                        .ToList();
+                                }
+
+                                foreach (var altTrain in dayTrains)
+                                {
+                                    altTrain.NextRunDate = altDate;
+                                    var altDepDateTime = altTrain.NextRunDate.Date + altTrain.Departure;
+                                    altTrain.IsDeparted = altDepDateTime <= indiaTime;
+                                    TimeSpan altTtd = altDepDateTime - indiaTime;
+                                    altTrain.IsFirstChartPrepared = altTtd.TotalHours <= 8 && altTtd.TotalMinutes > 30;
+                                    altTrain.IsChartPrepared = altTtd.TotalMinutes <= 30;
+                                    altTrain.MapUrl = BuildGoogleMapsUrl(altTrain.Id);
+
+                                    alternateTrains.Add(altTrain);
+                                }
+                            }
+                        }
+                        catch
+                        {
+                            // Ignore single day fetch errors
+                        }
+                    }
+                }
+                ViewBag.AlternateTrains = alternateTrains;
 
                 string sortby = HttpContext.Session.GetString("SortBy") ?? "DEP_EARLY";
 
@@ -456,10 +538,32 @@ namespace IRCTCClone.Controllers
             string sortby, 
             string quota,
             string classCode,
-            string cancelDates
+            string cancelDates,
+            bool flexibleWithDate = false,
+            bool pwdConcession = false,
+            bool railwayPassConcession = false
         ) 
         {
+            if (pwdConcession && (string.IsNullOrEmpty(quota) || quota == "GENERAL"))
+            {
+                quota = "PwD";
+            }
+            else if (railwayPassConcession && (string.IsNullOrEmpty(quota) || quota == "GENERAL"))
+            {
+                quota = "DP";
+            }
+
             ViewBag.Quota = quota ?? "GENERAL";
+            ViewBag.FlexibleWithDate = flexibleWithDate;
+            ViewBag.PwdConcession = pwdConcession;
+            ViewBag.RailwayPassConcession = railwayPassConcession;
+
+            HttpContext.Session.SetString("FlexibleWithDate", flexibleWithDate ? "1" : "0");
+            HttpContext.Session.SetString("PwdConcession", pwdConcession ? "1" : "0");
+            HttpContext.Session.SetString("RailwayPassConcession", railwayPassConcession ? "1" : "0");
+            TempData["FlexibleWithDate"] = flexibleWithDate;
+            TempData["PwdConcession"] = pwdConcession;
+            TempData["RailwayPassConcession"] = railwayPassConcession;
 
             var trains = Train.GetTrains(_connectionString, fromStationId, toStationId, journeyDate.ToString("yyyy-MM-dd"), quota);
 
@@ -529,7 +633,8 @@ namespace IRCTCClone.Controllers
 
                 train.IsDeparted = departureDateTime <= indiaTimePost;
                 TimeSpan timeToDeparture = departureDateTime - indiaTimePost;
-                train.IsChartPrepared = timeToDeparture.TotalHours <= 8;
+                train.IsFirstChartPrepared = timeToDeparture.TotalHours <= 8 && timeToDeparture.TotalMinutes > 30;
+                train.IsChartPrepared = timeToDeparture.TotalMinutes <= 30;
 
                 // ================= ROUTE MISMATCH CHECK =================
                 bool routeMismatch =
@@ -560,10 +665,7 @@ namespace IRCTCClone.Controllers
 
             TempData.Keep();
 
-            if (!trains.Any())
-            {
-                TempData["Error"] = "Trains not available for the searched route / date";
-            }
+
 
             HttpContext.Session.SetString("Quota", quota ?? "GENERAL");
             HttpContext.Session.SetString("ClassCode", classCode ?? "ALL");
@@ -737,6 +839,47 @@ namespace IRCTCClone.Controllers
             return url;
         }
 
+        private static string FormatDateRanges(IEnumerable<DateTime> dates)
+        {
+            var sorted = dates.Select(d => d.Date).Distinct().OrderBy(d => d).ToList();
+            if (!sorted.Any()) return "";
+
+            var chunks = new List<(DateTime Start, DateTime End)>();
+            DateTime start = sorted[0];
+            DateTime prev = sorted[0];
+
+            for (int i = 1; i < sorted.Count; i++)
+            {
+                // Group dates that are consecutive or belong to the same schedule period (gap <= 7 days)
+                if ((sorted[i] - prev).TotalDays <= 7)
+                {
+                    prev = sorted[i];
+                }
+                else
+                {
+                    chunks.Add((start, prev));
+                    start = sorted[i];
+                    prev = sorted[i];
+                }
+            }
+            chunks.Add((start, prev));
+
+            var parts = new List<string>();
+            foreach (var chunk in chunks)
+            {
+                if (chunk.Start == chunk.End)
+                {
+                    parts.Add(chunk.Start.ToString("dd MMM yyyy"));
+                }
+                else
+                {
+                    parts.Add($"{chunk.Start.ToString("dd MMM yyyy")} - {chunk.End.ToString("dd MMM yyyy")}");
+                }
+            }
+
+            return string.Join(", ", parts);
+        }
+
         [HttpGet]
         public IActionResult GetTrainAlerts(int trainId)
         {
@@ -746,107 +889,154 @@ namespace IRCTCClone.Controllers
             {
                 conn.Open();
 
-                // 🔴 CANCELLED
+                // 🔴 CANCELLED DATES (Merged into single row if any)
+                var cancelDates = new HashSet<DateTime>();
                 using (var cmd = new SqlCommand("spGetCancelledDatesByTrainId", conn))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
-
                     cmd.Parameters.AddWithValue("@TrainId", trainId);
 
                     using (var reader = cmd.ExecuteReader())
                     {
                         while (reader.Read())
                         {
-                            alerts.Add(new
+                            if (reader["CancelDate"] != DBNull.Value)
                             {
-                                type = "Cancelled",
-                                message = "Cancelled on " + Convert.ToDateTime(reader["CancelDate"]).ToString("dd MMM")
-                            });
+                                cancelDates.Add(Convert.ToDateTime(reader["CancelDate"]).Date);
+                            }
                         }
                     }
                 }
 
-                // 🟡 SKIPPED STATIONS
+                if (cancelDates.Any())
+                {
+                    string formattedCancelDates = FormatDateRanges(cancelDates);
+                    alerts.Add(new
+                    {
+                        type = "Cancelled",
+                        station = "",
+                        dates = formattedCancelDates,
+                        message = $"Cancelled on {formattedCancelDates}"
+                    });
+                }
+
+                // 🟡 SKIPPED STATIONS (Grouped into 1 distinct row per station with merged date ranges)
+                var skippedStations = new Dictionary<string, HashSet<DateTime>>(StringComparer.OrdinalIgnoreCase);
+
                 using (var cmd = new SqlCommand("spGetSkippedStationsByTrainId", conn))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
-
                     cmd.Parameters.AddWithValue("@TrainId", trainId);
 
                     using (var reader = cmd.ExecuteReader())
                     {
                         while (reader.Read())
                         {
-                            int routeDay = reader["RouteDay"] == DBNull.Value ? 1 : Convert.ToInt32(reader["RouteDay"]);
+                            string stationName = reader["Name"] != DBNull.Value ? reader["Name"].ToString()!.Trim() : "Unknown Station";
+                            if (string.IsNullOrEmpty(stationName)) continue;
 
-                            DateTime fromDate = Convert.ToDateTime(reader["FromDate"]);
-                            DateTime toDate = Convert.ToDateTime(reader["ToDate"]);
-
-                            // 🔥 CORE FIX
-                            DateTime actualFrom = fromDate.AddDays(routeDay - 1);
-                            DateTime actualTo = toDate.AddDays(routeDay - 1);
-
-                            alerts.Add(new
+                            if (!skippedStations.ContainsKey(stationName))
                             {
-                                type = "Skipped",
-                                message = "Skipped station: "
-                                          + reader["Name"].ToString()
-                                          + " ("
-                                          + Convert.ToDateTime(reader["FromDate"]).ToString("dd MMM")
-                                          + " - "
-                                          + Convert.ToDateTime(reader["ToDate"]).ToString("dd MMM")
-                                          + ")"
-                            });
+                                skippedStations[stationName] = new HashSet<DateTime>();
+                            }
+
+                            if (reader["FromDate"] != DBNull.Value && reader["ToDate"] != DBNull.Value)
+                            {
+                                DateTime fromDate = Convert.ToDateTime(reader["FromDate"]).Date;
+                                DateTime toDate = Convert.ToDateTime(reader["ToDate"]).Date;
+
+                                if (fromDate <= toDate)
+                                {
+                                    for (var dt = fromDate; dt <= toDate; dt = dt.AddDays(1))
+                                    {
+                                        skippedStations[stationName].Add(dt);
+                                    }
+                                }
+                                else
+                                {
+                                    skippedStations[stationName].Add(fromDate);
+                                }
+                            }
                         }
                     }
                 }
 
-                // 🔵 DIVERTED
-                //    using (var cmd = new SqlCommand(@"
-                //SELECT ViaStation 
-                //FROM DivertedTrains 
-                //WHERE TrainId = @TrainId", conn))
-                //    {
-                //        cmd.Parameters.AddWithValue("@TrainId", trainId);
+                foreach (var kvp in skippedStations)
+                {
+                    string formattedDates = FormatDateRanges(kvp.Value);
+                    alerts.Add(new
+                    {
+                        type = "Skipped",
+                        station = kvp.Key,
+                        dates = formattedDates,
+                        message = $"Skipped station: {kvp.Key} ({formattedDates})"
+                    });
+                }
 
-                //        using (var reader = cmd.ExecuteReader())
-                //        {
-                //            while (reader.Read())
-                //            {
-                //                alerts.Add(new
-                //                {
-                //                    type = "Diverted",
-                //                    message = "Diverted via " + reader["ViaStation"].ToString()
-                //                });
-                //            }
-                //        }
-                //    }
+                // 🟢 TEMPORARY STOPPAGES
+                try
+                {
+                    var tempStops = new Dictionary<string, (string Reason, HashSet<DateTime> Dates)>(StringComparer.OrdinalIgnoreCase);
 
-                // 🟢 TEMPORARY STOPS
-                //    using (var cmd = new SqlCommand(@"
-                //SELECT s.Name 
-                //FROM TemporaryStops ts
-                //INNER JOIN Stations s ON s.Id = ts.StationId
-                //WHERE ts.TrainId = @TrainId", conn))
-                //    {
-                //        cmd.Parameters.AddWithValue("@TrainId", trainId);
+                    using (var cmd = new SqlCommand("spGetTemporaryStopsByTrainId", conn))
+                    {
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.AddWithValue("@TrainId", trainId);
 
-                //        using (var reader = cmd.ExecuteReader())
-                //        {
-                //            while (reader.Read())
-                //            {
-                //                alerts.Add(new
-                //                {
-                //                    type = "Temporary Stop",
-                //                    message = "Stop added at " + reader["Name"].ToString()
-                //                });
-                //            }
-                //        }
-                //    }
-                //}
+                        using (var reader = cmd.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                string stationName = reader["StationName"] != DBNull.Value ? reader["StationName"].ToString()!.Trim() : "Unknown Station";
+                                string reason = reader["Reason"] != DBNull.Value ? reader["Reason"].ToString()!.Trim() : "Festival Season";
+                                string key = $"{stationName}___{reason}";
 
-                return Json(alerts);
+                                if (!tempStops.ContainsKey(key))
+                                {
+                                    tempStops[key] = (reason, new HashSet<DateTime>());
+                                }
+
+                                if (reader["FromDate"] != DBNull.Value && reader["ToDate"] != DBNull.Value)
+                                {
+                                    DateTime fromDate = Convert.ToDateTime(reader["FromDate"]).Date;
+                                    DateTime toDate = Convert.ToDateTime(reader["ToDate"]).Date;
+
+                                    if (fromDate <= toDate)
+                                    {
+                                        for (var dt = fromDate; dt <= toDate; dt = dt.AddDays(1))
+                                        {
+                                            tempStops[key].Dates.Add(dt);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        tempStops[key].Dates.Add(fromDate);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    foreach (var kvp in tempStops)
+                    {
+                        string stationName = kvp.Key.Split(new[] { "___" }, StringSplitOptions.None)[0];
+                        string reason = kvp.Value.Reason;
+                        string formattedDates = FormatDateRanges(kvp.Value.Dates);
+
+                        alerts.Add(new
+                        {
+                            type = "Temporary Stop",
+                            station = stationName,
+                            dates = formattedDates,
+                            reason = reason,
+                            message = $"Temporary stop added at {stationName} ({formattedDates}) • Reason: {reason}"
+                        });
+                    }
+                }
+                catch (SqlException) { }
             }
+
+            return Json(alerts);
         }
 
         private bool HasTrainAlerts(int trainId, DateTime journeyDate)

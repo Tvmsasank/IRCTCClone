@@ -16,7 +16,7 @@ namespace IRCTCClone.Models
         public string Gender { get; set; }
         public string Country { get; set; } = "India";
         public string Address { get; set; }
-        public bool IsAadhaarVerified { get; set; } = true;
+        public bool IsAadhaarVerified { get; set; } = false;
         public string AadhaarNumber { get; set; }
         public decimal WalletBalance { get; set; } = 0.00m;
         public DateTime? LastPasswordUpdate { get; set; }

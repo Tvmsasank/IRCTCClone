@@ -1,4 +1,4 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
 using IRCTCClone.Models;
 
 namespace IRCTCClone.Models
@@ -67,6 +67,9 @@ namespace IRCTCClone.Models
         public string Duration { get; set; }
         public string TicketStatus { get; set; }
         public DateTime? CancelledAt { get; internal set; }
+        public bool IsBoardingChanged { get; set; }
+        public DateTime? BoardingChangedAt { get; set; }
+        public string? OriginalBoardingStation { get; set; }
     }
 
     public class SeatStatus

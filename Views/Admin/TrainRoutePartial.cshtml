@@ -1,122 +1,1371 @@
 @model IEnumerable<IRCTCClone.Models.TrainRoute>
 
-@if (Model != null && Model.Any())
-{
-    <!-- RUNS ON (Always visible at the top of the route view) -->
-    <div class="runs-on-container" style="margin-bottom: 12px; padding: 5px 0;">
-        <span class="runs-label">Runs on:</span>
+@functions {
+    static readonly Dictionary<string, string> StationClusters = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        // Hyderabad / Secunderabad
+        { "SC", "HYD" }, { "SECUNDERABAD", "HYD" }, { "SECUNDERABAD JN", "HYD" },
+        { "HYB", "HYD" }, { "HYDERABAD", "HYD" }, { "HYDERABAD DECCAN", "HYD" },
+        { "KCG", "HYD" }, { "KACHEGUDA", "HYD" },
+        { "LPI", "HYD" }, { "LINGAMPALLI", "HYD" },
+        { "BMT", "HYD" }, { "BEGAMPET", "HYD" },
+        { "CHZ", "HYD" }, { "CHARLAPALLI", "HYD" },
 
-        @{
-            var days = ViewBag.RunsOn as string ?? "-------";
-            var labels = new[] { "M", "T", "W", "T", "F", "S", "S" };
+        // Visakhapatnam
+        { "VSKP", "VIZAG" }, { "VISAKHAPATNAM", "VIZAG" },
+        { "DVD", "VIZAG" }, { "DUVVADA", "VIZAG" },
+        { "SCM", "VIZAG" }, { "SIMHACHALAM", "VIZAG" },
+
+        // Delhi
+        { "NDLS", "DELHI" }, { "NEW DELHI", "DELHI" },
+        { "DLI", "DELHI" }, { "DELHI", "DELHI" }, { "OLD DELHI", "DELHI" },
+        { "NZM", "DELHI" }, { "HAZRAT NIZAMUDDIN", "DELHI" },
+        { "ANVT", "DELHI" }, { "ANAND VIHAR", "DELHI" }, { "ANAND VIHAR TERMINAL", "DELHI" },
+        { "DEE", "DELHI" }, { "DELHI SARAI ROHILLA", "DELHI" },
+
+        // Mumbai
+        { "CSMT", "MUMBAI" }, { "C SHIVAJI MAH T", "MUMBAI" }, { "MUMBAI CST", "MUMBAI" },
+        { "DR", "MUMBAI" }, { "DADAR", "MUMBAI" },
+        { "MMCT", "MUMBAI" }, { "MUMBAI CENTRAL", "MUMBAI" },
+        { "BDTS", "MUMBAI" }, { "BANDRA TERMINUS", "MUMBAI" },
+        { "LTT", "MUMBAI" }, { "LOKMANYA TILAK T", "MUMBAI" },
+        { "TNA", "MUMBAI" }, { "THANE", "MUMBAI" },
+        { "KYN", "MUMBAI" }, { "KALYAN", "MUMBAI" }, { "KALYAN JN", "MUMBAI" },
+
+        // Bangalore
+        { "SBC", "BLR" }, { "KSR BENGALURU", "BLR" }, { "BANGALORE CITY", "BLR" },
+        { "YPR", "BLR" }, { "YESVANTPUR", "BLR" },
+        { "SMVB", "BLR" }, { "SMVT BENGALURU", "BLR" },
+        { "BNC", "BLR" }, { "BANGALORE CANT", "BLR" },
+
+        // Chennai
+        { "MAS", "CHENNAI" }, { "CHENNAI CENTRAL", "CHENNAI" }, { "MGR CHENNAI CENTRAL", "CHENNAI" },
+        { "MS", "CHENNAI" }, { "CHENNAI EGMORE", "CHENNAI" },
+        { "TBM", "CHENNAI" }, { "TAMBARAM", "CHENNAI" },
+
+        // Kolkata
+        { "HWH", "KOLKATA" }, { "HOWRAH", "KOLKATA" }, { "HOWRAH JN", "KOLKATA" },
+        { "SDAH", "KOLKATA" }, { "SEALDAH", "KOLKATA" },
+        { "KOAA", "KOLKATA" }, { "KOLKATA", "KOLKATA" },
+        { "SHM", "KOLKATA" }, { "SHALIMAR", "KOLKATA" },
+        { "SRC", "KOLKATA" }, { "SANTRAGACHI", "KOLKATA" }
+    };
+
+    string Normalize(string? str)
+    {
+        if (string.IsNullOrWhiteSpace(str)) return "";
+        var sb = new System.Text.StringBuilder();
+        foreach (char c in str.ToUpperInvariant())
+        {
+            if (char.IsLetterOrDigit(c) || char.IsWhiteSpace(c))
+                sb.Append(c);
+            else if (c == '-')
+                sb.Append(' ');
+        }
+        return string.Join(" ", sb.ToString().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries));
+    }
+
+    int MatchStationScore(IRCTCClone.Models.Station? s, string? query)
+    {
+        if (s == null || string.IsNullOrWhiteSpace(query)) return 0;
+        string q = query.Trim().ToUpperInvariant();
+        string sCode = (s.Code ?? "").Trim().ToUpperInvariant();
+        string sName = (s.Name ?? "").Trim().ToUpperInvariant();
+
+        string qName = q;
+        string qCode = "";
+
+        if (q.Contains("-"))
+        {
+            var parts = q.Split(new[] { '-' }, StringSplitOptions.RemoveEmptyEntries).Select(p => p.Trim()).ToArray();
+            if (parts.Length >= 2)
+            {
+                if (parts[1].Length <= 5 && !parts[1].Contains(" "))
+                {
+                    qName = parts[0];
+                    qCode = parts[1];
+                }
+                else if (parts[0].Length <= 5 && !parts[0].Contains(" "))
+                {
+                    qCode = parts[0];
+                    qName = parts[1];
+                }
+            }
+        }
+        else if (q.Length <= 5 && !q.Contains(" "))
+        {
+            qCode = q;
         }
 
-        <div class="runs-days">
-            @for (int i = 0; i < 7; i++)
-            {
-                <span class="day @(days[i] != '-' ? "active" : "inactive")">
-                    @labels[i]
-                </span>
-            }
+        // Tier 1: Exact code match (e.g. SC == SC, VSKP == VSKP)
+        if (!string.IsNullOrEmpty(qCode) && !string.IsNullOrEmpty(sCode) && sCode == qCode)
+            return 1000;
+
+        // Tier 2: Exact full name match
+        string normQueryName = Normalize(qName);
+        string normStnName = Normalize(sName);
+        if (!string.IsNullOrEmpty(normQueryName) && normStnName == normQueryName)
+            return 900;
+
+        // Tier 3: Clean name without common rail suffixes
+        string cleanQuery = normQueryName.Replace(" JUNCTION", "").Replace(" JN", "").Replace(" TERMINUS", "").Replace(" TERM", "").Replace(" CANTT", "").Replace(" ROAD", "").Replace(" RD", "").Trim();
+        string cleanStn = normStnName.Replace(" JUNCTION", "").Replace(" JN", "").Replace(" TERMINUS", "").Replace(" TERM", "").Replace(" CANTT", "").Replace(" ROAD", "").Replace(" RD", "").Trim();
+        if (!string.IsNullOrEmpty(cleanQuery) && cleanQuery.Length >= 3 && cleanStn == cleanQuery)
+            return 800;
+
+        // Tier 4: Exact word boundary match (all words in query exist in station name)
+        var queryWords = cleanQuery.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        var stnWords = cleanStn.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        if (queryWords.Length > 0 && stnWords.Length > 0)
+        {
+            if (queryWords.All(qw => qw.Length >= 3 && stnWords.Contains(qw)))
+                return 700;
+            if (stnWords.All(sw => sw.Length >= 3 && queryWords.Contains(sw)))
+                return 600;
+        }
+
+        // Tier 5: Nearby / Cluster Station Match (e.g. Visakhapatnam cluster: VSKP <-> DVD, Hyderabad cluster: SC <-> HYB/KCG/LPI)
+        string? qCluster = null;
+        if (!string.IsNullOrEmpty(qCode) && StationClusters.TryGetValue(qCode, out var c1)) qCluster = c1;
+        else if (!string.IsNullOrEmpty(cleanQuery) && StationClusters.TryGetValue(cleanQuery, out var c2)) qCluster = c2;
+
+        if (!string.IsNullOrEmpty(qCluster))
+        {
+            if (!string.IsNullOrEmpty(sCode) && StationClusters.TryGetValue(sCode, out var sc1) && sc1 == qCluster)
+                return 500;
+            if (!string.IsNullOrEmpty(cleanStn) && StationClusters.TryGetValue(cleanStn, out var sc2) && sc2 == qCluster)
+                return 500;
+        }
+
+        return 0;
+    }
+}
+
+@if (Model == null || !Model.Any())
+{
+    <div class="schedule-modal-wrapper">
+        <div class="schedule-top-title-bar">
+            <div class="top-title-left">
+                <i class="bi bi-calendar3 text-primary me-2"></i>
+                <span class="top-title-main">Train Schedule</span>
+                <span class="top-title-badge">Official Route Timetable</span>
+            </div>
+            <button type="button" class="btn-schedule-close" id="closeScheduleModal" title="Close (Esc)">&times;</button>
+        </div>
+        <div class="schedule-empty-state">
+            <i class="bi bi-exclamation-circle text-muted" style="font-size: 2.5rem; display: block; margin-bottom: 10px;"></i>
+            <span style="font-size: 1rem; font-weight: 600; color: #475569;">No route timetable details available for this train.</span>
         </div>
     </div>
-
-    <!-- DESKTOP TABLE -->
-    <div class="route-table-wrapper">
-        <table class="table table-sm table-bordered mt-2 route-table">
-            <thead class="table-light">
-                <tr>
-                    <th>Stop No</th>
-                    <th>Station Code</th>
-                    <th>Station Name</th>
-                    <th>Arrival</th>
-                    <th>Departure</th>
-                    <th>Distance</th>
-                    <th>Day</th>
-                </tr>
-            </thead>
-
-            <tbody>
-                @foreach (var route in Model)
-                {
-                <tr>
-                    <td data-label="Stop">@route.StopNumber</td>
-                    <td data-label="Code">@(route.Station?.Code ?? "-")</td>
-                    <td data-label="Station">@(route.Station?.Name ?? "-")</td>
-                    <td data-label="Arrival">
-                        @(route.ArrivalTime.HasValue
-                                            ? route.ArrivalTime.Value.ToString(@"hh\:mm")
-                                            : "--")
-                                                </td>
-                                                    <td data-label="Departure">
-                            @(route.DepartureTime.HasValue
-                                                ? route.DepartureTime.Value.ToString(@"hh\:mm")
-                                                : "--")
-                    </td>
-                    <td data-label="Distance">@route.Distance</td>
-                    <td data-label="Day">@route.Day</td>
-                </tr>
-                }
-            </tbody>
-        </table>
-    </div>
-
-
-    <!-- MOBILE ROUTE VIEW -->
-    <div class="mobile-route-schedule">
-
-        @foreach (var route in Model)
-        {
-            <div class="mobile-route-row">
-
-                <div class="station-left">
-                    <div class="code">@route.Station?.Code</div>
-                    <div class="time">
-                        @{
-                            var isFirst = route.StopNumber == 1;
-                            var isLast = route.DepartureTime == null;
-                        }
-
-                        @(isFirst
-                                    ? "N.A."
-                                    : (route.ArrivalTime?.ToString(@"hh\:mm") ?? "N.A."))
-                                                                                         -
-                        @(isLast
-                                    ? "N.A."
-                                    : (route.DepartureTime?.ToString(@"hh\:mm") ?? "N.A."))
-                    </div>
-                </div>
-
-                <div class="station-name">
-                    @route.Station?.Name
-                </div>
-
-                <div class="station-day">
-                    <span>@route.Day</span>
-                </div>
-
-            </div>
-        }
-
-    </div>
-
 }
 else
 {
-    <div class="text-muted text-center mt-3">
-        No route details available for this train.
-    </div>
-}
+    var routeList = Model.Where(r => !r.IsSkipped).OrderBy(r => r.StopNumber).ToList();
+    if (!routeList.Any())
+    {
+        routeList = Model.OrderBy(r => r.StopNumber).ToList();
+    }
+    for (int i = 0; i < routeList.Count; i++)
+    {
+        routeList[i].StopNumber = i + 1;
+    }
+    var firstStop = routeList.FirstOrDefault();
+    var lastStop = routeList.LastOrDefault();
 
-@section Scripts
-{
+    int totalStops = routeList.Count;
+
+    string originStation = firstStop?.Station?.Name ?? "ORIGIN";
+    string originCode = firstStop?.Station?.Code ?? "";
+    string destStation = lastStop?.Station?.Name ?? "DESTINATION";
+    string destCode = lastStop?.Station?.Code ?? "";
+
+    // 1. Train's Total Journey Duration (Origin to Destination)
+    int totalMinutes = 0;
+    if (firstStop != null && lastStop != null)
+    {
+        int dayDiff = (lastStop.Day >= firstStop.Day) ? (lastStop.Day - firstStop.Day) : 0;
+        var dep = firstStop.DepartureTime ?? TimeSpan.Zero;
+        var arr = lastStop.ArrivalTime ?? TimeSpan.Zero;
+        totalMinutes = (dayDiff * 24 * 60) + (int)(arr.TotalMinutes - dep.TotalMinutes);
+        if (totalMinutes < 0) totalMinutes += 24 * 60;
+    }
+
+    int hrs = totalMinutes / 60;
+    int mins = totalMinutes % 60;
+    string totalJourneyTimeStr = $"{hrs} hrs {(mins > 0 ? mins + " mins" : "00 mins")}";
+
+    var trainNumber = ViewBag.TrainNumber != null ? ViewBag.TrainNumber.ToString() : "";
+    var trainName = ViewBag.TrainName as string ?? "";
+
+    var fromStation = ViewBag.FromStation as string;
+    var toStation = ViewBag.ToStation as string;
+
+    // 2. User's Searched Journey Duration & Stops (Strictly 1 Boarding and 1 Destination in forward route order)
+    var boardingCandidates = routeList
+        .Select(r => new { Route = r, Score = MatchStationScore(r.Station, fromStation) })
+        .Where(x => x.Score > 0)
+        .OrderByDescending(x => x.Score)
+        .ToList();
+
+    var destCandidates = routeList
+        .Select(r => new { Route = r, Score = MatchStationScore(r.Station, toStation) })
+        .Where(x => x.Score > 0)
+        .OrderByDescending(x => x.Score)
+        .ToList();
+
+    IRCTCClone.Models.TrainRoute? userBoardingStop = null;
+    IRCTCClone.Models.TrainRoute? userDestStop = null;
+
+    if (boardingCandidates.Any() && destCandidates.Any())
+    {
+        var bestPair = (from b in boardingCandidates
+                        from d in destCandidates
+                        where d.Route.StopNumber > b.Route.StopNumber
+                        orderby (b.Score + d.Score) descending, b.Route.StopNumber ascending
+                        select new { Boarding = b.Route, Dest = d.Route })
+                        .FirstOrDefault();
+
+        if (bestPair != null)
+        {
+            userBoardingStop = bestPair.Boarding;
+            userDestStop = bestPair.Dest;
+        }
+        else
+        {
+            userBoardingStop = boardingCandidates.First().Route;
+            userDestStop = destCandidates.First().Route;
+        }
+    }
+    else if (boardingCandidates.Any())
+    {
+        userBoardingStop = boardingCandidates.First().Route;
+    }
+    else if (destCandidates.Any())
+    {
+        userDestStop = destCandidates.First().Route;
+    }
+
+    bool hasUserSegment = userBoardingStop != null && userDestStop != null && userDestStop.StopNumber > userBoardingStop.StopNumber;
+    int userStationsCount = 0;
+    string userJourneyTimeStr = "--";
+    string userBoardingCode = userBoardingStop?.Station?.Code ?? "";
+    string userBoardingName = userBoardingStop?.Station?.Name ?? fromStation ?? "";
+    string userDestCode = userDestStop?.Station?.Code ?? "";
+    string userDestName = userDestStop?.Station?.Name ?? toStation ?? "";
+
+    if (hasUserSegment)
+    {
+        userBoardingCode = userBoardingStop?.Station?.Code ?? "";
+        userBoardingName = userBoardingStop?.Station?.Name ?? fromStation ?? "";
+        userDestCode = userDestStop?.Station?.Code ?? "";
+        userDestName = userDestStop?.Station?.Name ?? toStation ?? "";
+        userStationsCount = (userDestStop.StopNumber - userBoardingStop.StopNumber) + 1;
+
+        int userDayDiff = (userDestStop.Day >= userBoardingStop.Day) ? (userDestStop.Day - userBoardingStop.Day) : 0;
+        var userDep = userBoardingStop.DepartureTime ?? userBoardingStop.ArrivalTime ?? TimeSpan.Zero;
+        var userArr = userDestStop.ArrivalTime ?? userDestStop.DepartureTime ?? TimeSpan.Zero;
+        int userTotalMinutes = (userDayDiff * 24 * 60) + (int)(userArr.TotalMinutes - userDep.TotalMinutes);
+        if (userTotalMinutes < 0) userTotalMinutes += 24 * 60;
+
+        int uh = userTotalMinutes / 60;
+        int um = userTotalMinutes % 60;
+        userJourneyTimeStr = $"{uh} hrs {(um > 0 ? um + " mins" : "00 mins")}";
+    }
+
+    var runsOnStr = (ViewBag.RunsOn as string ?? "-------").Trim().Replace(" ", "");
+    if (runsOnStr.Length < 7) { runsOnStr = runsOnStr.PadRight(7, '-'); }
+    var dayLabels = new[] { "M", "T", "W", "T", "F", "S", "S" };
+    var dayNames = new[] { "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" };
+    bool[] isActiveDay = new bool[7];
+    for (int i = 0; i < 7; i++)
+    {
+        char c = runsOnStr[i];
+        isActiveDay[i] = (c != '-' && c != '0' && c != 'N' && c != 'n' && c != ' ');
+    }
+
+    <div class="schedule-modal-wrapper">
+        <!-- 🖥️ Desktop Schedule View (> 768px) -->
+        <div class="desktop-schedule-view">
+            <!-- 🏷️ 1. Top Header: "Train Schedule" Title + Close Button -->
+            <div class="schedule-top-title-bar">
+                <div class="top-title-left">
+                    <i class="bi bi-calendar3 text-primary me-2 fs-5"></i>
+                    <span class="top-title-main">Train Schedule</span>
+                    <span class="top-title-badge">Official Route Timetable</span>
+                </div>
+                <button type="button" class="btn-schedule-close" id="closeScheduleModal" title="Close (Esc)">&times;</button>
+            </div>
+
+            <!-- 🚆 2. Blue Train Banner: Train Number, Train Name, and TRAIN'S Origin & Destination -->
+            <div class="schedule-train-banner">
+            <div class="train-main-info">
+                @if (!string.IsNullOrEmpty(trainNumber))
+                {
+                    <span class="train-number-pill">@trainNumber</span>
+                }
+                <span class="train-name-heading">@trainName</span>
+
+                <!-- Displays TRAIN'S True Origin & Destination (not user's search) -->
+                <div class="journey-segment-pill" title="Train Origin & Terminus">
+                    <span class="segment-station origin">
+                        @IRCTCClone.Helpers.CityLandmarkHelper.RenderBadge(originCode + " " + originStation, "18px")
+                        <i class="bi bi-geo-alt-fill text-danger" style="margin-right: 6px;"></i> @originStation
+                    </span>
+                    <i class="bi bi-arrow-right segment-arrow" style="margin: 0 4px;"></i>
+                    <span class="segment-station dest">
+                        @IRCTCClone.Helpers.CityLandmarkHelper.RenderBadge(destCode + " " + destStation, "18px")
+                        <i class="bi bi-geo-alt-fill text-success" style="margin-right: 6px;"></i> @destStation
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 📊 3. Meta Row: Runs On, Total Stops, Total Journey Time, Your Journey Time & Extreme-Right Search -->
+        <div class="schedule-meta-bar">
+            <!-- Runs on -->
+            <div class="meta-item meta-runs">
+                <span class="meta-label">Runs On:</span>
+                <div class="runs-chips-strip">
+                    @for (int i = 0; i < 7; i++)
+                    {
+                        <span class="run-day-chip @(isActiveDay[i] ? "active" : "inactive")" title="@dayNames[i]: @(isActiveDay[i] ? "Operational" : "Not Operating")">
+                            @dayLabels[i]
+                        </span>
+                    }
+                </div>
+            </div>
+
+            <div class="meta-separator"></div>
+
+            <!-- Total Stops -->
+            <div class="meta-item meta-stops">
+                <span class="meta-label">Total Stops</span>
+                <div class="meta-value">
+                    <span class="stops-highlight">@totalStops</span>
+                    <span class="stops-text">Stops</span>
+                </div>
+            </div>
+
+            <div class="meta-separator"></div>
+
+            <!-- Total Journey Time (Train's Full Journey: Origin to Destination) -->
+            <div class="meta-item meta-duration">
+                <span class="meta-label">Total Journey Time</span>
+                <div class="duration-highlight">
+                    <i class="bi bi-clock-history text-secondary"></i>
+                    <span class="duration-text">@totalJourneyTimeStr</span>
+                </div>
+                <div class="orig-dest-subtitle" title="Train Origin - Destination">
+                    @IRCTCClone.Helpers.CityLandmarkHelper.RenderBadge(originCode + " " + originStation, "14px")
+                    <span>@(originStation)</span> - 
+                    @IRCTCClone.Helpers.CityLandmarkHelper.RenderBadge(destCode + " " + destStation, "14px")
+                    <span>@(destStation)</span>
+                </div>
+            </div>
+
+            <div class="meta-separator"></div>
+
+            <!-- 👤 Your Journey Time (User's Searched Boarding to Destination) -->
+            <div class="meta-item meta-user-journey">
+                <span class="meta-label label-user-journey"><i class="bi bi-person-badge-fill me-1"></i>Your Journey Time</span>
+                <div class="duration-highlight text-primary">
+                    <i class="bi bi-stopwatch-fill text-primary"></i>
+                    <span class="duration-text">@userJourneyTimeStr</span>
+                </div>
+                <div class="orig-dest-subtitle user-segment-sub" title="Your Boarding - Destination">
+                    @IRCTCClone.Helpers.CityLandmarkHelper.RenderBadge(userBoardingCode + " " + userBoardingName, "15px")
+                    <span>@(userBoardingName)</span> - 
+                    @IRCTCClone.Helpers.CityLandmarkHelper.RenderBadge(userDestCode + " " + userDestName, "15px")
+                    <span>@(userDestName)</span>
+                </div>
+            </div>
+
+            <!-- 🔍 Quick Station Filter - Positioned at Extreme Right -->
+            <div class="meta-item meta-search ms-auto">
+                <div class="schedule-search-input-wrap">
+                    <i class="bi bi-search search-icon"></i>
+                    <input type="text" id="routeStationSearch" placeholder="Search station or code..." autocomplete="off" />
+                    <button type="button" id="clearStationSearch" class="btn-clear-station-search" style="display:none;">&times;</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 📋 4. Constant Height Timetable Table Container -->
+        <div class="schedule-table-container">
+            <table class="schedule-table" id="scheduleTable">
+                <thead>
+                    <tr>
+                        <th class="col-sno text-center">S.No</th>
+                        <th class="col-code">Station Code</th>
+                        <th class="col-name">Station Name</th>
+                        <th class="col-time text-center">Arrival</th>
+                        <th class="col-time text-center">Departure</th>
+                        <th class="col-dist text-center">Distance</th>
+                        <th class="col-day text-center">Day</th>
+                    </tr>
+                </thead>
+                <tbody id="scheduleTableBody">
+                    @foreach (var route in routeList)
+                    {
+                        var isFirst = route.StopNumber == 1;
+                        var isLast = route.DepartureTime == null || route.StopNumber == totalStops;
+                        var stnCode = route.Station?.Code ?? "-";
+                        var stnName = route.Station?.Name ?? "-";
+
+                        bool isSearchFrom = (userBoardingStop != null && route.StopNumber == userBoardingStop.StopNumber);
+                        bool isSearchTo = (userDestStop != null && route.StopNumber == userDestStop.StopNumber);
+
+                        var searchData = $"{route.StopNumber} {stnCode} {stnName}".ToLower();
+
+                        <tr class="route-table-row @(isSearchFrom ? "row-boarding" : "") @(isSearchTo ? "row-destination" : "")" data-search="@searchData">
+                            <td class="col-sno text-center font-monospace">@route.StopNumber</td>
+                            <td class="col-code">
+                                <span class="station-code-badge">@stnCode</span>
+                            </td>
+                            <td class="col-name">
+                                <span class="station-name-text">@stnName</span>
+                                @IRCTCClone.Helpers.CityLandmarkHelper.RenderBadge(stnCode + " " + stnName, "19px")
+                                @if (route.IsTemporary)
+                                {
+                                    <span class="badge bg-success-subtle text-success" style="font-size: 11px; padding: 2px 7px; border: 1px solid #86efac; border-radius: 4px; margin-left: 6px;"><i class="bi bi-clock-history me-1"></i>Temporary Halt &bull; @(route.TemporaryReason ?? "Festival Season")</span>
+                                }
+                                @if (isSearchFrom)
+                                {
+                                    <span class="segment-indicator boarding-tag"><i class="bi bi-box-arrow-in-right"></i> Boarding</span>
+                                }
+                                @if (isSearchTo)
+                                {
+                                    <span class="segment-indicator dest-tag"><i class="bi bi-box-arrow-right"></i> Destination</span>
+                                }
+                            </td>
+                            <td class="col-time text-center">
+                                @if (isFirst || !route.ArrivalTime.HasValue)
+                                {
+                                    <span class="endpoint-time-badge">Starts</span>
+                                }
+                                else
+                                {
+                                    <span class="regular-time">@route.ArrivalTime.Value.ToString(@"hh\:mm")</span>
+                                }
+                            </td>
+                            <td class="col-time text-center">
+                                @if (isLast || !route.DepartureTime.HasValue)
+                                {
+                                    <span class="endpoint-time-badge">Ends</span>
+                                }
+                                else
+                                {
+                                    <span class="regular-time">@route.DepartureTime.Value.ToString(@"hh\:mm")</span>
+                                }
+                            </td>
+                            <td class="col-dist text-center">
+                                <span class="distance-text">@route.Distance km</span>
+                            </td>
+                            <td class="col-day text-center">
+                                <span class="day-badge">Day @route.Day</span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <div id="noMatchingStations" class="no-matching-stations" style="display:none;">
+                <i class="bi bi-search text-muted" style="font-size: 2.2rem; display: block; margin-bottom: 8px;"></i>
+                <div style="font-weight: 600; color: #475569; font-size: 0.95rem;">No matching stations found</div>
+                <div class="text-muted small mt-1">Try searching by another station name or code</div>
+            </div>
+        </div>
+
+        <!-- 🏷️ 5. Footer Bar with Total Stations & User's Traveled Stops (Single Straight Line) -->
+        <div class="schedule-footer-bar">
+            <div class="footer-left">
+                <span class="footer-count">
+                    <i class="bi bi-pin-map-fill text-primary me-1"></i>
+                    Showing <strong id="stationCountDisplay">@totalStops</strong> of @totalStops total stations
+                </span>
+                @if (hasUserSegment && userStationsCount > 0)
+                {
+                    <span class="footer-trip-separator">•</span>
+                    <span class="footer-user-trip-badge">
+                        <i class="bi bi-person-check-fill text-primary me-1"></i>
+                        <span>Your Trip: <strong>@userStationsCount stations</strong> (@IRCTCClone.Helpers.CityLandmarkHelper.RenderBadge(userBoardingName, "15px")@userBoardingName <i class="bi bi-arrow-right text-primary mx-1"></i> @IRCTCClone.Helpers.CityLandmarkHelper.RenderBadge(userDestName, "15px")@userDestName)</span>
+                    </span>
+                }
+            </div>
+            <div class="footer-right">
+                <span class="text-muted small">Indian Railways Timetable &bull; Times in 24-hr IST</span>
+            </div>
+        </div>
+    </div> <!-- End Desktop Schedule View -->
+
+        <!-- 📱 Mobile Schedule View (<= 768px, matching official IRCTC media_1789705803551.jpg) -->
+        <div class="mobile-schedule-view">
+            <!-- Top Blue Title Bar -->
+            <div class="m-schedule-header">
+                <span class="m-schedule-title">Train Schedule</span>
+                <button type="button" class="btn-schedule-close m-schedule-close" title="Close (Esc)">&times;</button>
+            </div>
+
+            <!-- Centered Train Info -->
+            <div class="m-train-summary">
+                <div class="m-train-name-num">@trainNumber - (@trainName)</div>
+                <div class="m-train-endpoints">
+                    <span>@originStation</span>
+                    <i class="bi bi-arrow-right mx-1"></i>
+                    <span>@destStation</span>
+                </div>
+                <div class="m-runs-strip">
+                    @{
+                        var dayShortLabels = new[] { "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN" };
+                    }
+                    @for (int i = 0; i < 7; i++)
+                    {
+                        <span class="m-run-chip @(isActiveDay[i] ? "m-chip-active" : "m-chip-inactive")">
+                            @dayShortLabels[i]
+                        </span>
+                    }
+                </div>
+            </div>
+
+            <!-- Clean 3-Column Stations List -->
+            <div class="m-schedule-list-container">
+                @foreach (var route in routeList)
+                {
+                    var isFirst = route.StopNumber == 1;
+                    var isLast = route.DepartureTime == null || route.StopNumber == totalStops;
+                    var stnCode = route.Station?.Code ?? "-";
+                    var stnName = route.Station?.Name ?? "-";
+
+                    bool isSearchFrom = (userBoardingStop != null && route.StopNumber == userBoardingStop.StopNumber);
+                    bool isSearchTo = (userDestStop != null && route.StopNumber == userDestStop.StopNumber);
+
+                    string arrStr = isFirst || !route.ArrivalTime.HasValue ? "N.A." : route.ArrivalTime.Value.ToString(@"hh\:mm");
+                    string depStr = isLast || !route.DepartureTime.HasValue ? "N.A." : route.DepartureTime.Value.ToString(@"hh\:mm");
+
+                    <div class="m-station-row @(isSearchFrom ? "m-row-boarding" : "") @(isSearchTo ? "m-row-destination" : "")">
+                        <!-- Left: Station Code & Timings -->
+                        <div class="m-stn-col-left">
+                            <div class="m-stn-code">@stnCode</div>
+                            <div class="m-stn-time">@arrStr - @depStr</div>
+                        </div>
+
+                        <!-- Middle: Station Name -->
+                        <div class="m-stn-col-mid">
+                            <div class="m-stn-name">
+                                @stnName.ToUpperInvariant()
+                                @if (route.IsTemporary)
+                                {
+                                    <span class="badge bg-success-subtle text-success" style="font-size: 10px; padding: 2px 6px; border: 1px solid #86efac; border-radius: 4px; margin-left: 4px; display:inline-block;"><i class="bi bi-clock-history me-1"></i>Temp Halt &bull; @(route.TemporaryReason ?? "Festival Season")</span>
+                                }
+                                @if (isSearchFrom)
+                                {
+                                    <span class="segment-indicator boarding-tag" style="display:inline-flex; margin-left:6px; font-size:0.7rem; padding:2px 6px;"><i class="bi bi-box-arrow-in-right"></i> Boarding</span>
+                                }
+                                @if (isSearchTo)
+                                {
+                                    <span class="segment-indicator dest-tag" style="display:inline-flex; margin-left:6px; font-size:0.7rem; padding:2px 6px;"><i class="bi bi-box-arrow-right"></i> Destination</span>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Right: Day & Circular Badge -->
+                        <div class="m-stn-col-right">
+                            <div class="m-day-label">Day</div>
+                            <div class="m-day-circle">@route.Day</div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .desktop-schedule-view {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+        }
+
+        .mobile-schedule-view {
+            display: none;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+            background: #ffffff;
+        }
+
+        .schedule-modal-wrapper {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+            font-family: inherit;
+        }
+
+        .schedule-empty-state {
+            padding: 60px 20px;
+            text-align: center;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* 1. Top Title Bar */
+        .schedule-top-title-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 20px;
+            background: #ffffff;
+            border-bottom: 1px solid #e2e8f0;
+            flex-shrink: 0;
+        }
+
+        .top-title-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .top-title-main {
+            font-size: 1.15rem;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: 0.3px;
+        }
+
+        .top-title-badge {
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: #1a4fa3;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            padding: 2px 8px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-schedule-close {
+            background: #f1f5f9;
+            border: none;
+            color: #475569;
+            font-size: 1.4rem;
+            line-height: 1;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
+            padding: 0;
+            flex-shrink: 0;
+        }
+
+        .btn-schedule-close:hover {
+            background: #e2e8f0;
+            color: #0f172a;
+            transform: scale(1.06);
+        }
+
+        /* 2. Blue Train Banner */
+        .schedule-train-banner {
+            background: linear-gradient(135deg, #1a4fa3 0%, #2563eb 100%);
+            color: #ffffff;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+
+        .train-main-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .train-number-pill {
+            background: #ffffff;
+            color: #1a4fa3;
+            font-weight: 800;
+            font-size: 0.95rem;
+            padding: 4px 10px;
+            border-radius: 6px;
+            letter-spacing: 0.5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.12);
+        }
+
+        .train-name-heading {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #ffffff;
+            letter-spacing: 0.3px;
+        }
+
+        .journey-segment-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.16);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            padding: 3px 14px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        .segment-station {
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .segment-arrow {
+            font-size: 0.95rem;
+            opacity: 0.85;
+        }
+
+        /* 3. Meta bar */
+        .schedule-meta-bar {
+            display: flex;
+            align-items: center;
+            padding: 10px 20px;
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            gap: 18px;
+            flex-wrap: wrap;
+            flex-shrink: 0;
+        }
+
+        .meta-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .meta-label {
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #64748b;
+            letter-spacing: 0.5px;
+            margin-bottom: 3px;
+        }
+
+        .label-user-journey {
+            color: #1d4ed8;
+            font-weight: 700;
+        }
+
+        .runs-chips-strip {
+            display: flex;
+            gap: 4px;
+        }
+
+        .run-day-chip {
+            width: 23px;
+            height: 23px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            user-select: none;
+        }
+
+        .run-day-chip.active {
+            background: #1a4fa3;
+            color: #ffffff;
+        }
+
+        .run-day-chip.inactive {
+            background: #e2e8f0;
+            color: #94a3b8;
+        }
+
+        .meta-separator {
+            width: 1px;
+            height: 32px;
+            background: #cbd5e1;
+        }
+
+        .meta-value {
+            display: flex;
+            align-items: baseline;
+            gap: 4px;
+        }
+
+        .stops-highlight {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #1a4fa3;
+        }
+
+        .stops-text {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #475569;
+        }
+
+        .duration-highlight {
+            font-size: 1.12rem;
+            font-weight: 700;
+            color: #0f172a;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            letter-spacing: 0.2px;
+        }
+
+        .duration-highlight i {
+            font-size: 1.18rem;
+            flex-shrink: 0;
+            margin-right: 2px;
+        }
+
+        .meta-user-journey .duration-highlight {
+            color: #1d4ed8;
+        }
+
+        .orig-dest-subtitle {
+            font-size: 0.74rem;
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            margin-top: 1px;
+        }
+
+        .user-segment-sub {
+            color: #1e40af;
+        }
+
+        .meta-search {
+            margin-left: auto;
+        }
+
+        .schedule-search-input-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .schedule-search-input-wrap .search-icon {
+            position: absolute;
+            left: 10px;
+            color: #94a3b8;
+            font-size: 0.85rem;
+        }
+
+        .schedule-search-input-wrap input {
+            padding: 6px 30px 6px 32px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            outline: none;
+            width: 230px;
+            background: #ffffff;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+
+        .schedule-search-input-wrap input:focus {
+            border-color: #1a4fa3;
+            box-shadow: 0 0 0 3px rgba(26, 79, 163, 0.12);
+        }
+
+        .btn-clear-station-search {
+            position: absolute;
+            right: 8px;
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            font-size: 1.1rem;
+            cursor: pointer;
+            line-height: 1;
+            padding: 0;
+        }
+
+        .btn-clear-station-search:hover {
+            color: #475569;
+        }
+
+        /* 4. Table styles - CONSTANT HEIGHT CONTAINER */
+        .schedule-table-container {
+            flex: 1 1 auto;
+            overflow-y: auto;
+            overflow-x: auto;
+            height: 100%;
+            min-height: 0;
+            background: #ffffff;
+            position: relative;
+        }
+
+        .schedule-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+            font-size: 0.88rem;
+            color: #1e293b;
+        }
+
+        .schedule-table thead th {
+            position: sticky;
+            top: 0;
+            background: #1a4fa3;
+            color: #ffffff;
+            font-weight: 600;
+            font-size: 0.8rem;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            padding: 11px 14px;
+            border: none;
+            z-index: 2;
+            white-space: nowrap;
+        }
+
+        .schedule-table tbody tr {
+            border-bottom: 1px solid #e2e8f0;
+            transition: background-color 0.12s ease;
+        }
+
+        .schedule-table tbody tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+
+        .schedule-table tbody tr:hover {
+            background-color: #eef4ff;
+        }
+
+        .schedule-table tbody td {
+            padding: 9px 14px;
+            vertical-align: middle;
+            border-right: 1px solid #f1f5f9;
+        }
+
+        .schedule-table tbody td:last-child {
+            border-right: none;
+        }
+
+        .station-code-badge {
+            display: inline-block;
+            font-family: monospace;
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: #1a4fa3;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            padding: 2px 7px;
+            border-radius: 4px;
+        }
+
+        .station-name-text {
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .segment-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 12px;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+
+        .boarding-tag {
+            background: #eff6ff;
+            color: #1d4ed8;
+            border: 1px solid #93c5fd;
+        }
+
+        .dest-tag {
+            background: #f0fdf4;
+            color: #15803d;
+            border: 1px solid #86efac;
+        }
+
+        .row-boarding {
+            background-color: #f0f7ff !important;
+            border-left: 4px solid #1a4fa3 !important;
+        }
+
+        .row-destination {
+            background-color: #f0fdf4 !important;
+            border-left: 4px solid #16a34a !important;
+        }
+
+        .endpoint-time-badge {
+            display: inline-block;
+            font-size: 0.76rem;
+            font-weight: 700;
+            color: #475569;
+            background: #f1f5f9;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        .regular-time {
+            font-weight: 600;
+            color: #0f172a;
+        }
+
+        .distance-text {
+            color: #475569;
+            font-weight: 500;
+        }
+
+        .day-badge {
+            display: inline-block;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: #334155;
+            background: #f1f5f9;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .no-matching-stations {
+            padding: 60px 20px;
+            text-align: center;
+            color: #64748b;
+        }
+
+        /* 5. Footer bar */
+        .schedule-footer-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 20px;
+            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+            font-size: 0.82rem;
+            color: #475569;
+            flex-shrink: 0;
+            gap: 16px;
+        }
+
+        .footer-left {
+            display: flex;
+            align-items: center;
+            flex-wrap: nowrap;
+            white-space: nowrap;
+            gap: 12px;
+        }
+
+        .footer-count {
+            display: inline-flex;
+            align-items: center;
+            white-space: nowrap;
+        }
+
+        .footer-trip-separator {
+            color: #94a3b8;
+            font-weight: 700;
+            font-size: 1.05rem;
+            margin: 0 2px;
+            user-select: none;
+        }
+
+        .footer-user-trip-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            padding: 3px 12px;
+            border-radius: 14px;
+            font-size: 0.8rem;
+            color: #1e3a8a;
+            white-space: nowrap;
+        }
+
+        .footer-user-trip-badge strong {
+            color: #1d4ed8;
+            font-weight: 700;
+            margin: 0 3px;
+        }
+
+        /* 🏛️ Landmark Badges */
+        .landmark-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            vertical-align: middle;
+            margin: 0 4px;
+            transition: transform 0.15s ease;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .landmark-badge:hover {
+            transform: scale(1.22);
+        }
+
+        .landmark-badge img {
+            object-fit: contain;
+            border-radius: 50%;
+            filter: drop-shadow(0 1px 2px rgba(0,0,0,0.22));
+            display: inline-block;
+        }
+
+        @@media (max-width: 768px) {
+            .desktop-schedule-view {
+                display: none !important;
+            }
+
+            .mobile-schedule-view {
+                display: flex !important;
+                flex-direction: column !important;
+                height: 100% !important;
+                min-height: 0 !important;
+                overflow: hidden !important;
+                background: #ffffff !important;
+            }
+
+            .schedule-modal-wrapper {
+                border-radius: 8px !important;
+                border: none !important;
+                height: 100% !important;
+                max-height: 92vh !important;
+                display: flex !important;
+                flex-direction: column !important;
+                overflow: hidden !important;
+                box-shadow: none !important;
+                background: #ffffff !important;
+            }
+
+            /* 1. Header Bar: Dark Blue, Title & Close */
+            .m-schedule-header {
+                background: #1b3d7d;
+                color: #ffffff;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 12px 16px;
+                flex-shrink: 0;
+            }
+
+            .m-schedule-title {
+                font-size: 16px;
+                font-weight: 700;
+                color: #ffffff;
+                letter-spacing: 0.3px;
+            }
+
+            .m-schedule-close {
+                background: transparent !important;
+                border: none !important;
+                color: #ffffff !important;
+                font-size: 26px !important;
+                line-height: 1 !important;
+                cursor: pointer !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                width: auto !important;
+                height: auto !important;
+            }
+
+            /* 2. Train Summary Header */
+            .m-train-summary {
+                padding: 12px 14px 10px;
+                text-align: center;
+                border-bottom: 1px solid #e2e8f0;
+                background: #ffffff;
+                flex-shrink: 0;
+            }
+
+            .m-train-name-num {
+                font-size: 15px;
+                font-weight: 800;
+                color: #1e3a8a;
+                margin-bottom: 3px;
+                letter-spacing: 0.3px;
+            }
+
+            .m-train-endpoints {
+                font-size: 13px;
+                font-weight: 700;
+                color: #1e293b;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-bottom: 8px;
+            }
+
+            .m-runs-strip {
+                display: flex;
+                justify-content: center;
+                gap: 4px;
+                flex-wrap: wrap;
+            }
+
+            .m-run-chip {
+                font-size: 10.5px;
+                font-weight: 700;
+                padding: 2px 6px;
+                border-radius: 4px;
+                display: inline-block;
+            }
+
+            .m-chip-active {
+                background: #dcfce7;
+                color: #15803d;
+                border: 1px solid #bbf7d0;
+            }
+
+            .m-chip-inactive {
+                background: #f1f5f9;
+                color: #94a3b8;
+                border: 1px solid #e2e8f0;
+            }
+
+            /* 3. Station List */
+            .m-schedule-list-container {
+                flex: 1 1 auto;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+                background: #ffffff;
+                min-height: 0;
+            }
+
+            .m-station-row {
+                display: flex;
+                align-items: center;
+                padding: 10px 14px;
+                border-bottom: 1px solid #f1f5f9;
+            }
+
+            .m-row-boarding {
+                background-color: #f0f7ff !important;
+                border-left: 4px solid #1a4fa3 !important;
+            }
+
+            .m-row-destination {
+                background-color: #f0fdf4 !important;
+                border-left: 4px solid #16a34a !important;
+            }
+
+            .m-stn-col-left {
+                width: 95px;
+                flex-shrink: 0;
+            }
+
+            .m-stn-code {
+                font-size: 14px;
+                font-weight: 800;
+                color: #0f172a;
+            }
+
+            .m-stn-time {
+                font-size: 11px;
+                color: #475569;
+                margin-top: 2px;
+                font-weight: 500;
+            }
+
+            .m-stn-col-mid {
+                flex: 1;
+                padding-left: 12px;
+                border-left: 1px solid #e2e8f0;
+                min-width: 0;
+            }
+
+            .m-stn-name {
+                font-size: 12.5px;
+                font-weight: 700;
+                color: #1e293b;
+                text-transform: uppercase;
+                letter-spacing: 0.3px;
+                word-break: break-word;
+            }
+
+            .m-stn-col-right {
+                width: 44px;
+                flex-shrink: 0;
+                text-align: center;
+            }
+
+            .m-day-label {
+                font-size: 11px;
+                color: #64748b;
+                font-weight: 600;
+            }
+
+            .m-day-circle {
+                width: 20px;
+                height: 20px;
+                border-radius: 50%;
+                background: #0284c7;
+                color: #ffffff;
+                font-size: 10.5px;
+                font-weight: 800;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 2px auto 0;
+            }
+        }
+    </style>
+
     <script>
-                // 🔥 Keep admin session alive
-        setInterval(() => {
-            fetch('/Admin/KeepAlive', {
-                method: 'GET',
-                credentials: 'include'
+        (function () {
+            var $input = $("#routeStationSearch");
+            var $clear = $("#clearStationSearch");
+            var $empty = $("#noMatchingStations");
+            var $countDisplay = $("#stationCountDisplay");
+            
+            // Fast cache of rows for lag-free 60fps search
+            var cachedRows = [];
+            var $rows = $("#scheduleTableBody tr");
+            $rows.each(function () {
+                cachedRows.push({
+                    el: this,
+                    text: $(this).data("search") || $(this).text().toLowerCase()
+                });
             });
-        }, 60000); // every 1 minute
+
+            $input.on("input", function () {
+                var q = $(this).val().toLowerCase().trim();
+                $clear.toggle(q.length > 0);
+
+                var visibleCount = 0;
+                for (var i = 0; i < cachedRows.length; i++) {
+                    var item = cachedRows[i];
+                    var isMatch = q.length === 0 || item.text.indexOf(q) !== -1;
+                    item.el.style.display = isMatch ? "" : "none";
+                    if (isMatch) visibleCount++;
+                }
+
+                $empty.toggle(visibleCount === 0);
+                if ($countDisplay.length) {
+                    $countDisplay.text(visibleCount);
+                }
+            });
+
+            $clear.on("click", function () {
+                $input.val("").trigger("input").focus();
+            });
+        })();
     </script>
 }

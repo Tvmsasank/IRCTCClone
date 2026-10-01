@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
 
@@ -41,8 +41,21 @@ namespace IrctcClone.Controllers
         }
 
         [Route("Error")]
-        public IActionResult Error()
+        public async Task<IActionResult> Error()
         {
+            try
+            {
+                await HttpContext.SignOutAsync();
+                HttpContext.Session.Clear();
+                foreach (var cookie in Request.Cookies.Keys)
+                {
+                    Response.Cookies.Delete(cookie);
+                }
+            }
+            catch
+            {
+                // ignore
+            }
             return View("Error");
         }
     }

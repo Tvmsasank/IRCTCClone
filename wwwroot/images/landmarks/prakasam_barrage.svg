@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <circle cx="32" cy="32" r="30" fill="#f0f9ff" stroke="#0ea5e9" stroke-width="2"/>
+  
+  <!-- Krishna River Waters -->
+  <path d="M 8 48 Q 20 44 32 48 Q 44 52 56 48 L 56 56 L 8 56 Z" fill="#0284c7"/>
+  
+  <!-- Barrage Road / Bridge Deck -->
+  <rect x="8" y="38" width="48" height="4" fill="#334155"/>
+  <rect x="8" y="36" width="48" height="2" fill="#e2e8f0"/>
+  
+  <!-- Barrage Sluice Gates & Piers -->
+  <rect x="12" y="24" width="3" height="14" fill="#475569"/>
+  <rect x="20" y="24" width="3" height="14" fill="#475569"/>
+  <rect x="28" y="24" width="3" height="14" fill="#475569"/>
+  <rect x="36" y="24" width="3" height="14" fill="#475569"/>
+  <rect x="44" y="24" width="3" height="14" fill="#475569"/>
+  <rect x="52" y="24" width="3" height="14" fill="#475569"/>
+  
+  <!-- Top Gantry Beam -->
+  <rect x="10" y="22" width="46" height="3" fill="#0f172a"/>
+  
+  <!-- Kanaka Durga Hill & Temple in background -->
+  <polygon points="10,36 22,14 34,36" fill="#15803d" opacity="0.6"/>
+  <polygon points="20,18 22,12 24,18" fill="#facc15"/>
+</svg>

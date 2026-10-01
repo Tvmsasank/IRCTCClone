@@ -30,8 +30,22 @@ namespace IRCTCClone.Controllers
         // -------------------- LOGIN (GET) --------------------
         [EnableRateLimiting("LoginLimiter")]
         [HttpGet]
-        public IActionResult Login(string returnUrl = null)
+        public async Task<IActionResult> Login(string returnUrl = null)
         {
+            if (User?.Identity?.IsAuthenticated == true)
+            {
+                try
+                {
+                    await HttpContext.SignOutAsync();
+                    HttpContext.Session.Clear();
+                    foreach (var cookie in Request.Cookies.Keys)
+                    {
+                        Response.Cookies.Delete(cookie);
+                    }
+                }
+                catch { }
+            }
+
             ViewBag.ReturnUrl = returnUrl;
             return View(new ViewModels());
         }
@@ -50,19 +64,20 @@ namespace IRCTCClone.Controllers
                 }
 
                 // ================= CAPTCHA VALIDATION =================
-                string sessionCaptcha = HttpContext.Session.GetString("CAPTCHA");
+
+                //string sessionCaptcha = HttpContext.Session.GetString("CAPTCHA");
 
                 Console.WriteLine("LOGIN SESSION ID = " + HttpContext.Session.Id);
-                Console.WriteLine("SESSION CAPTCHA = " + sessionCaptcha);
-                Console.WriteLine("USER CAPTCHA = " + model.CaptchaInput);
+                //Console.WriteLine("SESSION CAPTCHA = " + sessionCaptcha);
+                //Console.WriteLine("USER CAPTCHA = " + model.CaptchaInput);
 
-                if (string.IsNullOrEmpty(sessionCaptcha) || model.CaptchaInput?.ToUpper() != sessionCaptcha.ToUpper())
+/*                if (string.IsNullOrEmpty(sessionCaptcha) || model.CaptchaInput?.ToUpper() != sessionCaptcha.ToUpper())
                 {
                     TempData["Error"] = "Invalid captcha";
                     ViewBag.ReturnUrl = returnUrl;
                     return View(model);
                 }
-
+*/
                 // ======================================================
 
 
@@ -159,17 +174,20 @@ namespace IRCTCClone.Controllers
                 ResetAttempts(emailFromDb);
 
                 // clear captcha after validation
-                HttpContext.Session.Remove("CAPTCHA");
+
+                //HttpContext.Session.Remove("CAPTCHA");
 
                 HttpContext.Session.SetString("username", fullName);
+                HttpContext.Session.SetString("irctc_username", model.Username);
 
                 var claims = new List<Claim>
-            {
-                new Claim(ClaimTypes.Name, fullName),
-                new Claim(ClaimTypes.NameIdentifier, emailFromDb),
-                new Claim(ClaimTypes.Email, emailFromDb),
-                new Claim(ClaimTypes.Role, "User")
-            };
+                {
+                    new Claim(ClaimTypes.Name, fullName),
+                    new Claim(ClaimTypes.NameIdentifier, emailFromDb),
+                    new Claim(ClaimTypes.Email, emailFromDb),
+                    new Claim("IRCTCUsername", model.Username),
+                    new Claim(ClaimTypes.Role, "User")
+                };
 
                 var identity = new ClaimsIdentity(
                     claims,
@@ -181,7 +199,7 @@ namespace IRCTCClone.Controllers
 
                 HttpContext.Session.SetString("SessionToken", sessionToken.ToString());
 
-                HttpContext.Session.SetString("UserEmail",emailFromDb);
+                HttpContext.Session.SetString("UserEmail", emailFromDb);
 
                 using (var conn = new SqlConnection(_connectionString))
                 {
@@ -196,6 +214,33 @@ namespace IRCTCClone.Controllers
 
                         cmd.ExecuteNonQuery();
                     }
+
+                    // Synchronize authentic username with UserProfiles table
+                    try
+                    {
+                        using (var syncCmd = new SqlCommand(@"
+                            IF EXISTS (SELECT 1 FROM UserProfiles WHERE UserId = @Email OR Email = @Email)
+                            BEGIN
+                                UPDATE UserProfiles SET Username = @Username WHERE UserId = @Email OR Email = @Email;
+                            END
+                            ELSE
+                            BEGIN
+                                INSERT INTO UserProfiles (UserId, Username, FullName, Email, MobileNumber, DateOfBirth, Gender, Country, Address, IsAadhaarVerified, WalletBalance)
+                                VALUES (@Email, @Username, @FullName, @Email, NULL, NULL, NULL, 'India', NULL, 0, 0.00);
+                            END;
+                            
+                            -- Clean up hardcoded fallbacks that may have been previously inserted for other users
+                            UPDATE UserProfiles 
+                            SET MobileNumber = NULL, DateOfBirth = NULL, Address = NULL, Gender = NULL, IsAadhaarVerified = 0
+                            WHERE Email != 'venkatamanishashankt@gmail.com' AND (MobileNumber LIKE '%9000485456%' OR Address LIKE '%House no 3-2-63%');", conn))
+                        {
+                            syncCmd.Parameters.AddWithValue("@Email", emailFromDb);
+                            syncCmd.Parameters.AddWithValue("@Username", model.Username);
+                            syncCmd.Parameters.AddWithValue("@FullName", fullName);
+                            syncCmd.ExecuteNonQuery();
+                        }
+                    }
+                    catch { }
                 }
 
                 await HttpContext.SignInAsync(
@@ -408,34 +453,383 @@ namespace IRCTCClone.Controllers
         [HttpGet]
         public IActionResult ForgotPassword()
         {
+            HttpContext.Session.Remove("FP_OTP");
+            HttpContext.Session.Remove("FP_OTP_HASH");
+            HttpContext.Session.Remove("FP_EMAIL");
+            HttpContext.Session.Remove("FP_USERNAME");
+            HttpContext.Session.Remove("FP_EXPIRY");
             return View();
         }
 
         [HttpPost]
-        public IActionResult ForgotPassword(string email, string newPassword)
+        public async Task<IActionResult> ForgotPasswordVerify([FromBody] ForgotPasswordStep1Request request)
         {
-            using (var conn = new SqlConnection(_connectionString))
+            if (request == null)
             {
-                conn.Open();
-                using (var cmd = new SqlCommand("sp_UpdatePassword", conn))
-                {
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@Email", email);
-                    cmd.Parameters.AddWithValue("@PasswordHash", HashPassword(newPassword));
-
-                    var result = cmd.ExecuteScalar();
-
-                    if (result != null && result.ToString() == "-1")
-                    {
-                        ViewBag.Error = "❌ Email not found!";
-                        return View();
-                    }
-
-                    ViewBag.Message = "✅ Password updated successfully! You can now login.";
-                }
+                return Json(new { success = false, message = "Invalid request data." });
             }
 
-            return View();
+            // 1. Verify Captcha
+            var sessionCaptcha = HttpContext.Session.GetString("CAPTCHA");
+            if (string.IsNullOrWhiteSpace(sessionCaptcha) || 
+                !sessionCaptcha.Equals(request.Captcha?.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                return Json(new { success = false, message = "Invalid or expired Captcha. Please enter the characters shown in the image." });
+            }
+
+            string usernameInput = request.Username?.Trim() ?? "";
+            string emailInput = request.Email?.Trim() ?? "";
+
+            if (string.IsNullOrWhiteSpace(usernameInput) || string.IsNullOrWhiteSpace(emailInput))
+            {
+                return Json(new { success = false, message = "IRCTC User Name and Email Id are required." });
+            }
+
+            // 2. Query Usrs & UserProfiles for matching account
+            string foundUsername = "";
+            string foundEmail = "";
+            string foundFullName = "";
+            string foundMobile = "";
+
+            try
+            {
+                using (var conn = new SqlConnection(_connectionString))
+                {
+                    await conn.OpenAsync();
+
+                    using (var cmd = new SqlCommand(@"
+                        SELECT TOP 1 u.Username, u.Email, u.FullName, ISNULL(p.MobileNumber, '') AS MobileNumber
+                        FROM Usrs u
+                        LEFT JOIN UserProfiles p ON LOWER(LTRIM(RTRIM(p.UserId))) = LOWER(LTRIM(RTRIM(u.Email))) 
+                                                 OR LOWER(LTRIM(RTRIM(p.Email))) = LOWER(LTRIM(RTRIM(u.Email)))
+                                                 OR LOWER(LTRIM(RTRIM(p.Username))) = LOWER(LTRIM(RTRIM(u.Username)))
+                        WHERE (LOWER(LTRIM(RTRIM(u.Username))) = LOWER(LTRIM(RTRIM(@Username))) 
+                               OR LOWER(LTRIM(RTRIM(u.Email))) = LOWER(LTRIM(RTRIM(@Username))))
+                          AND (LOWER(LTRIM(RTRIM(u.Email))) = LOWER(LTRIM(RTRIM(@Email)))
+                               OR LOWER(LTRIM(RTRIM(p.Email))) = LOWER(LTRIM(RTRIM(@Email))))", conn))
+                    {
+                        cmd.Parameters.AddWithValue("@Username", usernameInput);
+                        cmd.Parameters.AddWithValue("@Email", emailInput);
+
+                        using (var reader = await cmd.ExecuteReaderAsync())
+                        {
+                            if (await reader.ReadAsync())
+                            {
+                                foundUsername = reader["Username"]?.ToString()?.Trim() ?? usernameInput;
+                                foundEmail = reader["Email"]?.ToString()?.Trim() ?? emailInput;
+                                foundFullName = reader["FullName"]?.ToString()?.Trim() ?? foundUsername;
+                                foundMobile = reader["MobileNumber"]?.ToString()?.Trim() ?? "";
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error verifying account in ForgotPassword: " + ex.Message);
+                return Json(new { success = false, message = "Database error occurred while checking account details." });
+            }
+
+            if (string.IsNullOrWhiteSpace(foundEmail))
+            {
+                return Json(new { success = false, message = "No account found matching this IRCTC User Name and Email Id. Please verify your details." });
+            }
+
+            // 3. Mask Email and Mobile
+            string maskedEmail = "";
+            if (foundEmail.Contains("@"))
+            {
+                var parts = foundEmail.Split('@');
+                var name = parts[0];
+                var domain = parts[1];
+                if (name.Length <= 2)
+                {
+                    maskedEmail = name + "***@" + domain;
+                }
+                else
+                {
+                    maskedEmail = name.Substring(0, 2) + new string('*', Math.Min(6, name.Length - 2)) + (name.Length > 4 ? name.Substring(name.Length - 2) : "") + "@" + domain;
+                }
+            }
+            else
+            {
+                maskedEmail = foundEmail;
+            }
+
+            string cleanMobile = Regex.Replace(foundMobile, @"[^\d]", "");
+            if (cleanMobile.Length > 10 && cleanMobile.StartsWith("91"))
+            {
+                cleanMobile = cleanMobile.Substring(cleanMobile.Length - 10);
+            }
+            string maskedMobile = "";
+            if (cleanMobile.Length >= 6)
+            {
+                maskedMobile = "******" + cleanMobile.Substring(cleanMobile.Length - 4);
+            }
+            else if (cleanMobile.Length > 0)
+            {
+                maskedMobile = "***" + cleanMobile;
+            }
+            else
+            {
+                maskedMobile = "Not registered";
+            }
+
+            // 4. Generate OTP
+            string otp = GenerateOTP();
+            string hashedOtp = HashOTP(otp);
+
+            // Save in session (10 min expiry)
+            HttpContext.Session.SetString("FP_OTP", otp);
+            HttpContext.Session.SetString("FP_OTP_HASH", hashedOtp);
+            HttpContext.Session.SetString("FP_EMAIL", foundEmail);
+            HttpContext.Session.SetString("FP_USERNAME", foundUsername);
+            HttpContext.Session.SetString("FP_EXPIRY", DateTime.UtcNow.AddMinutes(10).ToString("o"));
+
+            // Also attempt spRequestOtp if available
+            try
+            {
+                using (var conn = new SqlConnection(_connectionString))
+                {
+                    await conn.OpenAsync();
+                    using (var cmd = new SqlCommand("spRequestOtp", conn))
+                    {
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.AddWithValue("@UserId", foundEmail);
+                        cmd.Parameters.AddWithValue("@OtpHash", hashedOtp);
+                        cmd.Parameters.AddWithValue("@Purpose", "FORGOT_PASSWORD");
+
+                        var expiryParam = new SqlParameter("@ExpiryTime", SqlDbType.DateTime)
+                        {
+                            Direction = ParameterDirection.Output
+                        };
+                        cmd.Parameters.Add(expiryParam);
+                        await cmd.ExecuteNonQueryAsync();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Notice spRequestOtp in ForgotPassword: " + ex.Message);
+            }
+
+            // 5. Send OTP Email
+            try
+            {
+                await SendOTPEmail(foundEmail, otp, !string.IsNullOrWhiteSpace(foundFullName) ? foundFullName : foundUsername);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Notice SendOTPEmail in ForgotPassword: " + ex.Message);
+            }
+
+            Console.WriteLine($"[FORGOT PASSWORD OTP] Username: {foundUsername}, Email: {foundEmail}, OTP: {otp}");
+
+            return Json(new
+            {
+                success = true,
+                username = foundUsername,
+                maskedEmail = maskedEmail,
+                maskedMobile = maskedMobile,
+                message = $"Verification code has been sent to your registered Email id {maskedEmail} and Mobile no. {maskedMobile}."
+            });
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ForgotPasswordResendOtp()
+        {
+            var email = HttpContext.Session.GetString("FP_EMAIL");
+            var username = HttpContext.Session.GetString("FP_USERNAME");
+
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return Json(new { success = false, message = "Session expired. Please start the process again." });
+            }
+
+            string otp = GenerateOTP();
+            string hashedOtp = HashOTP(otp);
+
+            HttpContext.Session.SetString("FP_OTP", otp);
+            HttpContext.Session.SetString("FP_OTP_HASH", hashedOtp);
+            HttpContext.Session.SetString("FP_EXPIRY", DateTime.UtcNow.AddMinutes(10).ToString("o"));
+
+            try
+            {
+                using (var conn = new SqlConnection(_connectionString))
+                {
+                    await conn.OpenAsync();
+                    using (var cmd = new SqlCommand("spRequestOtp", conn))
+                    {
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.AddWithValue("@UserId", email);
+                        cmd.Parameters.AddWithValue("@OtpHash", hashedOtp);
+                        cmd.Parameters.AddWithValue("@Purpose", "FORGOT_PASSWORD");
+
+                        var expiryParam = new SqlParameter("@ExpiryTime", SqlDbType.DateTime)
+                        {
+                            Direction = ParameterDirection.Output
+                        };
+                        cmd.Parameters.Add(expiryParam);
+                        await cmd.ExecuteNonQueryAsync();
+                    }
+                }
+            }
+            catch { }
+
+            try
+            {
+                await SendOTPEmail(email, otp, username ?? "Customer");
+            }
+            catch { }
+
+            Console.WriteLine($"[RESEND FORGOT PASSWORD OTP] Email: {email}, OTP: {otp}");
+
+            return Json(new { success = true, message = "A new verification OTP has been sent." });
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ForgotPasswordReset([FromBody] ForgotPasswordStep2Request request)
+        {
+            if (request == null)
+            {
+                return Json(new { success = false, message = "Invalid request data." });
+            }
+
+            // 1. Verify Captcha
+            var sessionCaptcha = HttpContext.Session.GetString("CAPTCHA");
+            if (string.IsNullOrWhiteSpace(sessionCaptcha) || 
+                !sessionCaptcha.Equals(request.Captcha?.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                return Json(new { success = false, message = "Invalid or expired Captcha. Please enter the characters shown in the image." });
+            }
+
+            // 2. Validate passwords match and strength
+            if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword != request.ConfirmPassword)
+            {
+                return Json(new { success = false, message = "New Password and Confirm Password do not match." });
+            }
+
+            if (request.NewPassword.Length < 8 || request.NewPassword.Length > 20)
+            {
+                return Json(new { success = false, message = "Password must be between 8 and 15 characters in length." });
+            }
+
+            if (!Regex.IsMatch(request.NewPassword, @"[a-z]") ||
+                !Regex.IsMatch(request.NewPassword, @"[A-Z]") ||
+                !Regex.IsMatch(request.NewPassword, @"[0-9]") ||
+                !Regex.IsMatch(request.NewPassword, @"[\W_]"))
+            {
+                return Json(new { success = false, message = "Password must contain at least one uppercase letter, one lowercase letter, one numeric digit, and one special character." });
+            }
+
+            // 3. Verify OTP
+            var sessionEmail = HttpContext.Session.GetString("FP_EMAIL");
+            var sessionOtp = HttpContext.Session.GetString("FP_OTP");
+            var expiryStr = HttpContext.Session.GetString("FP_EXPIRY");
+
+            if (string.IsNullOrWhiteSpace(sessionEmail) || string.IsNullOrWhiteSpace(sessionOtp))
+            {
+                return Json(new { success = false, message = "OTP session has expired. Please request a new OTP." });
+            }
+
+            if (DateTime.TryParse(expiryStr, out var expiryTime) && DateTime.UtcNow > expiryTime)
+            {
+                return Json(new { success = false, message = "OTP has expired. Please click Resend OTP." });
+            }
+
+            bool isOtpValid = false;
+            if (sessionOtp == request.Otp?.Trim())
+            {
+                isOtpValid = true;
+            }
+            else
+            {
+                isOtpValid = VerifyOTP(sessionEmail, request.Otp?.Trim() ?? "", "FORGOT_PASSWORD");
+            }
+
+            if (!isOtpValid)
+            {
+                return Json(new { success = false, message = "Invalid OTP. Please enter the correct verification code." });
+            }
+
+            // 4. Update Password in Database
+            string newPasswordHash = HashPassword(request.NewPassword);
+            try
+            {
+                using (var conn = new SqlConnection(_connectionString))
+                {
+                    await conn.OpenAsync();
+
+                    // Try stored procedure sp_UpdatePassword
+                    try
+                    {
+                        using (var cmd = new SqlCommand("sp_UpdatePassword", conn))
+                        {
+                            cmd.CommandType = CommandType.StoredProcedure;
+                            cmd.Parameters.AddWithValue("@Email", sessionEmail);
+                            cmd.Parameters.AddWithValue("@PasswordHash", newPasswordHash);
+                            await cmd.ExecuteNonQueryAsync();
+                        }
+                    }
+                    catch { }
+
+                    // Also direct update on Usrs table
+                    using (var directCmd = new SqlCommand(@"
+                        UPDATE Usrs 
+                        SET PasswordHash = @PasswordHash, FailedAttempts = 0, IsLocked = 0, LockTime = NULL 
+                        WHERE LOWER(LTRIM(RTRIM(Email))) = LOWER(LTRIM(RTRIM(@Email))) 
+                           OR LOWER(LTRIM(RTRIM(Username))) = LOWER(LTRIM(RTRIM(@Username)))", conn))
+                    {
+                        directCmd.Parameters.AddWithValue("@PasswordHash", newPasswordHash);
+                        directCmd.Parameters.AddWithValue("@Email", sessionEmail);
+                        directCmd.Parameters.AddWithValue("@Username", request.Username ?? "");
+                        await directCmd.ExecuteNonQueryAsync();
+                    }
+
+                    // Also update LastPasswordUpdate on UserProfiles if exists
+                    try
+                    {
+                        using (var profCmd = new SqlCommand(@"
+                            UPDATE UserProfiles 
+                            SET LastPasswordUpdate = GETDATE() 
+                            WHERE LOWER(LTRIM(RTRIM(UserId))) = LOWER(LTRIM(RTRIM(@Email))) 
+                               OR LOWER(LTRIM(RTRIM(Email))) = LOWER(LTRIM(RTRIM(@Email))) 
+                               OR LOWER(LTRIM(RTRIM(Username))) = LOWER(LTRIM(RTRIM(@Username)))", conn))
+                        {
+                            profCmd.Parameters.AddWithValue("@Email", sessionEmail);
+                            profCmd.Parameters.AddWithValue("@Username", request.Username ?? "");
+                            await profCmd.ExecuteNonQueryAsync();
+                        }
+                    }
+                    catch { }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error updating password in ForgotPasswordReset: " + ex.Message);
+                return Json(new { success = false, message = "Failed to update password. Please try again." });
+            }
+
+            // 5. Send Password Changed Email notification
+            try
+            {
+                await SendPasswordChangedEmail(sessionEmail, request.Username ?? "Customer");
+            }
+            catch { }
+
+            // Clear forgot password session
+            HttpContext.Session.Remove("FP_OTP");
+            HttpContext.Session.Remove("FP_OTP_HASH");
+            HttpContext.Session.Remove("FP_EMAIL");
+            HttpContext.Session.Remove("FP_USERNAME");
+            HttpContext.Session.Remove("FP_EXPIRY");
+
+            return Json(new
+            {
+                success = true,
+                message = "Password updated successfully! You can now login with your new password.",
+                redirectUrl = "/Account/Login"
+            });
         }
 
         // -------------------- CHANGE PASSWORD ------------------
@@ -541,9 +935,13 @@ namespace IRCTCClone.Controllers
         }
 
         // GENERATE EMAIL
-        private async Task SendOTPEmail(string userEmail, string otp)
+        private async Task SendOTPEmail(string userEmail, string otp, string userName = "Customer")
         {
             string fullname = User.FindFirst(ClaimTypes.Name)?.Value;
+            if (string.IsNullOrWhiteSpace(fullname))
+            {
+                fullname = userName;
+            }
 
             string subject = "IRCTC – Change Password OTP Verification";
 
@@ -558,7 +956,7 @@ namespace IRCTCClone.Controllers
 
                 <h2 style='color:#d9534f; letter-spacing:2px;'>{otp}</h2>
 
-                <p>This OTP is valid for <strong>1 minute</strong>.</p>
+                <p>This OTP is valid for <strong>10 minutes</strong>.</p>
 
                 <br/>
 
@@ -598,9 +996,13 @@ namespace IRCTCClone.Controllers
 
 
         // PASSWORD CHANGE MAIL
-        private async Task SendPasswordChangedEmail(string userEmail)
+        private async Task SendPasswordChangedEmail(string userEmail, string userName = "Customer")
         {
             string fullname = User.FindFirst(ClaimTypes.Name)?.Value;
+            if (string.IsNullOrWhiteSpace(fullname))
+            {
+                fullname = userName;
+            }
 
             string subject = "IRCTC – Password Changed Successfully";
 

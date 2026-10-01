@@ -50,7 +50,7 @@ builder.Services.AddScoped<AiSearchService>();
 // SESSION
 builder.Services.AddSession(options =>
 {
-    options.IdleTimeout = TimeSpan.FromMinutes(5);
+    options.IdleTimeout = TimeSpan.FromMinutes(10);
 
     options.Cookie.Name = ".IRCTC.Session";
     options.Cookie.HttpOnly = true;

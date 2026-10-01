@@ -183,7 +183,57 @@
 
 </div>
 
-<!--  -->
+<!-- BOARDING POINT MODAL -->
+<div id="boardingPointModal" class="modal-overlay" style="display:none; z-index: 30005;">
+    <div class="modal-content" style="max-width: 520px; border-radius: 14px; overflow: hidden; padding: 0; border: none; box-shadow: 0 15px 40px rgba(0,0,0,0.25);">
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: #fff; padding: 18px 24px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <i class="fa-solid fa-location-crosshairs" style="font-size: 20px;"></i>
+                <div>
+                    <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: #fff;">Change Boarding Station</h3>
+                    <div style="font-size: 12px; opacity: 0.9;">IRCTC Authorized Modification</div>
+                </div>
+            </div>
+            <span onclick="closeBoardingModal()" style="cursor: pointer; font-size: 22px; line-height: 1; color: #fff; opacity: 0.8; transition: opacity 0.2s;">✖</span>
+        </div>
+
+        <!-- Body -->
+        <div style="padding: 22px 24px; background: #fff;">
+            <!-- Trip summary pill -->
+            <div id="bpTripSummary" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; margin-bottom: 18px; font-size: 13.5px;">
+            </div>
+
+            <div style="margin-bottom: 18px;">
+                <label style="display: block; font-size: 13px; font-weight: 700; color: #334155; margin-bottom: 6px;">
+                    Select New Boarding Station:
+                </label>
+                <select id="bpStationSelect" style="width: 100%; padding: 11px 14px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 14px; font-weight: 600; color: #0f172a; outline: none; background: #fff;">
+                    <option value="">Loading stations...</option>
+                </select>
+                <div id="bpNewTimeNotice" style="font-size: 12px; color: #0284c7; margin-top: 5px; font-weight: 600;"></div>
+            </div>
+
+            <!-- Caution alert -->
+            <div style="background: #fff7ed; border-left: 4px solid #f97316; padding: 12px 14px; border-radius: 6px; font-size: 12px; color: #9a3412; line-height: 1.5;">
+                <strong>⚠️ IMPORTANT IRCTC RULES:</strong><br/>
+                • Boarding point can be changed <strong>only ONCE (1 time)</strong>. Second chance is NOT permitted.<br/>
+                • Change is permitted up to <strong>30 minutes prior</strong> to scheduled departure.<br/>
+                • Passenger forfeits all rights to board from previous station once changed.
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 14px 24px; display: flex; justify-content: flex-end; gap: 10px;">
+            <button type="button" onclick="closeBoardingModal()" style="padding: 9px 18px; border-radius: 8px; border: 1px solid #cbd5e1; background: #fff; font-size: 13px; font-weight: 600; color: #64748b; cursor: pointer;">
+                Cancel
+            </button>
+            <button type="button" id="bpConfirmBtn" onclick="confirmBoardingChange()" style="padding: 9px 20px; border-radius: 8px; border: none; background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(2,132,199,0.3);">
+                Confirm Change
+            </button>
+        </div>
+    </div>
+</div>
 <div id="errorModal" class="modal-overlay">
     <div class="modal-content" style="width:400px; max-width:90%; text-align:center;">
         <p id="errorText" style="font-size:15px; margin-bottom:15px; font-weight:600;"></p>
@@ -217,6 +267,88 @@
 
     </div>
 
+</div>
+
+<!-- PNR LIVE STATUS MODAL -->
+<div id="pnrLiveStatusModal" class="modal-overlay" style="display:none; z-index: 30010;">
+    <div class="modal-content" style="max-width: 680px; width: 92%; border-radius: 12px; overflow: hidden; padding: 0;">
+        <div style="background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); color: #ffffff; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <i class="fa-solid fa-train text-warning fs-5"></i>
+                <div>
+                    <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: #ffffff;">PNR Status Inquiry</h3>
+                    <div id="pnrModalPnrSubtitle" style="font-size: 13px; color: #93c5fd; margin-top: 2px;">PNR: Loading...</div>
+                </div>
+            </div>
+            <span onclick="closePnrStatusModal()" style="cursor: pointer; font-size: 24px; font-weight: bold; color: #ffffff; line-height: 1;">&times;</span>
+        </div>
+
+        <div id="pnrModalBody" style="padding: 20px;">
+            <div style="text-align: center; padding: 30px; color: #64748b;">
+                <i class="fa-solid fa-spinner fa-spin fs-2 text-primary"></i>
+                <p class="mt-2 mb-0">Querying live reservation status from PRS...</p>
+            </div>
+        </div>
+
+        <div style="background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 11px; color: #64748b;">
+                <i class="fa-solid fa-shield-halved text-success me-1"></i> Live data fetched from Indian Railways PRS Server
+            </span>
+            <button type="button" class="btn-sec-action" onclick="closePnrStatusModal()" style="padding: 6px 18px; border-radius: 6px;">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- OPT MEAL MODAL (VANDE BHARAT) -->
+<div id="optMealModal" class="modal-overlay" style="display:none; z-index: 30020;">
+    <div class="modal-content" style="max-width: 480px; width: 92%; border-radius: 12px; overflow: hidden; padding: 0;">
+        <div style="background: linear-gradient(135deg, #166534 0%, #15803d 100%); color: #ffffff; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <i class="fa-solid fa-utensils fs-5 text-warning"></i>
+                <div>
+                    <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: #ffffff;">Vande Bharat - Catering Service</h3>
+                    <div id="optMealSubtitle" style="font-size: 13px; color: #bbf7d0; margin-top: 2px;">PNR: Loading...</div>
+                </div>
+            </div>
+            <span onclick="closeOptMealModal()" style="cursor: pointer; font-size: 24px; font-weight: bold; color: #ffffff; line-height: 1;">&times;</span>
+        </div>
+
+        <div style="padding: 20px;">
+            <p style="color: #475569; font-size: 14px; margin-bottom: 14px;">Select meal preference for your journey:</p>
+            <input type="hidden" id="optMealBookingId" />
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <input type="radio" name="optMealRadio" value="Veg" checked />
+                    <span>🥗 <strong>Veg Meal</strong></span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <input type="radio" name="optMealRadio" value="Non Veg" />
+                    <span>🍗 <strong>Non Veg Meal</strong></span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <input type="radio" name="optMealRadio" value="Jain Meal" />
+                    <span>🌱 <strong>Jain Meal</strong></span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <input type="radio" name="optMealRadio" value="Veg (Diabetic)" />
+                    <span>🥬 <strong>Veg (Diabetic)</strong></span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <input type="radio" name="optMealRadio" value="Non Veg (Diabetic)" />
+                    <span>🥩 <strong>Non Veg (Diabetic)</strong></span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <input type="radio" name="optMealRadio" value="No Food" />
+                    <span>🚫 <strong>No Food / Opt-out</strong></span>
+                </label>
+            </div>
+        </div>
+
+        <div style="background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 12px 20px; display: flex; justify-content: flex-end; gap: 10px;">
+            <button type="button" class="btn btn-secondary" onclick="closeOptMealModal()" style="padding: 6px 16px; border-radius: 6px;">Cancel</button>
+            <button type="button" class="btn btn-success" onclick="submitOptMeal()" style="padding: 6px 18px; border-radius: 6px; background:#166534;">Update Meal</button>
+        </div>
+    </div>
 </div>
 
 <!--  -->
@@ -276,7 +408,7 @@
 
                 // Fetch dynamic booking & passenger data if not yet loaded
                 if (dynamicContainer && !dynamicContainer.getAttribute('data-loaded')) {
-                    fetch(`/Booking/GetBookingForCancel?id=${bookingId}`)
+                    fetch(`/Booking/GetBookingDetails?id=${bookingId}`)
                         .then(res => res.json())
                         .then(data => {
                             dynamicContainer.setAttribute('data-loaded', 'true');
@@ -315,19 +447,48 @@
                                 passengerRowsHtml = `<tr><td colspan="7" style="text-align:center; color:#64748b; padding:12px;">No passenger records found.</td></tr>`;
                             } else {
                                 passengers.forEach((p, idx) => {
-                                    const isCan = p.currentStatus === 'CAN' || p.currentStatus === 'CANCELLED';
-                                    const statusColor = isCan ? 'status-cancelled' : 'status-confirmed';
-                                    
+                                    const currUpper = (p.currentStatus || '').toUpperCase();
+                                    const bookUpper = (p.bookingStatus || '').toUpperCase();
+
+                                    // Color coding: Green for CNF / AVAILABLE, Orange/Yellow for RAC, Red for WL / CAN
+                                    let statusColor = 'status-confirmed';
+                                    if (currUpper === 'CAN' || currUpper === 'CANCELLED') {
+                                        statusColor = 'status-cancelled';
+                                    } else if (currUpper.includes('WL') || currUpper.includes('WAIT')) {
+                                        statusColor = 'status-badge-wl';
+                                    } else if (currUpper.includes('RAC')) {
+                                        statusColor = 'status-badge-rac';
+                                    }
+
+                                    let bookColor = 'status-confirmed';
+                                    if (bookUpper === 'CAN' || bookUpper === 'CANCELLED') {
+                                        bookColor = 'status-cancelled';
+                                    } else if (bookUpper.includes('WL') || bookUpper.includes('WAIT')) {
+                                        bookColor = 'status-badge-wl';
+                                    } else if (bookUpper.includes('RAC')) {
+                                        bookColor = 'status-badge-rac';
+                                    }
+
                                     // Coach & Berth assignment from DB
                                     let coachBerth = '--';
-                                    if (p.seat && p.seat.trim() !== '') {
+                                    const isBookWL = bookUpper.includes('WL') || bookUpper.includes('WAIT');
+                                    const isCurrCNF = currUpper === 'CNF' || currUpper === 'CONFIRMED';
+
+                                    if (isBookWL && isCurrCNF && !isPrepared) {
+                                        coachBerth = '<span style="color:#64748b; font-size:12px; font-weight:600;" title="Confirmed: Berth will be allotted at Chart Preparation">-- <small style="display:block; font-size:10px; color:#2563eb; font-weight:700;">(Allotted at Charting)</small></span>';
+                                    } else if (p.seat && p.seat.trim() !== '') {
                                         coachBerth = `${p.seat} ${p.berth ? `(${p.berth})` : ''}`;
                                     } else if (p.bookingStatus === 'RAC' || p.currentStatus === 'RAC') {
                                         coachBerth = `RAC ${p.Position ? `(${p.Position})` : ''}`;
                                     } else if (p.bookingStatus === 'WL' || p.currentStatus === 'WL') {
                                         coachBerth = `WL ${p.Position ? `(${p.Position})` : ''}`;
-                                    } else if (isCan) {
+                                    } else if (currUpper === 'CAN' || currUpper === 'CANCELLED') {
                                         coachBerth = 'Cancelled';
+                                    }
+
+                                    let mealBadge = '';
+                                    if (p.meal && p.meal.trim() !== '') {
+                                        mealBadge = `<div style="margin-top:4px;"><span style="display:inline-flex; align-items:center; gap:4px; font-size:11px; padding:2px 7px; border-radius:4px; background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; font-weight:600;"><i class="fa-solid fa-utensils"></i> Meal: ${p.meal}</span></div>`;
                                     }
 
                                     const insuranceStatus = hasInsurance ? `Opted` : `--`;
@@ -337,9 +498,12 @@
                                             <td>${idx + 1}</td>
                                             <td><strong>${p.name}</strong></td>
                                             <td>${p.age} / ${p.gender}</td>
-                                            <td><span class="booking-status">${p.bookingStatus} ${p.Position ? `(${p.Position})` : ''}</span></td>
+                                            <td><span class="${bookColor}">${p.bookingStatus} ${p.Position ? `(${p.Position})` : ''}</span></td>
                                             <td><span class="${statusColor}">${p.currentStatus} ${p.Position ? `(${p.Position})` : ''}</span></td>
-                                            <td><strong>${coachBerth}</strong></td>
+                                            <td>
+                                                <strong>${coachBerth}</strong>
+                                                ${mealBadge}
+                                            </td>
                                             <td>${insuranceStatus}</td>
                                         </tr>
                                     `;
@@ -456,7 +620,7 @@
 
                                 <!-- 6. Action Buttons Bar -->
                                 <div class="accordion-actions-bar">
-                                    <button type="button" class="btn-sec-action" onclick="alert('PNR ${b.pnr} status is current and valid.')">
+                                    <button type="button" class="btn-sec-action" onclick="checkPnrStatusLive('${b.pnr}', ${b.bookingId}, this)">
                                         <i class="fa-solid fa-magnifying-glass"></i> Get PNR Status
                                     </button>
                                     
@@ -464,19 +628,27 @@
                                         <i class="fa-solid fa-comment-sms"></i> Get SMS
                                     </button>
 
-                                    <button type="button" class="btn-sec-action" onclick="alert('Boarding point change is permitted up to 4 hours prior to chart preparation.')">
+                                    ${b.status !== 'CANCELLED' ? `
+                                    <button type="button" class="btn-sec-action" onclick="openBoardingModal('${b.bookingId}')">
                                         <i class="fa-solid fa-location-crosshairs"></i> Change Boarding Point
                                     </button>
+                                    ` : ''}
+
+                                    ${(b.trainName || '').replace(/[\s-]/g, '').toUpperCase().includes('VANDEBHARAT') && b.status !== 'CANCELLED' ? `
+                                    <button type="button" class="btn-sec-action" style="background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; font-weight:600;" onclick="openOptMealModal('${b.bookingId}', '${b.pnr}')">
+                                        <i class="fa-solid fa-utensils me-1"></i> Opt Meal
+                                    </button>
+                                    ` : ''}
 
                                     ${b.status === 'CANCELLED' ? `
                                         <button type="button" class="btn-sec-action text-blue" onclick="showRefundExplanation('${b.pnr}')">
                                             <i class="fa-solid fa-receipt"></i> Refund Calculation
                                         </button>
-                                    ` : `
+                                    ` : (b.canCancel !== false ? `
                                         <button type="button" class="btn-danger-action" onclick="openCancelModal('${b.bookingId}')">
                                             <i class="fa-regular fa-circle-xmark"></i> Cancel E-Ticket
                                         </button>
-                                    `}
+                                    ` : '')}
 
                                     <a href="/Booking/DownloadTicket/${b.bookingId}" class="btn-primary-action no-loader">
                                         <i class="fa-solid fa-download"></i> Download E-Ticket
@@ -517,6 +689,8 @@
             document.querySelectorAll('.tab-btn-modern').forEach(b => b.classList.remove('active'));
             if (el) el.classList.add('active');
 
+            let pastShown = 0;
+
             cards.forEach(card => {
 
                 const journeyEnd = new Date(card.getAttribute('data-journey-end'));
@@ -524,13 +698,26 @@
 
                 let show = false;
 
-                if (type === 'all') show = true;
-
-                else if (type === 'upcoming')
+                if (type === 'all') {
+                    if (now <= journeyEnd && status !== "CANCELLED") {
+                        show = true;
+                    } else {
+                        if (pastShown < 10) {
+                            show = true;
+                            pastShown++;
+                        }
+                    }
+                }
+                else if (type === 'upcoming') {
                     show = (now <= journeyEnd && status !== "CANCELLED");
-
-                else if (type === 'past')
-                    show = (now > journeyEnd || status == "CANCELLED");
+                }
+                else if (type === 'past') {
+                    if (now > journeyEnd || status == "CANCELLED") {
+                        if (visible < 10) {
+                            show = true;
+                        }
+                    }
+                }
 
                 if (show) {
                     card.style.display = 'block';
@@ -544,6 +731,47 @@
             if (emptyEl) {
                 emptyEl.style.display = visible === 0 ? 'block' : 'none';
             }
+        }
+
+        // OPT MEAL MODAL FUNCTIONS FOR VANDE BHARAT
+        function openOptMealModal(bookingId, pnr) {
+            document.getElementById('optMealBookingId').value = bookingId;
+            document.getElementById('optMealSubtitle').innerText = `PNR: ${pnr}`;
+            document.getElementById('optMealModal').style.display = 'flex';
+        }
+
+        function closeOptMealModal() {
+            document.getElementById('optMealModal').style.display = 'none';
+        }
+
+        function submitOptMeal() {
+            const bookingId = document.getElementById('optMealBookingId').value;
+            const selectedMeal = document.querySelector('input[name="optMealRadio"]:checked')?.value || 'Veg';
+
+            fetch('/Booking/UpdateMealPreference', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `bookingId=${encodeURIComponent(bookingId)}&meal=${encodeURIComponent(selectedMeal)}`
+            })
+            .then(res => res.json())
+            .then(data => {
+                closeOptMealModal();
+                if (data.success) {
+                    Swal.fire('Meal Updated', data.message, 'success');
+                    const dynamicContainer = document.getElementById(`acc-content-dynamic-${bookingId}`);
+                    if (dynamicContainer) {
+                        dynamicContainer.removeAttribute('data-loaded');
+                        toggleBookingAccordion(bookingId);
+                        toggleBookingAccordion(bookingId);
+                    }
+                } else {
+                    Swal.fire('Error', data.message || 'Failed to update meal', 'error');
+                }
+            })
+            .catch(() => {
+                closeOptMealModal();
+                Swal.fire('Error', 'Failed to update meal preference.', 'error');
+            });
         }
 
         // UPCOMING, PAST, ALL TICKETS COUNT
@@ -669,9 +897,16 @@
         // CLOSE MODAL ON CLICK CANCEL
         function openCancelModal(bookingId) {
 
+            showLoader();
             fetch(`/Booking/GetBookingForCancel?id=${bookingId}`)
             .then(res => res.json())
             .then(data => {
+
+                hideLoader();
+                if (data.success === false) {
+                    showToast(data.message, "error");
+                    return;
+                }
 
                 const b = data.booking;
 
@@ -826,14 +1061,18 @@
                 }
                 
                 else {
-                    showErrorModal("Cancel failed");
+                    closeIrctcModal();
+                    document.getElementById("fullCancelModal").style.display = "none";
+                    showToast(data.message || "Cancel failed", "error");
                 }
             })
 
             .catch(err => {
                 hideLoader();
+                closeIrctcModal();
+                document.getElementById("fullCancelModal").style.display = "none";
                 console.error(err);
-                showErrorModal("Cancellation failed. Please try again.");
+                showToast("Cancellation failed. Please try again.", "error");
             });
         }
 
@@ -895,11 +1134,282 @@
                 checked > 0 ? "inline-block" : "none";
         });
 
-        // <p><b>Status:</b>
-        //    <span style="color:${getStatusClass(b.status)}; font-weight:bold;">
-        //        ${b.status}
-        //    </span>
-        // </p>
+        // ----------------------------------------------------
+        // BOARDING POINT CHANGE MODAL & AJAX
+        // ----------------------------------------------------
+        let currentBpBookingId = null;
+        let currentBpStationsData = [];
+
+        function openBoardingModal(bookingId) {
+            currentBpBookingId = bookingId;
+            showLoader();
+            fetch(`/Booking/GetBoardingStations?bookingId=${bookingId}`)
+            .then(res => res.json())
+            .then(data => {
+                hideLoader();
+                if (!data.success) {
+                    showToast(data.message, "error");
+                    return;
+                }
+
+                currentBpStationsData = data.stations || [];
+
+                // Summary
+                document.getElementById("bpTripSummary").innerHTML = `
+                    <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                        <span><b>PNR:</b> <span style="color:#0284c7; font-weight:700;">${data.pnr}</span></span>
+                        <span><b>Date:</b> ${data.journeyDate}</span>
+                    </div>
+                    <div style="margin-bottom:6px;">
+                        <b>Train:</b> ${data.trainNo} - ${data.trainName}
+                    </div>
+                    <div style="display:flex; justify-content:space-between; color:#475569; font-size:12.5px;">
+                        <span>Current Boarding: <strong style="color:#dc2626;">${data.currentBoarding}</strong> (${data.currentDeparture} hrs)</span>
+                        <span>Destination: <strong>${data.destination}</strong></span>
+                    </div>
+                `;
+
+                // Populate stations dropdown
+                const select = document.getElementById("bpStationSelect");
+                select.innerHTML = '<option value="">-- Choose New Boarding Station --</option>';
+
+                let eligibleCount = 0;
+                currentBpStationsData.forEach(st => {
+                    const isCurrent = (st.stationName || '').trim().toLowerCase() === (data.currentBoarding || '').trim().toLowerCase();
+                    const isDest = (st.stationName || '').trim().toLowerCase() === (data.destination || '').trim().toLowerCase();
+
+                    if (!isCurrent && !isDest) {
+                        const opt = document.createElement("option");
+                        opt.value = st.stationName;
+                        opt.dataset.departure = st.departureTime || '';
+                        opt.dataset.day = st.dayNumber || '1';
+                        opt.textContent = `${st.stationName} (Dep: ${st.departureTime || '--:--'} hrs, Day ${st.dayNumber || '1'})`;
+                        select.appendChild(opt);
+                        eligibleCount++;
+                    }
+                });
+
+                if (eligibleCount === 0) {
+                    select.innerHTML = '<option value="">No other intermediate stations available</option>';
+                    document.getElementById("bpConfirmBtn").disabled = true;
+                } else {
+                    document.getElementById("bpConfirmBtn").disabled = false;
+                }
+
+                select.onchange = function() {
+                    const selectedOpt = select.options[select.selectedIndex];
+                    const dep = selectedOpt ? selectedOpt.dataset.departure : '';
+                    const notice = document.getElementById("bpNewTimeNotice");
+                    if (dep) {
+                        notice.innerHTML = `<i class="fa-solid fa-clock"></i> New Departure Time: <strong>${dep} hrs</strong>`;
+                    } else {
+                        notice.innerHTML = '';
+                    }
+                };
+
+                document.getElementById("bpNewTimeNotice").innerHTML = '';
+                document.getElementById("boardingPointModal").style.display = "flex";
+            })
+            .catch(err => {
+                hideLoader();
+                console.error(err);
+                showToast("Failed to load boarding stations. Please try again.", "error");
+            });
+        }
+
+        function closeBoardingModal() {
+            document.getElementById("boardingPointModal").style.display = "none";
+        }
+
+        function confirmBoardingChange() {
+            const select = document.getElementById("bpStationSelect");
+            const newStation = select.value;
+            if (!newStation) {
+                showToast("Please select a new boarding station.", "error");
+                return;
+            }
+
+            const selectedOpt = select.options[select.selectedIndex];
+            const depTime = selectedOpt ? selectedOpt.dataset.departure : '';
+
+            if (!confirm(`Are you sure you want to change your boarding station to ${newStation}? As per IRCTC rules, this can only be done ONCE.`)) {
+                return;
+            }
+
+            showLoader();
+            fetch('/Booking/ChangeBoardingPoint', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    bookingId: currentBpBookingId,
+                    newStation: newStation,
+                    departureTime: depTime
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                hideLoader();
+                if (data.success) {
+                    closeBoardingModal();
+                    showToast(data.message, "success");
+                    setTimeout(() => {
+                        safeReload();
+                    }, 800);
+                } else {
+                    showToast(data.message || "Failed to change boarding point.", "error");
+                }
+            })
+            .catch(err => {
+                hideLoader();
+                console.error(err);
+                showToast("Error processing boarding point change.", "error");
+            });
+        }
+
+        function checkPnrStatusLive(pnr, bookingId, btn) {
+            const modal = document.getElementById('pnrLiveStatusModal');
+            const subtitle = document.getElementById('pnrModalPnrSubtitle');
+            const body = document.getElementById('pnrModalBody');
+
+            if (modal) modal.style.display = 'flex';
+            if (subtitle) subtitle.textContent = `PNR: ${pnr}`;
+            if (body) {
+                body.innerHTML = `
+                    <div style="text-align: center; padding: 30px; color: #64748b;">
+                        <i class="fa-solid fa-spinner fa-spin fs-2 text-primary"></i>
+                        <p class="mt-2 mb-0">Querying live reservation status from PRS...</p>
+                    </div>`;
+            }
+
+            let origHtml = '';
+            if (btn) {
+                origHtml = btn.innerHTML;
+                btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Checking...`;
+                btn.disabled = true;
+            }
+
+            fetch(`/Booking/GetPnrStatusDetails?pnr=${encodeURIComponent(pnr)}&bookingId=${bookingId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (btn) {
+                        btn.innerHTML = origHtml;
+                        btn.disabled = false;
+                    }
+
+                    if (!data || !data.success) {
+                        if (body) {
+                            body.innerHTML = `
+                                <div style="padding: 20px; text-align: center; color: #ef4444;">
+                                    <i class="fa-solid fa-circle-exclamation fs-2 mb-2"></i>
+                                    <p>${(data && data.message) || 'Unable to retrieve PNR status at this moment.'}</p>
+                                </div>`;
+                        }
+                        return;
+                    }
+
+                    showToast(`PNR ${pnr} status refreshed successfully!`, "success");
+
+                    let chartBadge = data.isChartPrepared
+                        ? `<span style="background:#dcfce7; color:#15803d; padding:4px 12px; border-radius:12px; font-size:12px; font-weight:700;"><i class="fa-solid fa-circle-check me-1"></i> Chart Prepared</span>`
+                        : `<span style="background:#fef3c7; color:#92400e; padding:4px 12px; border-radius:12px; font-size:12px; font-weight:700;"><i class="fa-solid fa-clock me-1"></i> Chart Not Prepared</span>`;
+
+                    let paxRows = '';
+                    (data.passengers || []).forEach((p, idx) => {
+                        let coachBerth = '--';
+                        let isBookWL = (p.bookingStatus || '').toUpperCase().includes('WL') || (p.bookingStatus || '').toUpperCase().includes('WAIT');
+                        let isCurrCNF = (p.currentStatus || '').toUpperCase() === 'CNF' || (p.currentStatus || '').toUpperCase() === 'CONFIRMED';
+
+                        if (isBookWL && isCurrCNF && !data.isChartPrepared) {
+                            coachBerth = '<span style="color:#64748b; font-size:11.5px; font-weight:600;" title="Confirmed: Berth will be allotted at Chart Preparation">-- <small style="display:block; font-size:10px; color:#2563eb; font-weight:700;">(Allotted at Charting)</small></span>';
+                        } else if (p.seat && p.seat.trim() !== '') {
+                            coachBerth = `${p.seat} ${p.berth ? `(${p.berth})` : ''}`;
+                        } else if (p.currentStatus === 'RAC' || p.bookingStatus === 'RAC') {
+                            coachBerth = `RAC ${p.position ? `(${p.position})` : ''}`;
+                        } else if (p.currentStatus === 'WL' || p.bookingStatus === 'WL') {
+                            coachBerth = `WL ${p.position ? `(${p.position})` : ''}`;
+                        }
+
+                        let cnfColor = (p.currentStatus === 'CNF' || p.currentStatus === 'CONFIRMED') ? '#15803d' : (p.currentStatus === 'RAC' ? '#ea580c' : '#dc2626');
+
+                        paxRows += `
+                            <tr style="border-bottom: 1px solid #f1f5f9;">
+                                <td style="padding: 10px 12px; font-weight: 600; color: #64748b;">${idx + 1}</td>
+                                <td style="padding: 10px 12px; font-weight: 700; color: #1e293b;">${p.name} <small style="color:#64748b; font-weight:400;">(${p.age}/${p.gender})</small></td>
+                                <td style="padding: 10px 12px;"><span style="background:#f1f5f9; color:#334155; padding:3px 8px; border-radius:4px; font-weight:700; font-size:12px;">${p.bookingStatus}</span></td>
+                                <td style="padding: 10px 12px;"><span style="color:${cnfColor}; font-weight:800; font-size:13px;">${p.currentStatus}</span></td>
+                                <td style="padding: 10px 12px; font-weight: 700; color: #1e3a8a;">${coachBerth}</td>
+                            </tr>`;
+                    });
+
+                    body.innerHTML = `
+                        <!-- Train & Journey Strip -->
+                        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px 16px; margin-bottom:16px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                                <div>
+                                    <div style="font-weight:800; font-size:15px; color:#1e3a8a;">
+                                        <i class="fa-solid fa-train me-1"></i> ${data.trainNumber} / ${data.trainName}
+                                    </div>
+                                    <div style="font-size:13px; color:#64748b; margin-top:2px;">
+                                        <span>Class: <strong>${data.classCode}</strong></span>
+                                        <span style="margin:0 6px;">•</span>
+                                        <span>Quota: <strong>${data.quota}</strong></span>
+                                        <span style="margin:0 6px;">•</span>
+                                        <span>Date: <strong>${data.journeyDate}</strong></span>
+                                    </div>
+                                </div>
+                                <div>
+                                    ${chartBadge}
+                                </div>
+                            </div>
+                            <div style="margin-top:10px; padding-top:10px; border-top:1px dashed #cbd5e1; font-size:13px; color:#334155; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                                <div><strong>From / Boarding:</strong> ${data.from} (${data.departure || '--:--'} hrs.)</div>
+                                <div><strong>To:</strong> ${data.to} (${data.arrival || '--:--'} hrs.)</div>
+                            </div>
+                        </div>
+
+                        <!-- Passenger Status Table -->
+                        <div style="margin-bottom:10px;">
+                            <div style="font-weight:700; color:#1e293b; font-size:14px; margin-bottom:8px;">
+                                <i class="fa-solid fa-users text-primary me-1"></i> Passenger Live Status
+                            </div>
+                            <div style="overflow-x:auto;">
+                                <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                                    <thead>
+                                        <tr style="background:#f1f5f9; color:#475569; text-align:left;">
+                                            <th style="padding:8px 12px; border-radius:6px 0 0 6px;">#</th>
+                                            <th style="padding:8px 12px;">Passenger</th>
+                                            <th style="padding:8px 12px;">Booking Status</th>
+                                            <th style="padding:8px 12px;">Current Status</th>
+                                            <th style="padding:8px 12px; border-radius:0 6px 6px 0;">Coach & Berth</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${paxRows || '<tr><td colspan="5" style="text-align:center; padding:12px; color:#94a3b8;">No passenger records.</td></tr>'}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    `;
+                })
+                .catch(err => {
+                    if (btn) {
+                        btn.innerHTML = origHtml;
+                        btn.disabled = false;
+                    }
+                    if (body) {
+                        body.innerHTML = `
+                            <div style="padding: 20px; text-align: center; color: #ef4444;">
+                                <i class="fa-solid fa-circle-exclamation fs-2 mb-2"></i>
+                                <p>Error connecting to PRS server. Please try again.</p>
+                            </div>`;
+                    }
+                });
+        }
+
+        function closePnrStatusModal() {
+            const modal = document.getElementById('pnrLiveStatusModal');
+            if (modal) modal.style.display = 'none';
+        }
 
     </script>
 }

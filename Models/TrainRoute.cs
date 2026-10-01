@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 
 namespace IRCTCClone.Models
 {
@@ -21,5 +21,7 @@ namespace IRCTCClone.Models
         public DateTime? FromDate { get; set; }
         public DateTime? ToDate { get; set; }
         public Station Station { get; set; }
+        public bool IsTemporary { get; set; }
+        public string? TemporaryReason { get; set; }
     }
 }

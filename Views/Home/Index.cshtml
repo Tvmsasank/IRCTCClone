@@ -30,10 +30,20 @@
 
 <div class="home-page">
     <div class="search-card">
-        <!-- Header -->
+        <!-- Header (Desktop) -->
         <div class="search-card-header">
             <h1 class="search-title" data-translate="bookticket">BOOK TICKET</h1>
         </div>
+
+        <!-- Mobile Tabs (Visible only on mobile <= 768px when logged in) -->
+        @if (User.Identity.IsAuthenticated)
+        {
+            <div class="mobile-search-tabs">
+                <button type="button" class="mobile-tab-btn active" data-tab="book">Book Ticket</button>
+                <a href="/Booking/History?filter=upcoming" class="mobile-tab-btn">Upcoming Journey</a>
+                <a href="/Booking/History" class="mobile-tab-btn">Last Transaction</a>
+            </div>
+        }
 
         <form method="post" action="/Train/TrainResults" id="homeSearchForm" novalidate>
 
@@ -41,6 +51,7 @@
             <div class="field-group grid-from">
                 <label class="field-label" data-translate="from">From*</label>
                 <div class="station-input-wrapper">
+                    <span class="mobile-row-icon"><i class="bi bi-cursor-fill" style="transform: rotate(45deg); display: inline-block;"></i></span>
                     <div class="floating-group">
                         <input type="text"
                                id="fromStation"
@@ -48,7 +59,10 @@
                                placeholder=" "
                                autocomplete="off"
                                required />
-                        <label for="fromStation" data-translate="from_placeholder">Enter source station</label>
+                        <label for="fromStation">
+                            <span class="desktop-label-txt" data-translate="from_placeholder">Enter source station</span>
+                            <span class="mobile-label-txt">From</span>
+                        </label>
                         <input type="hidden" id="fromStationId" name="fromStationId" />
                         <div id="fromStationList" class="autocomplete-list"></div>
                     </div>
@@ -58,7 +72,10 @@
             <!-- Swap Button -->
             <div class="swap-row">
                 <div class="swap-line"></div>
-                <button type="button" class="swap-btn" id="swapStations">⇄</button>
+                <button type="button" class="swap-btn" id="swapStations" title="Swap Stations">
+                    <span class="desktop-swap-icon"><i class="bi bi-arrow-left-right"></i></span>
+                    <span class="mobile-swap-icon"><i class="bi bi-arrow-down-up"></i></span>
+                </button>
                 <div class="swap-line"></div>
             </div>
 
@@ -66,6 +83,7 @@
             <div class="field-group grid-to">
                 <label class="field-label" data-translate="to">To*</label>
                 <div class="station-input-wrapper">
+                    <span class="mobile-row-icon"><i class="bi bi-geo-alt-fill"></i></span>
                     <div class="floating-group">
                         <input type="text"
                                id="toStation"
@@ -73,7 +91,10 @@
                                placeholder=" "
                                autocomplete="off"
                                required />
-                        <label for="toStation" data-translate="to_placeholder">Enter destination station</label>
+                        <label for="toStation">
+                            <span class="desktop-label-txt" data-translate="to_placeholder">Enter destination station</span>
+                            <span class="mobile-label-txt">To</span>
+                        </label>
                         <input type="hidden" id="toStationId" name="toStationId" />
                         <div id="toStationList" class="autocomplete-list"></div>
                     </div>
@@ -83,19 +104,24 @@
             <!-- Date -->
             <div class="field-group grid-date">
                 <label class="field-label" data-translate="date">DD/MM/YYYY *</label>
-                <input type="text"
-                       id="journeyDate"
-                       name="journeyDate"
-                       class="date-input"
-                       placeholder="Select Journey Date"
-                       data-translate="date_placeholder"
-                       required />
+                <div class="mobile-date-wrapper">
+                    <span class="mobile-row-icon"><i class="bi bi-calendar3"></i></span>
+                    <input type="text"
+                           id="journeyDate"
+                           name="journeyDate"
+                           class="date-input"
+                           placeholder="Select Journey Date"
+                           data-translate="date_placeholder"
+                           required />
+                </div>
             </div>
 
             <!-- Classes -->
             <div class="field-group grid-class">
                 <label class="field-label" data-translate="classes">Classes</label>
-                <select id="classFilterDropdown" name="classCode" class="form-control">
+                
+                <!-- Desktop Native Select -->
+                <select id="classFilterDropdown" name="classCode" class="form-control desktop-only-select">
                     <option value="ALL" selected="@(ViewBag.classCode == null || ViewBag.classCode == "ALL")">All Classes</option>
                     <option value="EA" selected="@(ViewBag.classCode == "EA")">Anubhuti Class (EA)</option>
                     <option value="1A" selected="@(ViewBag.classCode == "1A")">AC First Class (1A)</option>
@@ -108,12 +134,38 @@
                     <option value="VS" selected="@(ViewBag.classCode == "VS")">Vistadome Non AC (VS)</option>
                     <option value="2S" selected="@(ViewBag.classCode == "2S")">Second Sitting (2S)</option>
                 </select>
+
+                <!-- Mobile Custom Dropdown -->
+                <div class="mobile-custom-select" id="mobileClassDropdown">
+                    <div class="mobile-select-trigger" id="mobileClassTrigger">
+                        <div class="mobile-trigger-left">
+                            <span class="mobile-row-icon"><i class="bi bi-briefcase-fill"></i></span>
+                            <span class="mobile-select-text" id="mobileClassText">All Classes</span>
+                        </div>
+                        <span class="mobile-select-arrow"><i class="bi bi-chevron-down"></i></span>
+                    </div>
+                    <div class="mobile-dropdown-panel" id="mobileClassPanel">
+                        <div class="mobile-dropdown-item active" data-value="ALL">All Classes</div>
+                        <div class="mobile-dropdown-item" data-value="EA">Anubhuti Class (EA)</div>
+                        <div class="mobile-dropdown-item" data-value="1A">AC First Class (1A)</div>
+                        <div class="mobile-dropdown-item" data-value="EV">Vistadome AC (EV)</div>
+                        <div class="mobile-dropdown-item" data-value="EC">Exec. Chair Car (EC)</div>
+                        <div class="mobile-dropdown-item" data-value="2A">AC 2 Tier (2A)</div>
+                        <div class="mobile-dropdown-item" data-value="FC">First Class (FC)</div>
+                        <div class="mobile-dropdown-item" data-value="3A">AC 3 Tier (3A)</div>
+                        <div class="mobile-dropdown-item" data-value="3E">AC 3 Economy (3E)</div>
+                        <div class="mobile-dropdown-item" data-value="VS">Vistadome Non AC (VS)</div>
+                        <div class="mobile-dropdown-item" data-value="2S">Second Sitting (2S)</div>
+                    </div>
+                </div>
             </div>
 
             <!-- Quota -->
             <div class="field-group grid-quota">
                 <label class="field-label" data-translate="quota">Quota</label>
-                <select id="quota" name="quota" class="form-control" style="cursor: pointer">
+                
+                <!-- Desktop Native Select -->
+                <select id="quota" name="quota" class="form-control desktop-only-select" style="cursor: pointer">
 
                     @if (ViewBag.TatkalExclusive == true && ViewBag.IsLoggedIn == true)
                     {
@@ -132,28 +184,102 @@
                         <option value="PT" id="premiumTatkalOption">PREMIUM TATKAL</option>
                     }
                 </select>
+
+                <!-- Mobile Custom Dropdown -->
+                <div class="mobile-custom-select" id="mobileQuotaDropdown">
+                    <div class="mobile-select-trigger" id="mobileQuotaTrigger">
+                        <div class="mobile-trigger-left">
+                            <span class="mobile-row-icon"><i class="bi bi-grid-fill"></i></span>
+                            <span class="mobile-select-text" id="mobileQuotaText">GENERAL</span>
+                        </div>
+                        <span class="mobile-select-arrow"><i class="bi bi-chevron-down"></i></span>
+                    </div>
+                    <div class="mobile-dropdown-panel" id="mobileQuotaPanel">
+                        @if (ViewBag.TatkalExclusive == true && ViewBag.IsLoggedIn == true)
+                        {
+                            <div class="mobile-dropdown-item active" data-value="TATKAL">TATKAL</div>
+                            <div class="mobile-dropdown-item" data-value="PT">PREMIUM TATKAL</div>
+                        }
+                        else
+                        {
+                            <div class="mobile-dropdown-item active" data-value="GENERAL">GENERAL</div>
+                            <div class="mobile-dropdown-item" data-value="LADIES">LADIES</div>
+                            <div class="mobile-dropdown-item" data-value="SENIOR">LOWER BERTH/SR.CITIZEN</div>
+                            <div class="mobile-dropdown-item" data-value="PwD">PERSON WITH DISABILITY</div>
+                            <div class="mobile-dropdown-item" data-value="DP">DUTY PASS</div>
+                            <div class="mobile-dropdown-item" data-value="TATKAL">TATKAL</div>
+                            <div class="mobile-dropdown-item" data-value="PT">PREMIUM TATKAL</div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3 CONCESSIONS CHECKBOXES (Home Page) -->
+            <div class="field-group grid-concessions home-concessions-group">
+                <label class="home-concession-item">
+                    <input type="checkbox" id="homeChkDisabilityConcession" name="pwdConcession" value="true" />
+                    <span>Person With Disability Concession</span>
+                </label>
+                <label class="home-concession-item">
+                    <input type="checkbox" id="homeChkFlexibleWithDate" name="flexibleWithDate" value="true" />
+                    <span>Flexible With Date</span>
+                </label>
+                <label class="home-concession-item">
+                    <input type="checkbox" id="homeChkRailwayPassConcession" name="railwayPassConcession" value="true" />
+                    <span>Railway Pass Concession</span>
+                </label>
             </div>
 
             <!-- Search Button -->
-            <button type="submit" class="mainpageloginbtn" data-translate="searchtrains">Search Trains</button>
+            <button type="submit" class="mainpageloginbtn grid-button" data-translate="searchtrains">Search Trains</button>
 
-            <!-- Links -->
-            <div class="text-center grid-pnr">
-                <a asp-controller="Booking" asp-action="CheckPNR" data-translate="checkpnr">
-                    🔍 Check PNR Status
-                </a>
-            </div>
+            <!-- Search MEMU/DEMU/MMTS Trains (Placed directly below Search Trains) -->
+            <button type="button" class="home-memu-sub-btn" onclick="openMemuModal()" data-translate="searchmemu">
+                <i class="bi bi-train-front me-2"></i>
+                <span>Search MEMU/DEMU/MMTS Trains</span>
+            </button>
 
-            <div class="text-center memu-link grid-memu">
-                <button type="button" class="memu-btn" onclick="openMemuModal()" data-translate="searchmemu">
-                    🔍 Search MEMU/DEMU/MMTS Trains
-                </button>
-            </div>
+            <!-- Links Row / Mobile Quick Actions -->
+            <div class="home-bottom-links-row @(!User.Identity.IsAuthenticated ? "guest-bottom-links" : "auth-bottom-links")">
+                <div class="bottom-action-col grid-pnr">
+                    <a asp-controller="Booking" asp-action="CheckPNR" class="bottom-action-btn" data-translate="checkpnr">
+                        <i class="bi bi-clipboard-check-fill me-1"></i> <span>PNR STATUS</span>
+                    </a>
+                </div>
 
-            <div class="text-center grid-chart">
-                <a href="https://www.irctc.co.in/online-charts/" target="_blank" data-translate="chartvacancy">
-                    Chart Vacancy
-                </a>
+                <!-- Desktop MEMU button (hidden on mobile) -->
+                <div class="bottom-action-col grid-memu desktop-only-memu">
+                    <button type="button" class="bottom-action-btn memu-btn" onclick="openMemuModal()" data-translate="searchmemu">
+                        <i class="bi bi-train-front me-1"></i>
+                        <span>SEARCH MEMU/DEMU/MMTS TRAINS</span>
+                    </button>
+                </div>
+
+                <div class="bottom-action-col grid-chart">
+                    <a href="https://www.irctc.co.in/online-charts/" target="_blank" class="bottom-action-btn" data-translate="chartvacancy">
+                        <i class="bi bi-file-earmark-bar-graph-fill me-1"></i> <span>CHARTS / VACANCY</span>
+                    </a>
+                </div>
+
+                @if (User.Identity.IsAuthenticated)
+                {
+                    <div class="bottom-action-col grid-refund">
+                        <a asp-controller="Booking" asp-action="History" class="bottom-action-btn">
+                            <i class="bi bi-arrow-repeat me-1"></i>
+                            <span>Refund Status</span>
+                        </a>
+                    </div>
+
+                    <div class="bottom-action-col grid-favourite">
+                        <a asp-controller="Booking" asp-action="History" class="bottom-action-btn btn-two-line">
+                            <i class="bi bi-geo-alt-fill me-1"></i>
+                            <div class="btn-text-group">
+                                <span>Re-Book Favourite</span>
+                                <span>Journey</span>
+                            </div>
+                        </a>
+                    </div>
+                }            
             </div>
         </form>
     </div>
@@ -259,12 +385,104 @@
         <button id="close-warning" class="warning-close-btn">OK</button>
     </div>
 </div>
- *@
+*@
+
+<!-- ♿ Person With Disability Concession Confirmation Modal (Home Page) -->
+<div id="homePwdConcessionModal" class="concession-modal-overlay" style="display:none;" role="dialog" aria-modal="true">
+    <div class="concession-modal-card">
+        <div class="concession-modal-header">
+            <h5>Confirmation</h5>
+            <button type="button" class="concession-modal-close" onclick="closeHomePwdModal(false)" aria-label="Close">✖</button>
+        </div>
+        <div class="concession-modal-body">
+            <p>Specially abled availing the concession need to carry Photo Identity card issued by Railways which is to be produced for On board / off board verification during journey. Escort passengers also need to carry photo identity card mentioned at the time of booking.</p>
+        </div>
+        <div class="concession-modal-footer">
+            <button type="button" class="concession-btn-ok" onclick="closeHomePwdModal(true)">
+                <i class="bi bi-check-lg me-1"></i> OK
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- 🎫 Railway Pass Concession Confirmation Modal (Home Page) -->
+<div id="homeRailwayPassModal" class="concession-modal-overlay" style="display:none;" role="dialog" aria-modal="true">
+    <div class="concession-modal-card">
+        <div class="concession-modal-header">
+            <h5>Confirmation</h5>
+            <button type="button" class="concession-modal-close" onclick="closeHomeRailwayPassModal(false)" aria-label="Close">✖</button>
+        </div>
+        <div class="concession-modal-body">
+            <p>You are booking ticket in Railway Pass Concession. Do you want to continue?</p>
+        </div>
+        <div class="concession-modal-footer concession-modal-footer-two">
+            <button type="button" class="concession-btn-ok" onclick="closeHomeRailwayPassModal(true)">OK</button>
+            <button type="button" class="concession-btn-cancel" onclick="closeHomeRailwayPassModal(false)">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
 <script src="~/js/site.js" asp-append-version="true"></script>
 
 <script>
+    function openHomePwdModal() {
+        document.getElementById("homePwdConcessionModal").style.display = "flex";
+    }
+
+    function closeHomePwdModal(isConfirmed) {
+        document.getElementById("homePwdConcessionModal").style.display = "none";
+        const cb = document.getElementById("homeChkDisabilityConcession");
+        if (cb) {
+            cb.checked = isConfirmed;
+            if (isConfirmed) {
+                const quotaSelect = document.getElementById("quota");
+                if (quotaSelect) quotaSelect.value = "PwD";
+            }
+        }
+    }
+
+    function openHomeRailwayPassModal() {
+        document.getElementById("homeRailwayPassModal").style.display = "flex";
+    }
+
+    function closeHomeRailwayPassModal(isConfirmed) {
+        document.getElementById("homeRailwayPassModal").style.display = "none";
+        const cb = document.getElementById("homeChkRailwayPassConcession");
+        if (cb) {
+            cb.checked = isConfirmed;
+            if (isConfirmed) {
+                const quotaSelect = document.getElementById("quota");
+                if (quotaSelect) quotaSelect.value = "DP";
+            }
+        }
+    }
+
+    $(document).on("change", "#homeChkDisabilityConcession", function () {
+        if (this.checked) {
+            openHomePwdModal();
+        }
+    });
+
+    $(document).on("change", "#homeChkRailwayPassConcession", function () {
+        if (this.checked) {
+            openHomeRailwayPassModal();
+        }
+    });
+
+    $(document).on("click", "#homePwdConcessionModal", function (e) {
+        if ($(e.target).is("#homePwdConcessionModal")) {
+            closeHomePwdModal(false);
+        }
+    });
+
+    $(document).on("click", "#homeRailwayPassModal", function (e) {
+        if ($(e.target).is("#homeRailwayPassModal")) {
+            closeHomeRailwayPassModal(false);
+        }
+    });
+
     // 🌍 GLOBAL FLAGS (accessible everywhere)
     window.isLoggedIn =
         '@ViewBag.IsLoggedIn'.toLowerCase() === 'true';
@@ -616,24 +834,7 @@
         openSmartSearch();
     };
 
-        document.addEventListener("DOMContentLoaded", function () {
 
-        flatpickr("#journeyDate", {
-            dateFormat: "d/m/Y",        // UI format like IRCTC
-            defaultDate: "today",       // auto select today
-            minDate: "today",
-            maxDate: new Date().fp_incr(63), // 63 days limit
-
-            showMonths: 1,
-            disableMobile: true,        // force desktop style
-
-            onChange: function(selectedDates, dateStr, instance) {
-
-                updateQuotaOptions();
-            }
-        });
-
-    });
 
     // automatic tatkal selection in the dropdown
     document.getElementById("homeSearchForm").addEventListener("submit", function (e) {
@@ -682,7 +883,16 @@
             defaultDate: "today",
             minDate: "today",
             maxDate: new Date().fp_incr(63),   // ✅ FINAL FIX
-            disableMobile: true
+            disableMobile: true,
+            onChange: function(selectedDates, dateStr, instance) {
+                updateQuotaOptions();
+            },
+            onOpen: function() {
+                $(".mobile-date-wrapper").addClass("focus-active");
+            },
+            onClose: function() {
+                $(".mobile-date-wrapper").removeClass("focus-active");
+            }
         });
 
         const quotaDropdown = document.getElementById("quota");
@@ -765,9 +975,123 @@
         updateQuotaOptions();
     });
 
+    // Mobile Custom Dropdown logic (Classes & Quota)
+    // Mobile Custom Dropdown logic (Classes & Quota) & Input Focus
+    $(function () {
+        // Toggle Classes Panel
+        $("#mobileClassTrigger").on("click", function (e) {
+            e.stopPropagation();
+            $("#mobileQuotaPanel").removeClass("open");
+            $("#mobileQuotaTrigger").removeClass("focus-active has-dropdown-open");
+            
+            const isOpen = $("#mobileClassPanel").hasClass("open");
+            if (isOpen) {
+                $("#mobileClassPanel").removeClass("open");
+                $("#mobileClassTrigger").removeClass("focus-active has-dropdown-open");
+            } else {
+                $("#mobileClassPanel").addClass("open");
+                $("#mobileClassTrigger").addClass("focus-active has-dropdown-open");
+            }
+        });
+
+        // Toggle Quota Panel
+        $("#mobileQuotaTrigger").on("click", function (e) {
+            e.stopPropagation();
+            $("#mobileClassPanel").removeClass("open");
+            $("#mobileClassTrigger").removeClass("focus-active has-dropdown-open");
+            
+            const isOpen = $("#mobileQuotaPanel").hasClass("open");
+            if (isOpen) {
+                $("#mobileQuotaPanel").removeClass("open");
+                $("#mobileQuotaTrigger").removeClass("focus-active has-dropdown-open");
+            } else {
+                $("#mobileQuotaPanel").addClass("open");
+                $("#mobileQuotaTrigger").addClass("focus-active has-dropdown-open");
+            }
+        });
+
+        // Select Class Option
+        $("#mobileClassPanel .mobile-dropdown-item").on("click", function (e) {
+            e.stopPropagation();
+            const val = $(this).data("value");
+            const text = $(this).text().trim();
+            $("#mobileClassText").text(text);
+            $("#mobileClassPanel .mobile-dropdown-item").removeClass("active");
+            $(this).addClass("active");
+            $("#classFilterDropdown").val(val).trigger("change");
+            $("#mobileClassPanel").removeClass("open");
+            $("#mobileClassTrigger").removeClass("focus-active has-dropdown-open");
+        });
+
+        // Select Quota Option
+        $("#mobileQuotaPanel .mobile-dropdown-item").on("click", function (e) {
+            e.stopPropagation();
+            const val = $(this).data("value");
+            const text = $(this).text().trim();
+            $("#mobileQuotaText").text(text);
+            $("#mobileQuotaPanel .mobile-dropdown-item").removeClass("active");
+            $(this).addClass("active");
+            $("#quota").val(val).trigger("change");
+            $("#mobileQuotaPanel").removeClass("open");
+            $("#mobileQuotaTrigger").removeClass("focus-active has-dropdown-open");
+        });
+
+        // Close dropdowns on outside click
+        $(document).on("click", function () {
+            $("#mobileClassPanel, #mobileQuotaPanel").removeClass("open");
+            $("#mobileClassTrigger, #mobileQuotaTrigger").removeClass("focus-active has-dropdown-open");
+        });
+
+        // Station Inputs Focus Handling
+        $("#fromStation, #toStation").on("focus", function () {
+            $(this).closest(".station-input-wrapper").addClass("focus-active");
+        });
+
+        $("#fromStation, #toStation").on("blur", function () {
+            const $wrap = $(this).closest(".station-input-wrapper");
+            setTimeout(function () {
+                if (!$wrap.find(".autocomplete-list:visible").length) {
+                    $wrap.removeClass("focus-active has-dropdown-open");
+                }
+            }, 250);
+        });
+
+        // Two-way sync: when native select changes, update mobile custom dropdown display
+        $("#classFilterDropdown").on("change", function () {
+            const val = $(this).val();
+            const text = $(this).find("option:selected").text().trim();
+            if (text) $("#mobileClassText").text(text);
+            $("#mobileClassPanel .mobile-dropdown-item").removeClass("active");
+            $("#mobileClassPanel .mobile-dropdown-item[data-value='" + val + "']").addClass("active");
+        });
+
+        $("#quota").on("change", function () {
+            const val = $(this).val();
+            const text = $(this).find("option:selected").text().trim();
+            if (text) $("#mobileQuotaText").text(text);
+            $("#mobileQuotaPanel .mobile-dropdown-item").removeClass("active");
+            $("#mobileQuotaPanel .mobile-dropdown-item[data-value='" + val + "']").addClass("active");
+        });
+
+        // Initial sync on page load
+        const initClassText = $("#classFilterDropdown option:selected").text().trim();
+        if (initClassText) $("#mobileClassText").text(initClassText);
+
+        const initQuotaText = $("#quota option:selected").text().trim();
+        if (initQuotaText) $("#mobileQuotaText").text(initQuotaText);
+    });
+
 </script>
 
 <style>
+    @@media (max-width: 768px) {
+        .desktop-only-memu,
+        .home-bottom-links-row .bottom-action-col.desktop-only-memu,
+        .home-bottom-links-row .grid-memu {
+            display: none !important;
+        }
+    }
+
     .date-input {
         width: 100%;
         padding: 11.5px;

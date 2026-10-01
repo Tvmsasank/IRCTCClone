@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <circle cx="32" cy="32" r="30" fill="#f0fdf4" stroke="#16a34a" stroke-width="2"/>
+  
+  <!-- Andhra Paris & Canals badge -->
+  <!-- Water Canal -->
+  <path d="M 8 50 Q 20 46 32 50 Q 44 54 56 50 L 56 56 L 8 56 Z" fill="#38bdf8"/>
+  <rect x="8" y="47" width="48" height="3" fill="#65a30d"/>
+  
+  <!-- Tenali Heritage Clock Tower / Monument -->
+  <rect x="27" y="24" width="10" height="23" fill="#0284c7" rx="1"/>
+  <rect x="25" y="22" width="14" height="3" fill="#0369a1"/>
+  <polygon points="26,22 32,12 38,22" fill="#075985"/>
+  <line x1="32" y1="12" x2="32" y2="8" stroke="#facc15" stroke-width="1.5"/>
+  <circle cx="32" cy="7.5" r="1.2" fill="#facc15"/>
+  
+  <!-- Clock on tower -->
+  <circle cx="32" cy="30" r="2.5" fill="#ffffff"/>
+  <circle cx="32" cy="30" r="0.5" fill="#000000"/>
+  <line x1="32" y1="30" x2="32" y2="28.5" stroke="#000000" stroke-width="0.5"/>
+  <line x1="32" y1="30" x2="33.5" y2="30" stroke="#000000" stroke-width="0.5"/>
+</svg>

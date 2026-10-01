@@ -842,6 +842,177 @@ namespace IRCTCClone.Services
             }
         }
 
+        public async Task<bool> SendBoardingPointChangedEmailAsync(
+            string recipientEmail,
+            string pnr,
+            string trainNo,
+            string trainName,
+            string oldBoarding,
+            string newBoarding,
+            DateTime journeyDate,
+            TimeSpan departureTime)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(recipientEmail) || !recipientEmail.Contains("@"))
+                {
+                    recipientEmail = _config["EmailSettings:SenderEmail"];
+                }
+
+                string subject = $"IRCTC Clone: Boarding Point Changed Successfully - PNR {pnr}";
+                string depStr = departureTime.ToString(@"hh\:mm");
+                string jDateStr = journeyDate.ToString("dd-MMM-yyyy");
+
+                string htmlBody = $@"<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'/>
+    <style>
+        body {{ font-family: 'Segoe UI', Arial, sans-serif; background-color: #f1f5f9; margin: 0; padding: 20px; color: #1e293b; }}
+        .card {{ max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; }}
+        .header {{ background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: #ffffff; padding: 24px; text-align: center; }}
+        .header h2 {{ margin: 0 0 6px 0; font-size: 20px; }}
+        .content {{ padding: 24px; }}
+        .alert-box {{ background: #eff6ff; border-left: 4px solid #0284c7; padding: 12px 16px; border-radius: 6px; margin-bottom: 20px; font-size: 13.5px; color: #1e40af; }}
+        .details-table {{ width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 14px; }}
+        .details-table td {{ padding: 10px 12px; border-bottom: 1px solid #f1f5f9; }}
+        .details-table td:first-child {{ color: #64748b; font-weight: 500; width: 40%; }}
+        .details-table td:last-child {{ font-weight: 700; color: #0f172a; }}
+        .badge-old {{ color: #dc2626; text-decoration: line-through; }}
+        .badge-new {{ background: #dcfce7; color: #166534; padding: 3px 10px; border-radius: 12px; font-weight: 700; }}
+        .rules-box {{ background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 14px; font-size: 12.5px; color: #9a3412; margin-top: 16px; }}
+        .rules-box strong {{ display: block; margin-bottom: 6px; }}
+        .footer {{ background: #f8fafc; padding: 16px; text-align: center; font-size: 11.5px; color: #64748b; border-top: 1px solid #e2e8f0; }}
+    </style>
+</head>
+<body>
+    <div class='card'>
+        <div class='header'>
+            <h2>IRCTC Clone E-Ticketing Service</h2>
+            <div style='font-size: 14px; opacity: 0.9;'>Boarding Point Change Confirmation</div>
+        </div>
+        <div class='content'>
+            <div class='alert-box'>
+                ✅ Your request for boarding point modification has been processed successfully.
+            </div>
+            <table class='details-table'>
+                <tr><td>PNR Number</td><td><span style='color:#0284c7; font-size:16px;'>{pnr}</span></td></tr>
+                <tr><td>Train Details</td><td>{trainNo} - {trainName}</td></tr>
+                <tr><td>Journey Date</td><td>{jDateStr}</td></tr>
+                <tr><td>Previous Boarding Point</td><td><span class='badge-old'>{oldBoarding}</span></td></tr>
+                <tr><td>New Boarding Point</td><td><span class='badge-new'>{newBoarding}</span></td></tr>
+                <tr><td>Boarding Time</td><td>{depStr} hrs</td></tr>
+            </table>
+
+            <div class='rules-box'>
+                <strong>⚠️ IMPORTANT BOARDING NOTICE:</strong>
+                • As per IRCTC rules, boarding point can be changed <strong>only ONCE</strong>. No second change is permitted.<br/>
+                • You have forfeited the right to board from your previous boarding station ({oldBoarding}).<br/>
+                • You are authorized to board the train <strong>ONLY from {newBoarding}</strong>.
+            </div>
+        </div>
+        <div class='footer'>
+            Helpline: 139 | 24x7 Customer Support<br/>
+            This is an automated notification. Please do not reply.
+        </div>
+    </div>
+</body>
+</html>";
+
+                await SendEmail(recipientEmail, subject, htmlBody);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error sending boarding point email: {ex.Message}");
+                return false;
+            }
+        }
+
+        public async Task<bool> SendStatusUpgradeEmailAsync(
+            string recipientEmail,
+            string pnr,
+            string trainNo,
+            string trainName,
+            string passengerName,
+            string oldStatus,
+            string newStatus,
+            string coachBerth,
+            DateTime journeyDate)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(recipientEmail) || !recipientEmail.Contains("@"))
+                {
+                    recipientEmail = _config["EmailSettings:SenderEmail"];
+                }
+
+                string subject = $"IRCTC Clone: Status Upgrade Notification - PNR {pnr} ({oldStatus} → {newStatus})";
+                string jDateStr = journeyDate.ToString("dd-MMM-yyyy");
+
+                string htmlBody = $@"<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'/>
+    <style>
+        body {{ font-family: 'Segoe UI', Arial, sans-serif; background-color: #f1f5f9; margin: 0; padding: 20px; color: #1e293b; }}
+        .card {{ max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; }}
+        .header {{ background: linear-gradient(135deg, #15803d 0%, #166534 100%); color: #ffffff; padding: 24px; text-align: center; }}
+        .header h2 {{ margin: 0 0 6px 0; font-size: 20px; }}
+        .content {{ padding: 24px; }}
+        .upgrade-banner {{ background: #f0fdf4; border: 1.5px solid #86efac; padding: 14px 18px; border-radius: 8px; margin-bottom: 20px; text-align: center; }}
+        .upgrade-banner .arrow {{ font-size: 20px; color: #15803d; font-weight: bold; margin: 0 10px; }}
+        .status-badge {{ display: inline-block; padding: 4px 14px; border-radius: 20px; font-weight: 700; font-size: 14px; }}
+        .status-old {{ background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }}
+        .status-new {{ background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }}
+        .details-table {{ width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 14px; }}
+        .details-table td {{ padding: 10px 12px; border-bottom: 1px solid #f1f5f9; }}
+        .details-table td:first-child {{ color: #64748b; font-weight: 500; width: 40%; }}
+        .details-table td:last-child {{ font-weight: 700; color: #0f172a; }}
+        .footer {{ background: #f8fafc; padding: 16px; text-align: center; font-size: 11.5px; color: #64748b; border-top: 1px solid #e2e8f0; }}
+    </style>
+</head>
+<body>
+    <div class='card'>
+        <div class='header'>
+            <h2>IRCTC Clone E-Ticketing Service</h2>
+            <div style='font-size: 14px; opacity: 0.9;'>PNR Status Upgrade Notification</div>
+        </div>
+        <div class='content'>
+            <div class='upgrade-banner'>
+                <span style='font-size: 13px; color: #166534; display: block; margin-bottom: 8px;'>Good News! Your Ticket Status Has Been Upgraded:</span>
+                <span class='status-badge status-old'>{oldStatus}</span>
+                <span class='arrow'>→</span>
+                <span class='status-badge status-new'>{newStatus}</span>
+            </div>
+            <table class='details-table'>
+                <tr><td>PNR Number</td><td><span style='color:#0284c7; font-size:16px;'>{pnr}</span></td></tr>
+                <tr><td>Passenger Name</td><td>{passengerName}</td></tr>
+                <tr><td>Train Details</td><td>{trainNo} - {trainName}</td></tr>
+                <tr><td>Journey Date</td><td>{jDateStr}</td></tr>
+                <tr><td>Previous Status</td><td>{oldStatus}</td></tr>
+                <tr><td>New Status</td><td><strong style='color:#15803d;'>{newStatus}</strong></td></tr>
+                <tr><td>Berth / Coach</td><td><strong>{coachBerth}</strong></td></tr>
+            </table>
+        </div>
+        <div class='footer'>
+            Helpline: 139 | 24x7 Customer Support<br/>
+            This is an automated notification. Please do not reply.
+        </div>
+    </div>
+</body>
+</html>";
+
+                await SendEmail(recipientEmail, subject, htmlBody);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error sending status upgrade email: {ex.Message}");
+                return false;
+            }
+        }
+
     }
 
 }
